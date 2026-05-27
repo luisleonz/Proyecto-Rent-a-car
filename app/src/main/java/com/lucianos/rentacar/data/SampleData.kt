@@ -1,5 +1,39 @@
 package com.lucianos.rentacar.data
 
+// ─── Auth ────────────────────────────────────────────────────────────────────
+
+data class AppUser(
+    val email: String,
+    val name: String,
+    val firstName: String,
+    val role: String,
+    val branch: String,
+    val hasPassword: Boolean,
+    val initials: String
+)
+
+val sampleUsers = listOf(
+    AppUser("luciano@lucianos.com", "Luciano Ortega", "Luciano", "Administrador", "Polanco", true, "LO"),
+    AppUser("esteban@lucianos.com", "Esteban Ruiz", "Esteban", "Mostrador", "Polanco", false, "ER"),
+    AppUser("maria@lucianos.com", "María González", "María", "Mostrador", "Polanco", true, "MG"),
+)
+
+object AuthState {
+    var currentEmail: String = ""
+    var currentFirstName: String = ""
+    var currentInitials: String = ""
+    var currentRole: String = ""
+    var currentBranch: String = ""
+
+    fun setUser(user: AppUser) {
+        currentEmail = user.email
+        currentFirstName = user.firstName
+        currentInitials = user.initials
+        currentRole = user.role
+        currentBranch = user.branch
+    }
+}
+
 data class Reservation(
     val id: String,
     val time: String,

@@ -1,5 +1,6 @@
 package com.lucianos.rentacar.navigation
 
+import android.net.Uri
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -30,6 +31,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.lucianos.rentacar.ui.screens.auth.EnterPasswordScreen
+import com.lucianos.rentacar.ui.screens.auth.LoginScreen
 import com.lucianos.rentacar.ui.screens.home.HomeScreen
 import com.lucianos.rentacar.ui.screens.more.MoreScreen
 import com.lucianos.rentacar.ui.screens.onboarding.OnboardingDoneScreen
@@ -45,6 +48,10 @@ import com.lucianos.rentacar.ui.theme.LucianosPrimary
 import com.lucianos.rentacar.ui.theme.LucianosPrimarySoft
 
 sealed class Screen(val route: String) {
+    object Login : Screen("login")
+    object EnterPassword : Screen("enter_password/{email}") {
+        fun withEmail(email: String) = "enter_password/${Uri.encode(email)}"
+    }
     object Onboarding : Screen("onboarding")
     object OnboardingPassword : Screen("onboarding_password")
     object OnboardingPermissions : Screen("onboarding_permissions")
@@ -96,9 +103,37 @@ fun MainApp() {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Onboarding.route,
+            startDestination = Screen.Login.route,
             modifier = Modifier.padding(innerPadding)
         ) {
+            // ── Auth ──────────────────────────────────────────────────────────
+            composable(Screen.Login.route) {
+                LoginScreen(
+                    onUserWithPassword = { email ->
+                        navController.navigate(Screen.EnterPassword.withEmail(email))
+                    },
+                    onNewUser = {
+                        navController.navigate(Screen.Onboarding.route)
+                    }
+                )
+            }
+            composable(
+                route = Screen.EnterPassword.route,
+                arguments = listOf(navArgument("email") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val email = Uri.decode(backStackEntry.arguments?.getString("email") ?: "")
+                EnterPasswordScreen(
+                    email = email,
+                    onSuccess = {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(Screen.Login.route) { inclusive = true }
+                        }
+                    },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            // ── Onboarding (primer ingreso) ───────────────────────────────────
             composable(Screen.Onboarding.route) {
                 OnboardingWelcomeScreen(
                     onContinue = { navController.navigate(Screen.OnboardingPassword.route) }
@@ -127,11 +162,13 @@ fun MainApp() {
                 OnboardingDoneScreen(
                     onEnterPanel = {
                         navController.navigate(Screen.Home.route) {
-                            popUpTo(Screen.Onboarding.route) { inclusive = true }
+                            popUpTo(Screen.Login.route) { inclusive = true }
                         }
                     }
                 )
             }
+
+            // ── Main app ──────────────────────────────────────────────────────
             composable(Screen.Home.route) {
                 HomeScreen(navController = navController)
             }

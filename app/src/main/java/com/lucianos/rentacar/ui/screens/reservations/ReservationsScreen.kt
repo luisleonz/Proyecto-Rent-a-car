@@ -1,6 +1,7 @@
 package com.lucianos.rentacar.ui.screens.reservations
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,9 +43,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.lucianos.rentacar.data.EntregaState
+import com.lucianos.rentacar.data.DevolucionState
 import com.lucianos.rentacar.data.Reservation
 import com.lucianos.rentacar.data.todayReservations
 import com.lucianos.rentacar.data.tomorrowReservations
+import com.lucianos.rentacar.navigation.Screen
 import com.lucianos.rentacar.ui.components.AvatarCircle
 import com.lucianos.rentacar.ui.components.StatusChip
 import com.lucianos.rentacar.ui.theme.LucianosBackground
@@ -102,7 +106,8 @@ fun ReservationsScreen(navController: NavController) {
                 // Today section
                 DaySection(
                     header = "Hoy · martes 21 mayo",
-                    reservations = todayReservations
+                    reservations = todayReservations,
+                    navController = navController
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -110,7 +115,8 @@ fun ReservationsScreen(navController: NavController) {
                 // Tomorrow section
                 DaySection(
                     header = "Mañana · miércoles 22",
-                    reservations = tomorrowReservations
+                    reservations = tomorrowReservations,
+                    navController = navController
                 )
 
                 Spacer(modifier = Modifier.height(80.dp))
@@ -187,7 +193,7 @@ private fun DayFilterChip(label: String, isSelected: Boolean, onClick: () -> Uni
 }
 
 @Composable
-private fun DaySection(header: String, reservations: List<Reservation>) {
+private fun DaySection(header: String, reservations: List<Reservation>, navController: NavController) {
     Text(
         text = header,
         fontSize = 13.sp,
@@ -208,7 +214,15 @@ private fun DaySection(header: String, reservations: List<Reservation>) {
     ) {
         Column {
             reservations.forEachIndexed { index, reservation ->
-                ReservationCard(reservation = reservation)
+                ReservationCard(reservation = reservation, onClick = {
+                    if (reservation.type.lowercase() == "entrega") {
+                        EntregaState.reset(reservation.id)
+                        navController.navigate(Screen.EntregaStep1.withId(reservation.id))
+                    } else {
+                        DevolucionState.reset(reservation.id)
+                        navController.navigate(Screen.DevolucionStep1.withId(reservation.id))
+                    }
+                })
                 if (index < reservations.size - 1) {
                     Divider(
                         color = LucianosHairline,
@@ -222,12 +236,13 @@ private fun DaySection(header: String, reservations: List<Reservation>) {
 }
 
 @Composable
-private fun ReservationCard(reservation: Reservation) {
+private fun ReservationCard(reservation: Reservation, onClick: () -> Unit = {}) {
     val isUrgent = reservation.status == "urgent"
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

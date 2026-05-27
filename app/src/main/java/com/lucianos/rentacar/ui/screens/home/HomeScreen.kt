@@ -35,6 +35,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.lucianos.rentacar.data.DevolucionState
+import com.lucianos.rentacar.data.EntregaState
 import com.lucianos.rentacar.data.sampleKpi
 import com.lucianos.rentacar.data.todayReservations
 import com.lucianos.rentacar.navigation.Screen
@@ -289,7 +291,16 @@ private fun AgendaSection(navController: NavController) {
                     vehicle = reservation.vehicle,
                     type = reservation.type,
                     initials = reservation.clientInitials,
-                    isUrgent = reservation.status == "urgent"
+                    isUrgent = reservation.status == "urgent",
+                    onClick = {
+                        if (reservation.type.lowercase() == "entrega") {
+                            EntregaState.reset(reservation.id)
+                            navController.navigate(Screen.EntregaStep1.withId(reservation.id))
+                        } else {
+                            DevolucionState.reset(reservation.id)
+                            navController.navigate(Screen.DevolucionStep1.withId(reservation.id))
+                        }
+                    }
                 )
                 if (index < todayReservations.size - 1) {
                     Divider(color = LucianosHairline, thickness = 1.dp)

@@ -25,7 +25,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Star
@@ -61,6 +60,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lucianos.rentacar.data.AuthState
 import com.lucianos.rentacar.ui.components.AvatarCircle
 import com.lucianos.rentacar.ui.components.SectionEyebrow
 import com.lucianos.rentacar.ui.theme.LucianosDanger
@@ -69,7 +69,6 @@ import com.lucianos.rentacar.ui.theme.LucianosHairline
 import com.lucianos.rentacar.ui.theme.LucianosInk
 import com.lucianos.rentacar.ui.theme.LucianosInk2
 import com.lucianos.rentacar.ui.theme.LucianosInk3
-import com.lucianos.rentacar.ui.theme.LucianosInk4
 import com.lucianos.rentacar.ui.theme.LucianosPrimary
 import com.lucianos.rentacar.ui.theme.LucianosPrimaryDeep
 import com.lucianos.rentacar.ui.theme.LucianosPrimarySoft
@@ -124,7 +123,7 @@ fun OnboardingWelcomeScreen(onContinue: () -> Unit) {
                 Spacer(modifier = Modifier.height(40.dp))
 
                 Text(
-                    text = "Hola Esteban,\nvamos a configurar\ntu acceso.",
+                    text = "Hola ${AuthState.currentFirstName},\nvamos a configurar\ntu acceso.",
                     style = SerifHero,
                     color = Color.White,
                     lineHeight = 52.sp
@@ -529,7 +528,7 @@ fun OnboardingPermissionsScreen(onContinue: () -> Unit, onBack: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "Como empleado de mostrador, estos son tus accesos.",
+                text = "Como ${AuthState.currentRole.lowercase()}, estos son tus accesos.",
                 fontSize = 14.sp,
                 color = LucianosInk2,
                 fontFamily = FontFamily.SansSerif
@@ -900,7 +899,7 @@ fun OnboardingDoneScreen(onEnterPanel: () -> Unit) {
                 Spacer(modifier = Modifier.height(28.dp))
 
                 Text(
-                    text = "Bienvenido al\nequipo, Esteban.",
+                    text = "Bienvenido al\nequipo, ${AuthState.currentFirstName}.",
                     style = SerifHero.copy(fontSize = 36.sp),
                     color = Color.White,
                     textAlign = TextAlign.Center,
@@ -926,12 +925,12 @@ fun OnboardingDoneScreen(onEnterPanel: () -> Unit) {
                     color = Color.White.copy(alpha = 0.15f)
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
-                        SummaryRow("Rol", "Empleado de mostrador")
+                        SummaryRow("Rol", AuthState.currentRole)
                         Divider(
                             color = Color.White.copy(alpha = 0.2f),
                             modifier = Modifier.padding(vertical = 10.dp)
                         )
-                        SummaryRow("Sucursal", "Polanco")
+                        SummaryRow("Sucursal", AuthState.currentBranch)
                         Divider(
                             color = Color.White.copy(alpha = 0.2f),
                             modifier = Modifier.padding(vertical = 10.dp)

@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.lucianos.rentacar.data.AuthState
 import com.lucianos.rentacar.data.DevolucionState
 import com.lucianos.rentacar.data.EntregaState
 import com.lucianos.rentacar.data.sampleKpi
@@ -114,13 +115,13 @@ private fun HomeAppBar() {
                     color = LucianosInk
                 )
                 Text(
-                    text = "Luciano",
+                    text = AuthState.currentFirstName.ifEmpty { "equipo" },
                     style = SerifItalicGreeting,
                     color = LucianosPrimary
                 )
             }
             Text(
-                text = "Martes 21 de mayo · 12 movimientos hoy",
+                text = "${AuthState.currentBranch.ifEmpty { "Sucursal" }} · 12 movimientos hoy",
                 fontSize = 12.sp,
                 color = LucianosInk3,
                 fontFamily = FontFamily.SansSerif
@@ -148,7 +149,10 @@ private fun HomeAppBar() {
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        AvatarCircle(initials = "LA", size = 36.dp)
+        AvatarCircle(
+            initials = AuthState.currentInitials.ifEmpty { "??" },
+            size = 36.dp
+        )
     }
 }
 

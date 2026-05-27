@@ -39,6 +39,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.lucianos.rentacar.data.AuthState
+import com.lucianos.rentacar.navigation.Screen
 import com.lucianos.rentacar.ui.components.AvatarCircle
 import com.lucianos.rentacar.ui.theme.LucianosBackground
 import com.lucianos.rentacar.ui.theme.LucianosHairline
@@ -55,18 +57,23 @@ data class MoreMenuItem(
     val label: String,
     val sublabel: String? = null,
     val isDanger: Boolean = false,
-    val iconTint: Color = LucianosInk2
+    val iconTint: Color = LucianosInk2,
+    val route: String? = null
 )
 
 @Composable
 fun MoreScreen(navController: NavController) {
     val menuItems = listOf(
-        MoreMenuItem(Icons.Filled.Payments, "Caja / Turno", "Cierre del día", iconTint = LucianosPrimary),
-        MoreMenuItem(Icons.Filled.Group, "Equipo", "4 empleados activos", iconTint = Color(0xFF4444AA)),
-        MoreMenuItem(Icons.Filled.BarChart, "Reportes", "Semana actual", iconTint = Color(0xFF888800)),
+        MoreMenuItem(Icons.Filled.Payments, "Caja / Turno", "Cierre del día",
+            iconTint = LucianosPrimary, route = Screen.CajaTurno.route),
+        MoreMenuItem(Icons.Filled.Group, "Equipo", "4 empleados activos",
+            iconTint = Color(0xFF4444AA)),
+        MoreMenuItem(Icons.Filled.BarChart, "Reportes", "Semana actual",
+            iconTint = Color(0xFF888800)),
         MoreMenuItem(Icons.Filled.Settings, "Configuración", iconTint = LucianosInk2),
         MoreMenuItem(Icons.Filled.Headset, "Soporte", iconTint = LucianosInk2),
-        MoreMenuItem(Icons.Filled.Logout, "Cerrar sesión", isDanger = true, iconTint = LucianosDanger),
+        MoreMenuItem(Icons.Filled.Logout, "Cerrar sesión", isDanger = true,
+            iconTint = LucianosDanger),
     )
 
     Column(
@@ -115,7 +122,9 @@ fun MoreScreen(navController: NavController) {
             ) {
                 Column {
                     menuItems.dropLast(1).forEachIndexed { index, item ->
-                        MenuRow(item = item)
+                        MenuRow(item = item, onClick = {
+                            item.route?.let { navController.navigate(it) }
+                        })
                         if (index < menuItems.size - 2) {
                             Divider(
                                 color = LucianosHairline,
@@ -137,7 +146,16 @@ fun MoreScreen(navController: NavController) {
                 shadowElevation = 0.dp,
                 border = androidx.compose.foundation.BorderStroke(1.dp, LucianosDanger.copy(alpha = 0.2f))
             ) {
-                MenuRow(item = menuItems.last())
+                MenuRow(item = menuItems.last(), onClick = {
+                    AuthState.currentEmail = ""
+                    AuthState.currentFirstName = ""
+                    AuthState.currentInitials = ""
+                    AuthState.currentRole = ""
+                    AuthState.currentBranch = ""
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                })
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -170,21 +188,21 @@ private fun ProfileHeader() {
             verticalAlignment = Alignment.CenterVertically
         ) {
             AvatarCircle(
-                initials = "LA",
+                initials = AuthState.currentInitials.ifEmpty { "??" },
                 accent = LucianosPrimary,
                 size = 52.dp
             )
             Spacer(modifier = Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Luciano",
+                    text = AuthState.currentFirstName.ifEmpty { "Empleado" },
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Serif,
                     color = LucianosInk
                 )
                 Text(
-                    text = "Administrador · Polanco",
+                    text = "${AuthState.currentRole.ifEmpty { "Mostrador" }} · ${AuthState.currentBranch.ifEmpty { "Sucursal" }}",
                     fontSize = 13.sp,
                     color = LucianosInk3,
                     fontFamily = FontFamily.SansSerif
@@ -197,7 +215,7 @@ private fun ProfileHeader() {
                         .padding(horizontal = 8.dp, vertical = 3.dp)
                 ) {
                     Text(
-                        text = "Admin",
+                        text = if (AuthState.currentRole == "Administrador") "Admin" else "Mostrador",
                         fontSize = 11.sp,
                         color = LucianosPrimary,
                         fontWeight = FontWeight.SemiBold,
@@ -210,11 +228,11 @@ private fun ProfileHeader() {
 }
 
 @Composable
-private fun MenuRow(item: MoreMenuItem) {
+private fun MenuRow(item: MoreMenuItem, onClick: () -> Unit = {}) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { /* navigate */ }
+            .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

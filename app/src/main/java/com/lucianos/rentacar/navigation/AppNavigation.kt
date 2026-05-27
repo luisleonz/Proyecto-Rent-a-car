@@ -33,6 +33,10 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.lucianos.rentacar.ui.screens.auth.EnterPasswordScreen
 import com.lucianos.rentacar.ui.screens.auth.LoginScreen
+import com.lucianos.rentacar.ui.screens.caja.CajaCierreScreen
+import com.lucianos.rentacar.ui.screens.caja.CajaJustificacionScreen
+import com.lucianos.rentacar.ui.screens.caja.CajaOkScreen
+import com.lucianos.rentacar.ui.screens.caja.CajaTurnoScreen
 import com.lucianos.rentacar.ui.screens.flows.DevolucionOkScreen
 import com.lucianos.rentacar.ui.screens.flows.DevolucionStep1Screen
 import com.lucianos.rentacar.ui.screens.flows.DevolucionStep2Screen
@@ -72,6 +76,11 @@ sealed class Screen(val route: String) {
         fun withPlate(plate: String) = "vehicle_detail/$plate"
     }
     object More : Screen("more")
+    // Caja / Turno
+    object CajaTurno : Screen("caja_turno")
+    object CajaCierre : Screen("caja_cierre")
+    object CajaJustificacion : Screen("caja_justificacion")
+    object CajaOk : Screen("caja_ok")
     // Entrega flow
     object EntregaStep1 : Screen("entrega_step1/{resId}") {
         fun withId(id: String) = "entrega_step1/$id"
@@ -222,6 +231,12 @@ fun MainApp() {
             composable(Screen.More.route) {
                 MoreScreen(navController = navController)
             }
+
+            // ── Caja / Turno ──────────────────────────────────────────────────
+            composable(Screen.CajaTurno.route) { CajaTurnoScreen(navController) }
+            composable(Screen.CajaCierre.route) { CajaCierreScreen(navController) }
+            composable(Screen.CajaJustificacion.route) { CajaJustificacionScreen(navController) }
+            composable(Screen.CajaOk.route) { CajaOkScreen(navController) }
 
             // ── Entrega flow ──────────────────────────────────────────────────
             composable(

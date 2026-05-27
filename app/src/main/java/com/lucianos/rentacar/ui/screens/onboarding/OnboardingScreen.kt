@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Star
@@ -68,6 +69,7 @@ import com.lucianos.rentacar.ui.theme.LucianosHairline
 import com.lucianos.rentacar.ui.theme.LucianosInk
 import com.lucianos.rentacar.ui.theme.LucianosInk2
 import com.lucianos.rentacar.ui.theme.LucianosInk3
+import com.lucianos.rentacar.ui.theme.LucianosInk4
 import com.lucianos.rentacar.ui.theme.LucianosPrimary
 import com.lucianos.rentacar.ui.theme.LucianosPrimaryDeep
 import com.lucianos.rentacar.ui.theme.LucianosPrimarySoft

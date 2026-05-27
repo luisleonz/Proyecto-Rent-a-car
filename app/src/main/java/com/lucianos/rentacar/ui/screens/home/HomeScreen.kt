@@ -103,7 +103,7 @@ private fun HomeAppBar() {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.Baseline) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "Buenos días, ",
                     fontSize = 18.sp,

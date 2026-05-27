@@ -65,6 +65,21 @@ fun ReservationsScreen(navController: NavController) {
     val dayFilters = listOf("Hoy", "Mañana", "Mié", "Jue", "Vie", "Sáb")
     var selectedDay by remember { mutableStateOf("Hoy") }
 
+    val reservationsForDay: List<Reservation> = when (selectedDay) {
+        "Hoy"    -> todayReservations
+        "Mañana" -> tomorrowReservations
+        else     -> emptyList()
+    }
+    val headerForDay = when (selectedDay) {
+        "Hoy"    -> "Hoy · martes 21 mayo"
+        "Mañana" -> "Mañana · miércoles 22"
+        "Mié"    -> "Miércoles 22 mayo"
+        "Jue"    -> "Jueves 23 mayo"
+        "Vie"    -> "Viernes 24 mayo"
+        "Sáb"    -> "Sábado 25 mayo"
+        else     -> selectedDay
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -103,21 +118,15 @@ fun ReservationsScreen(navController: NavController) {
             ) {
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Today section
-                DaySection(
-                    header = "Hoy · martes 21 mayo",
-                    reservations = todayReservations,
-                    navController = navController
-                )
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // Tomorrow section
-                DaySection(
-                    header = "Mañana · miércoles 22",
-                    reservations = tomorrowReservations,
-                    navController = navController
-                )
+                if (reservationsForDay.isEmpty()) {
+                    EmptyDayState(day = selectedDay)
+                } else {
+                    DaySection(
+                        header = headerForDay,
+                        reservations = reservationsForDay,
+                        navController = navController
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(80.dp))
             }
@@ -291,5 +300,33 @@ private fun ReservationCard(reservation: Reservation, onClick: () -> Unit = {}) 
 
         // Type chip
         StatusChip(status = reservation.type.lowercase())
+    }
+}
+
+@Composable
+private fun EmptyDayState(day: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 48.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text("📅", fontSize = 40.sp)
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "Sin reservas para $day",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = LucianosInk,
+            fontFamily = FontFamily.SansSerif
+        )
+        Text(
+            text = "No hay entregas ni devoluciones\nprogramadas para este día.",
+            fontSize = 13.sp,
+            color = LucianosInk3,
+            fontFamily = FontFamily.SansSerif,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
     }
 }

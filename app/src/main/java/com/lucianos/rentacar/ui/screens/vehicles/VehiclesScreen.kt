@@ -2,6 +2,7 @@ package com.lucianos.rentacar.ui.screens.vehicles
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,14 +59,15 @@ import com.lucianos.rentacar.ui.theme.LucianosWarn
 
 @Composable
 fun VehiclesScreen(navController: NavController) {
-    val filters = listOf("Todos", "Disponibles", "Rentados", "Taller")
+    val filters = listOf("Todos", "Disponibles", "Rentados", "Reservados", "Taller")
     var selectedFilter by remember { mutableStateOf("Todos") }
 
     val filtered = when (selectedFilter) {
-        "Disponibles" -> sampleFleet.filter { it.status == "disponible" }
-        "Rentados" -> sampleFleet.filter { it.status == "rentado" }
-        "Taller" -> sampleFleet.filter { it.status == "taller" }
-        else -> sampleFleet
+        "Disponibles"  -> sampleFleet.filter { it.status == "disponible" }
+        "Rentados"     -> sampleFleet.filter { it.status == "rentado" }
+        "Reservados"   -> sampleFleet.filter { it.status == "reservado" }
+        "Taller"       -> sampleFleet.filter { it.status == "taller" }
+        else           -> sampleFleet
     }
 
     Box(
@@ -101,28 +103,52 @@ fun VehiclesScreen(navController: NavController) {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Vehicle list
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color.White,
-                    shadowElevation = 0.dp,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, LucianosHairline)
-                ) {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        filtered.forEachIndexed { index, vehicle ->
-                            VehicleListItem(
-                                plate = vehicle.plate,
-                                model = vehicle.model,
-                                color = vehicle.color,
-                                km = vehicle.km,
-                                status = vehicle.status,
-                                clientInfo = buildClientInfo(vehicle),
-                                modifier = Modifier.clickable {
-                                    navController.navigate(Screen.VehicleDetail.withPlate(vehicle.plate))
+                if (filtered.isEmpty()) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("🚗", fontSize = 36.sp)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Sin vehículos en esta categoría",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = LucianosInk,
+                            fontFamily = FontFamily.SansSerif
+                        )
+                        Text(
+                            text = "Prueba con otro filtro.",
+                            fontSize = 13.sp,
+                            color = LucianosInk3,
+                            fontFamily = FontFamily.SansSerif
+                        )
+                    }
+                } else {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.White,
+                        shadowElevation = 0.dp,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, LucianosHairline)
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            filtered.forEachIndexed { index, vehicle ->
+                                VehicleListItem(
+                                    plate = vehicle.plate,
+                                    model = vehicle.model,
+                                    color = vehicle.color,
+                                    km = vehicle.km,
+                                    status = vehicle.status,
+                                    clientInfo = buildClientInfo(vehicle),
+                                    modifier = Modifier.clickable {
+                                        navController.navigate(Screen.VehicleDetail.withPlate(vehicle.plate))
+                                    }
+                                )
+                                if (index < filtered.size - 1) {
+                                    Divider(color = LucianosHairline, thickness = 1.dp)
                                 }
-                            )
-                            if (index < filtered.size - 1) {
-                                Divider(color = LucianosHairline, thickness = 1.dp)
                             }
                         }
                     }
@@ -315,33 +341,29 @@ private fun SegmentedFilter(
     selected: String,
     onSelect: (String) -> Unit
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = Color(0xFFF0F0F0)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            options.forEach { option ->
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (selected == option) Color.White else Color.Transparent)
-                        .clickable { onSelect(option) }
-                        .padding(vertical = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = option,
-                        fontSize = 12.sp,
-                        fontWeight = if (selected == option) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (selected == option) LucianosPrimary else LucianosInk3,
-                        fontFamily = FontFamily.SansSerif
-                    )
-                }
+        options.forEach { option ->
+            val isSelected = selected == option
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(if (isSelected) LucianosPrimary else Color(0xFFF0F0F0))
+                    .clickable { onSelect(option) }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = option,
+                    fontSize = 13.sp,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (isSelected) Color.White else LucianosInk3,
+                    fontFamily = FontFamily.SansSerif
+                )
             }
         }
     }

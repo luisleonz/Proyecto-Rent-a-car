@@ -33,6 +33,18 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.lucianos.rentacar.ui.screens.auth.EnterPasswordScreen
 import com.lucianos.rentacar.ui.screens.auth.LoginScreen
+import com.lucianos.rentacar.ui.screens.caja.CajaCierreScreen
+import com.lucianos.rentacar.ui.screens.caja.CajaJustificacionScreen
+import com.lucianos.rentacar.ui.screens.caja.CajaOkScreen
+import com.lucianos.rentacar.ui.screens.caja.CajaTurnoScreen
+import com.lucianos.rentacar.ui.screens.flows.DevolucionOkScreen
+import com.lucianos.rentacar.ui.screens.flows.DevolucionStep1Screen
+import com.lucianos.rentacar.ui.screens.flows.DevolucionStep2Screen
+import com.lucianos.rentacar.ui.screens.flows.DevolucionStep3Screen
+import com.lucianos.rentacar.ui.screens.flows.EntregaOkScreen
+import com.lucianos.rentacar.ui.screens.flows.EntregaStep1Screen
+import com.lucianos.rentacar.ui.screens.flows.EntregaStep2Screen
+import com.lucianos.rentacar.ui.screens.flows.EntregaStep3Screen
 import com.lucianos.rentacar.ui.screens.home.HomeScreen
 import com.lucianos.rentacar.ui.screens.more.MoreScreen
 import com.lucianos.rentacar.ui.screens.onboarding.OnboardingDoneScreen
@@ -64,6 +76,37 @@ sealed class Screen(val route: String) {
         fun withPlate(plate: String) = "vehicle_detail/$plate"
     }
     object More : Screen("more")
+    // Caja / Turno
+    object CajaTurno : Screen("caja_turno")
+    object CajaCierre : Screen("caja_cierre")
+    object CajaJustificacion : Screen("caja_justificacion")
+    object CajaOk : Screen("caja_ok")
+    // Entrega flow
+    object EntregaStep1 : Screen("entrega_step1/{resId}") {
+        fun withId(id: String) = "entrega_step1/$id"
+    }
+    object EntregaStep2 : Screen("entrega_step2/{resId}") {
+        fun withId(id: String) = "entrega_step2/$id"
+    }
+    object EntregaStep3 : Screen("entrega_step3/{resId}") {
+        fun withId(id: String) = "entrega_step3/$id"
+    }
+    object EntregaOk : Screen("entrega_ok/{resId}") {
+        fun withId(id: String) = "entrega_ok/$id"
+    }
+    // Devolución flow
+    object DevolucionStep1 : Screen("devolucion_step1/{resId}") {
+        fun withId(id: String) = "devolucion_step1/$id"
+    }
+    object DevolucionStep2 : Screen("devolucion_step2/{resId}") {
+        fun withId(id: String) = "devolucion_step2/$id"
+    }
+    object DevolucionStep3 : Screen("devolucion_step3/{resId}") {
+        fun withId(id: String) = "devolucion_step3/$id"
+    }
+    object DevolucionOk : Screen("devolucion_ok/{resId}") {
+        fun withId(id: String) = "devolucion_ok/$id"
+    }
 }
 
 data class BottomNavItem(
@@ -188,6 +231,54 @@ fun MainApp() {
             composable(Screen.More.route) {
                 MoreScreen(navController = navController)
             }
+
+            // ── Caja / Turno ──────────────────────────────────────────────────
+            composable(Screen.CajaTurno.route) { CajaTurnoScreen(navController) }
+            composable(Screen.CajaCierre.route) { CajaCierreScreen(navController) }
+            composable(Screen.CajaJustificacion.route) { CajaJustificacionScreen(navController) }
+            composable(Screen.CajaOk.route) { CajaOkScreen(navController) }
+
+            // ── Entrega flow ──────────────────────────────────────────────────
+            composable(
+                route = Screen.EntregaStep1.route,
+                arguments = listOf(navArgument("resId") { type = NavType.StringType })
+            ) { EntregaStep1Screen(it.arguments?.getString("resId") ?: "", navController) }
+
+            composable(
+                route = Screen.EntregaStep2.route,
+                arguments = listOf(navArgument("resId") { type = NavType.StringType })
+            ) { EntregaStep2Screen(it.arguments?.getString("resId") ?: "", navController) }
+
+            composable(
+                route = Screen.EntregaStep3.route,
+                arguments = listOf(navArgument("resId") { type = NavType.StringType })
+            ) { EntregaStep3Screen(it.arguments?.getString("resId") ?: "", navController) }
+
+            composable(
+                route = Screen.EntregaOk.route,
+                arguments = listOf(navArgument("resId") { type = NavType.StringType })
+            ) { EntregaOkScreen(it.arguments?.getString("resId") ?: "", navController) }
+
+            // ── Devolución flow ───────────────────────────────────────────────
+            composable(
+                route = Screen.DevolucionStep1.route,
+                arguments = listOf(navArgument("resId") { type = NavType.StringType })
+            ) { DevolucionStep1Screen(it.arguments?.getString("resId") ?: "", navController) }
+
+            composable(
+                route = Screen.DevolucionStep2.route,
+                arguments = listOf(navArgument("resId") { type = NavType.StringType })
+            ) { DevolucionStep2Screen(it.arguments?.getString("resId") ?: "", navController) }
+
+            composable(
+                route = Screen.DevolucionStep3.route,
+                arguments = listOf(navArgument("resId") { type = NavType.StringType })
+            ) { DevolucionStep3Screen(it.arguments?.getString("resId") ?: "", navController) }
+
+            composable(
+                route = Screen.DevolucionOk.route,
+                arguments = listOf(navArgument("resId") { type = NavType.StringType })
+            ) { DevolucionOkScreen(it.arguments?.getString("resId") ?: "", navController) }
         }
     }
 }

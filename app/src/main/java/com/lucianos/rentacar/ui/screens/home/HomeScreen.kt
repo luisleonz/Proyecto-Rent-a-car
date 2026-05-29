@@ -35,6 +35,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.lucianos.rentacar.data.AuthState
+import com.lucianos.rentacar.data.DevolucionState
+import com.lucianos.rentacar.data.EntregaState
 import com.lucianos.rentacar.data.sampleKpi
 import com.lucianos.rentacar.data.todayReservations
 import com.lucianos.rentacar.navigation.Screen
@@ -103,7 +106,7 @@ private fun HomeAppBar() {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.Baseline) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "Buenos días, ",
                     fontSize = 18.sp,
@@ -112,13 +115,13 @@ private fun HomeAppBar() {
                     color = LucianosInk
                 )
                 Text(
-                    text = "Luciano",
+                    text = AuthState.currentFirstName.ifEmpty { "equipo" },
                     style = SerifItalicGreeting,
                     color = LucianosPrimary
                 )
             }
             Text(
-                text = "Martes 21 de mayo · 12 movimientos hoy",
+                text = "${AuthState.currentBranch.ifEmpty { "Sucursal" }} · 12 movimientos hoy",
                 fontSize = 12.sp,
                 color = LucianosInk3,
                 fontFamily = FontFamily.SansSerif
@@ -146,7 +149,10 @@ private fun HomeAppBar() {
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        AvatarCircle(initials = "LA", size = 36.dp)
+        AvatarCircle(
+            initials = AuthState.currentInitials.ifEmpty { "??" },
+            size = 36.dp
+        )
     }
 }
 
@@ -289,7 +295,16 @@ private fun AgendaSection(navController: NavController) {
                     vehicle = reservation.vehicle,
                     type = reservation.type,
                     initials = reservation.clientInitials,
-                    isUrgent = reservation.status == "urgent"
+                    isUrgent = reservation.status == "urgent",
+                    onClick = {
+                        if (reservation.type.lowercase() == "entrega") {
+                            EntregaState.reset(reservation.id)
+                            navController.navigate(Screen.EntregaStep1.withId(reservation.id))
+                        } else {
+                            DevolucionState.reset(reservation.id)
+                            navController.navigate(Screen.DevolucionStep1.withId(reservation.id))
+                        }
+                    }
                 )
                 if (index < todayReservations.size - 1) {
                     Divider(color = LucianosHairline, thickness = 1.dp)

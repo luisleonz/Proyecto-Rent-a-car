@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -69,6 +70,7 @@ import com.lucianos.rentacar.ui.theme.LucianosHairline
 import com.lucianos.rentacar.ui.theme.LucianosInk
 import com.lucianos.rentacar.ui.theme.LucianosInk2
 import com.lucianos.rentacar.ui.theme.LucianosInk3
+import com.lucianos.rentacar.ui.theme.LucianosInk4
 import com.lucianos.rentacar.ui.theme.LucianosPrimary
 import com.lucianos.rentacar.ui.theme.LucianosPrimaryDeep
 import com.lucianos.rentacar.ui.theme.LucianosPrimarySoft

@@ -1,0 +1,34 @@
+# Built application files
+*.apk
+*.aar
+*.ap_
+*.aab
+
+# Build directories
+/build/
+app/build/
+
+# Files for the ART/Dalvik VM
+*.dex
+
+# Java class files
+*.class
+
+# Gradle files
+.gradle/
+local.properties
+
+# Signing files
+*.jks
+*.keystore
+
+# Log/debug output
+*.log
+
+# Local configuration files
+*.iml
+.idea/
+
+# Keystore files
+*.jks
+*.keystore

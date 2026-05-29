@@ -1,6 +1,7 @@
 package com.lucianos.rentacar.ui.screens.reservations
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,9 +43,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.lucianos.rentacar.data.EntregaState
+import com.lucianos.rentacar.data.DevolucionState
 import com.lucianos.rentacar.data.Reservation
 import com.lucianos.rentacar.data.todayReservations
 import com.lucianos.rentacar.data.tomorrowReservations
+import com.lucianos.rentacar.navigation.Screen
 import com.lucianos.rentacar.ui.components.AvatarCircle
 import com.lucianos.rentacar.ui.components.StatusChip
 import com.lucianos.rentacar.ui.theme.LucianosBackground
@@ -60,6 +64,21 @@ import com.lucianos.rentacar.ui.theme.MonoTime
 fun ReservationsScreen(navController: NavController) {
     val dayFilters = listOf("Hoy", "Mañana", "Mié", "Jue", "Vie", "Sáb")
     var selectedDay by remember { mutableStateOf("Hoy") }
+
+    val reservationsForDay: List<Reservation> = when (selectedDay) {
+        "Hoy"    -> todayReservations
+        "Mañana" -> tomorrowReservations
+        else     -> emptyList()
+    }
+    val headerForDay = when (selectedDay) {
+        "Hoy"    -> "Hoy · martes 21 mayo"
+        "Mañana" -> "Mañana · miércoles 22"
+        "Mié"    -> "Miércoles 22 mayo"
+        "Jue"    -> "Jueves 23 mayo"
+        "Vie"    -> "Viernes 24 mayo"
+        "Sáb"    -> "Sábado 25 mayo"
+        else     -> selectedDay
+    }
 
     Box(
         modifier = Modifier
@@ -99,19 +118,15 @@ fun ReservationsScreen(navController: NavController) {
             ) {
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Today section
-                DaySection(
-                    header = "Hoy · martes 21 mayo",
-                    reservations = todayReservations
-                )
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // Tomorrow section
-                DaySection(
-                    header = "Mañana · miércoles 22",
-                    reservations = tomorrowReservations
-                )
+                if (reservationsForDay.isEmpty()) {
+                    EmptyDayState(day = selectedDay)
+                } else {
+                    DaySection(
+                        header = headerForDay,
+                        reservations = reservationsForDay,
+                        navController = navController
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(80.dp))
             }
@@ -187,7 +202,7 @@ private fun DayFilterChip(label: String, isSelected: Boolean, onClick: () -> Uni
 }
 
 @Composable
-private fun DaySection(header: String, reservations: List<Reservation>) {
+private fun DaySection(header: String, reservations: List<Reservation>, navController: NavController) {
     Text(
         text = header,
         fontSize = 13.sp,
@@ -208,7 +223,15 @@ private fun DaySection(header: String, reservations: List<Reservation>) {
     ) {
         Column {
             reservations.forEachIndexed { index, reservation ->
-                ReservationCard(reservation = reservation)
+                ReservationCard(reservation = reservation, onClick = {
+                    if (reservation.type.lowercase() == "entrega") {
+                        EntregaState.reset(reservation.id)
+                        navController.navigate(Screen.EntregaStep1.withId(reservation.id))
+                    } else {
+                        DevolucionState.reset(reservation.id)
+                        navController.navigate(Screen.DevolucionStep1.withId(reservation.id))
+                    }
+                })
                 if (index < reservations.size - 1) {
                     Divider(
                         color = LucianosHairline,
@@ -222,12 +245,13 @@ private fun DaySection(header: String, reservations: List<Reservation>) {
 }
 
 @Composable
-private fun ReservationCard(reservation: Reservation) {
+private fun ReservationCard(reservation: Reservation, onClick: () -> Unit = {}) {
     val isUrgent = reservation.status == "urgent"
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -276,5 +300,33 @@ private fun ReservationCard(reservation: Reservation) {
 
         // Type chip
         StatusChip(status = reservation.type.lowercase())
+    }
+}
+
+@Composable
+private fun EmptyDayState(day: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 48.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text("📅", fontSize = 40.sp)
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "Sin reservas para $day",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = LucianosInk,
+            fontFamily = FontFamily.SansSerif
+        )
+        Text(
+            text = "No hay entregas ni devoluciones\nprogramadas para este día.",
+            fontSize = 13.sp,
+            color = LucianosInk3,
+            fontFamily = FontFamily.SansSerif,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
     }
 }

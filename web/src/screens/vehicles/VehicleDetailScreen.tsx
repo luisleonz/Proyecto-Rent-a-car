@@ -1,12 +1,14 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, MoreVertical, User, CalendarDays, Wrench, History, ChevronRight } from 'lucide-react'
-import { sampleFleet } from '../../data/sampleData'
+import { sampleFleet, todayReservations, tomorrowReservations } from '../../data/sampleData'
 import StatusChip from '../../components/StatusChip'
 
 export default function VehicleDetailScreen() {
   const { plate } = useParams<{ plate: string }>()
   const navigate = useNavigate()
   const vehicle = sampleFleet.find(v => v.plate === plate) ?? sampleFleet[0]
+  const allRes = [...todayReservations, ...tomorrowReservations]
+  const devRes = allRes.find(r => r.type.toLowerCase() === 'devolución') ?? allRes[0]
 
   const sections = [
     ...(vehicle.status === 'rentado' && vehicle.currentClient
@@ -86,6 +88,7 @@ export default function VehicleDetailScreen() {
         <div className="px-4 mt-6">
           <button
             disabled={vehicle.status !== 'rentado'}
+            onClick={() => vehicle.status === 'rentado' && navigate(`/app/devolucion/${devRes.id}/1`)}
             className="w-full py-3.5 rounded-xl text-white font-semibold text-base transition-opacity"
             style={{
               backgroundColor: vehicle.status === 'rentado' ? '#2D8A56' : '#BCBCC4',

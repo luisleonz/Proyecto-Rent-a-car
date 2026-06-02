@@ -10,23 +10,20 @@ interface MenuItem {
   isDanger?: boolean
   iconColor: string
   iconBg: string
+  route?: string
 }
 
 const MENU_ITEMS: MenuItem[] = [
-  { icon: DollarSign, label: 'Caja / Turno', sublabel: 'Cierre del día', iconColor: '#2D8A56', iconBg: '#E8F5EE' },
+  { icon: DollarSign, label: 'Caja / Turno', sublabel: 'Cierre del día', iconColor: '#2D8A56', iconBg: '#E8F5EE', route: '/app/caja' },
   { icon: Users, label: 'Equipo', sublabel: '4 empleados activos', iconColor: '#4444AA', iconBg: '#EEEEFF' },
   { icon: BarChart3, label: 'Reportes', sublabel: 'Semana actual', iconColor: '#888800', iconBg: '#FFFFF0' },
   { icon: Settings, label: 'Configuración', iconColor: '#585868', iconBg: '#F0F0F0' },
   { icon: Headphones, label: 'Soporte', iconColor: '#585868', iconBg: '#F0F0F0' },
 ]
 
-const LOGOUT: MenuItem = {
-  icon: LogOut, label: 'Cerrar sesión', isDanger: true, iconColor: '#C04040', iconBg: '#FEEEEE'
-}
-
-function MenuRow({ item, showChevron = true }: { item: MenuItem; showChevron?: boolean }) {
+function MenuRow({ item, onClick }: { item: MenuItem; onClick?: () => void }) {
   return (
-    <button className="w-full flex items-center gap-3 px-4 py-3.5 text-left">
+    <button onClick={onClick} className="w-full flex items-center gap-3 px-4 py-3.5 text-left">
       <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
         style={{ backgroundColor: item.iconBg }}>
         <item.icon size={18} style={{ color: item.iconColor }} />
@@ -39,7 +36,7 @@ function MenuRow({ item, showChevron = true }: { item: MenuItem; showChevron?: b
           <p className="text-xs font-sans" style={{ color: '#838390' }}>{item.sublabel}</p>
         )}
       </div>
-      {showChevron && !item.isDanger && (
+      {!item.isDanger && (
         <ChevronRight size={16} style={{ color: '#BCBCC4' }} />
       )}
     </button>
@@ -52,7 +49,6 @@ export default function MoreScreen() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#FAFAF7' }}>
-      {/* AppBar */}
       <div className="bg-white px-4 py-3 border-b border-hairline">
         <h1 className="text-xl font-bold font-serif" style={{ color: '#1E1E26' }}>Más</h1>
       </div>
@@ -79,7 +75,10 @@ export default function MoreScreen() {
         <div className="bg-white rounded-2xl border border-hairline overflow-hidden">
           {MENU_ITEMS.map((item, i) => (
             <div key={item.label}>
-              <MenuRow item={item} />
+              <MenuRow
+                item={item}
+                onClick={item.route ? () => navigate(item.route!) : undefined}
+              />
               {i < MENU_ITEMS.length - 1 && (
                 <div className="h-px ml-16" style={{ backgroundColor: '#EAEAE4' }} />
               )}

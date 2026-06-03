@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { CalendarDays, Filter, Plus } from 'lucide-react'
 import { todayReservations, tomorrowReservations, Reservation } from '../../data/sampleData'
 import AvatarCircle from '../../components/AvatarCircle'
@@ -6,10 +7,10 @@ import StatusChip from '../../components/StatusChip'
 
 const DAY_FILTERS = ['Hoy', 'Mañana', 'Mié', 'Jue', 'Vie', 'Sáb']
 
-function ReservationCard({ r }: { r: Reservation }) {
+function ReservationCard({ r, onClick }: { r: Reservation; onClick: () => void }) {
   const urgent = r.status === 'urgent'
   return (
-    <div className="flex items-center gap-3 px-4 py-3.5">
+    <button onClick={onClick} className="w-full flex items-center gap-3 px-4 py-3.5 text-left">
       <span className="font-mono text-xs w-11 flex-shrink-0 text-right"
         style={{ color: urgent ? '#C04040' : '#838390' }}>
         {r.time}
@@ -20,18 +21,26 @@ function ReservationCard({ r }: { r: Reservation }) {
         <p className="text-xs font-sans truncate" style={{ color: '#838390' }}>{r.vehicle}</p>
       </div>
       <StatusChip status={r.type.toLowerCase()} />
-    </div>
+    </button>
   )
 }
 
 function DaySection({ header, reservations }: { header: string; reservations: Reservation[] }) {
+  const navigate = useNavigate()
+
+  function handleClick(r: Reservation) {
+    const t = r.type.toLowerCase()
+    if (t === 'entrega') navigate(`/app/entrega/${r.id}/1`)
+    else navigate(`/app/devolucion/${r.id}/1`)
+  }
+
   return (
     <div className="mb-5">
       <p className="text-xs font-semibold font-sans mb-2.5 uppercase tracking-wide" style={{ color: '#838390' }}>{header}</p>
       <div className="bg-white rounded-2xl border border-hairline overflow-hidden">
         {reservations.map((r, i) => (
           <div key={r.id}>
-            <ReservationCard r={r} />
+            <ReservationCard r={r} onClick={() => handleClick(r)} />
             {i < reservations.length - 1 && <div className="h-px mx-4" style={{ backgroundColor: '#EAEAE4' }} />}
           </div>
         ))}

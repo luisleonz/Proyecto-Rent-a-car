@@ -65,6 +65,43 @@ export const tomorrowReservations: Reservation[] = [
   { id: '6', time: '11:00', type: 'Entrega', clientName: 'Pedro Soto', vehicle: 'Polo · QRS-115', clientInitials: 'PS' },
 ]
 
+export interface Cotizacion {
+  id: string
+  clientName: string
+  clientInitials: string
+  vehicleType: string
+  days: number
+  dailyRate: number
+  insuranceName: string
+  insuranceCost: number
+  discount: number
+  status: 'enviada' | 'aceptada' | 'vencida'
+  date: string
+}
+
+export const VEHICLE_TYPES = [
+  { label: 'Compacto', rate: 700 },
+  { label: 'Sedán', rate: 850 },
+  { label: 'Hatchback', rate: 760 },
+  { label: 'SUV', rate: 1350 },
+  { label: 'Pickup', rate: 1650 },
+]
+
+export const INSURANCE_OPTIONS = [
+  { label: 'Básico', cost: 300 },
+  { label: 'Amplio', cost: 550 },
+  { label: 'Sin seguro', cost: 0 },
+]
+
+export const sampleCotizaciones: Cotizacion[] = [
+  { id: 'COT-041', clientName: 'Mariana Pérez', clientInitials: 'MP', vehicleType: 'Sedán', days: 4, dailyRate: 850, insuranceName: 'Básico', insuranceCost: 300, discount: 200, status: 'enviada', date: 'hoy 11:22' },
+  { id: 'COT-040', clientName: 'Ricardo López', clientInitials: 'RL', vehicleType: 'SUV', days: 7, dailyRate: 1350, insuranceName: 'Amplio', insuranceCost: 550, discount: 0, status: 'aceptada', date: 'ayer 14:05' },
+  { id: 'COT-039', clientName: 'Lupita Cruz', clientInitials: 'LC', vehicleType: 'Compacto', days: 2, dailyRate: 700, insuranceName: 'Sin seguro', insuranceCost: 0, discount: 0, status: 'vencida', date: 'lun 09:40' },
+  { id: 'COT-038', clientName: 'Jorge Díaz', clientInitials: 'JD', vehicleType: 'Hatchback', days: 3, dailyRate: 760, insuranceName: 'Básico', insuranceCost: 300, discount: 100, status: 'aceptada', date: 'dom 16:30' },
+  { id: 'COT-037', clientName: 'Pedro Soto', clientInitials: 'PS', vehicleType: 'Pickup', days: 5, dailyRate: 1650, insuranceName: 'Amplio', insuranceCost: 550, discount: 0, status: 'enviada', date: 'sáb 10:15' },
+  { id: 'COT-036', clientName: 'Ana Torres', clientInitials: 'AT', vehicleType: 'Sedán', days: 3, dailyRate: 850, insuranceName: 'Básico', insuranceCost: 300, discount: 0, status: 'vencida', date: 'vie 08:00' },
+]
+
 export const sampleFleet: Vehicle[] = [
   { plate: 'ABC-123', model: 'Nissan Sentra', year: '2022', color: 'Azul', status: 'rentado', km: '45,200', currentClient: 'M. Pérez', clientInfo: 'vence vie' },
   { plate: 'XYZ-908', model: 'Nissan Versa', year: '2023', color: 'Blanco', status: 'disponible', km: '12,100' },

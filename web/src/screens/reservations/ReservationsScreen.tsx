@@ -37,17 +37,17 @@ const FILTER_MAP: Record<string, ReservaStatus> = {
   'Entregadas':  'entregada',  'Devueltas': 'devuelta',
 }
 
-const fmt = (n: number) => new Intl.NumberFormat('es-MX').format(n)
-const fmtDate = (s: string) => new Date(s + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
-const toInput  = (s: string) => s  // already YYYY-MM-DD from DB
+const fmt      = (n: number) => new Intl.NumberFormat('es-MX').format(n)
+const fmtDate  = (s: string) => new Date(s + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
+const toInput  = (s: string) => s
 
 function clientName(r: ReservaConDetalle) {
-  if (!r.clientes) return 'Cliente desconocido'
-  return [r.clientes.nombre, r.clientes.apellido].filter(Boolean).join(' ')
+  return r.clientes?.nombre ?? 'Cliente desconocido'
 }
 function initials(r: ReservaConDetalle) {
-  if (!r.clientes) return '?'
-  return ((r.clientes.nombre[0] ?? '') + (r.clientes.apellido?.[0] ?? '')).toUpperCase() || '?'
+  const n = r.clientes?.nombre ?? ''
+  const parts = n.trim().split(' ')
+  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '?'
 }
 
 /* ─── Detail / edit panel ────────────────────────────────────── */
@@ -181,7 +181,7 @@ function ReservaPanel({ res, open, onClose, onSolicitudCreada }: PanelProps) {
                     Depósito de apartado recibido
                   </span>
                   <span style={{ fontSize: 13, color: 'var(--primary)', marginLeft: 'auto', fontWeight: 700 }}>
-                    ${new Intl.NumberFormat('es-MX').format(res.deposito)}
+                    ${fmt(res.deposito)}
                   </span>
                   {res.metodo_deposito && (
                     <span style={{
@@ -337,67 +337,108 @@ function SkeletonRow() {
 }
 
 /* ─── New reservation modal ──────────────────────────────────── */
+type VehicleOption = { id: string; modelo: string; placa: string; tarifa_diaria: number | null }
+
 function NuevaReservaModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
-  const [vehicles, setVehicles]         = useState<{ id: string; modelo: string; placa: string; tarifa_diaria: number | null }[]>([])
-  const [clienteNombre, setClienteNombre] = useState('')
-  const [clienteTel, setClienteTel]     = useState('')
-  const [vehiculoId, setVehiculoId]     = useState('')
-  const [fechaEntrega, setFechaEntrega] = useState('')
-  const [fechaDev, setFechaDev]         = useState('')
-  const [working, setWorking]           = useState(false)
+  const [vehicles, setVehicles]             = useState<VehicleOption[]>([])
+  const [clienteNombre, setClienteNombre]   = useState('')
+  const [clienteTel, setClienteTel]         = useState('')
+  const [vehiculoId, setVehiculoId]         = useState('')
+  const [fechaEntrega, setFechaEntrega]     = useState('')
+  const [fechaDev, setFechaDev]             = useState('')
+  const [descuento, setDescuento]           = useState('')
+  const [tieneDeposito, setTieneDeposito]   = useState(false)
+  const [deposito, setDeposito]             = useState('')
+  const [metodoDeposito, setMetodoDeposito] = useState<'efectivo' | 'transferencia'>('efectivo')
+  const [working, setWorking]               = useState(false)
+  const [error, setError]                   = useState('')
   const today = new Date().toISOString().split('T')[0]
 
   useEffect(() => {
     if (!open) return
-    db.from('vehiculos').select('id, modelo, placa, tarifa_diaria').in('status', ['disponible']).order('modelo')
-      .then(({ data }: { data: { id: string; modelo: string; placa: string; tarifa_diaria: number | null }[] | null }) => {
+    db.from('vehiculos')
+      .select('id, modelo, placa, tarifa_diaria')
+      .in('status', ['disponible'])
+      .order('modelo')
+      .then(({ data }: { data: VehicleOption[] | null }) => {
         const list = data ?? []
         setVehicles(list)
         if (list.length) setVehiculoId(list[0].id)
       })
   }, [open])
 
+  function reset() {
+    setClienteNombre(''); setClienteTel(''); setFechaEntrega(''); setFechaDev('')
+    setDescuento(''); setTieneDeposito(false); setDeposito(''); setMetodoDeposito('efectivo')
+    setError('')
+  }
+
+  function handleClose() { reset(); onClose() }
+
+  // Derived calculations
+  const selectedVehicle = vehicles.find(v => v.id === vehiculoId)
+  const dias = (fechaEntrega && fechaDev)
+    ? Math.max(0, Math.ceil((new Date(fechaDev).getTime() - new Date(fechaEntrega).getTime()) / 86400000))
+    : 0
+  const tarifa     = selectedVehicle?.tarifa_diaria ?? 0
+  const subtotal   = tarifa * dias
+  const descNum    = Math.min(Math.max(0, Number(descuento) || 0), subtotal)
+  const total      = subtotal - descNum
+  const showCalc   = dias > 0 && tarifa > 0
+
   async function handleCreate() {
     if (!clienteNombre.trim() || !fechaEntrega || !fechaDev || !vehiculoId) return
     setWorking(true)
+    setError('')
 
-    const v = vehicles.find(x => x.id === vehiculoId)
-    const dias = Math.max(1, Math.ceil((new Date(fechaDev).getTime() - new Date(fechaEntrega).getTime()) / 86400000))
-    const total = (v?.tarifa_diaria ?? 0) * dias
-
-    const { data: cliente } = await db.from('clientes').insert({
-      nombre: clienteNombre.trim(), telefono: clienteTel.trim() || null,
+    const { data: cliente, error: cErr } = await db.from('clientes').insert({
+      nombre: clienteNombre.trim(),
+      telefono: clienteTel.trim() || null,
     }).select('id').single()
+    if (cErr) { setError(`Error al crear cliente: ${cErr.message}`); setWorking(false); return }
 
-    await db.from('reservas').insert({
-      cliente_id: cliente?.id ?? null, vehiculo_id: vehiculoId,
-      fecha_entrega: fechaEntrega, fecha_devolucion: fechaDev,
-      status: 'confirmada', total,
+    const { error: rErr } = await db.from('reservas').insert({
+      cliente_id: cliente?.id ?? null,
+      vehiculo_id: vehiculoId,
+      fecha_entrega: fechaEntrega,
+      fecha_devolucion: fechaDev,
+      status: 'confirmada',
+      total: showCalc ? total : null,
+      deposito: tieneDeposito ? (Number(deposito) || 0) : 0,
+      metodo_deposito: tieneDeposito ? metodoDeposito : null,
     })
+    if (rErr) { setError(`Error al crear reserva: ${rErr.message}`); setWorking(false); return }
 
-    await db.from('vehiculos').update({ status: 'reservado', cliente_actual: clienteNombre.trim() }).eq('id', vehiculoId)
+    await db.from('vehiculos')
+      .update({ status: 'reservado', cliente_actual: clienteNombre.trim() })
+      .eq('id', vehiculoId)
 
     setWorking(false)
-    setClienteNombre(''); setClienteTel(''); setFechaEntrega(''); setFechaDev('')
+    reset()
     onCreated()
     onClose()
   }
 
   if (!open) return null
+
+  const canCreate = !working && clienteNombre.trim() && fechaEntrega && fechaDev && vehiculoId
+
   return (
     <>
-      <div className="qpanel-overlay" onClick={onClose} />
+      <div className="qpanel-overlay" onClick={handleClose} />
       <div className="qpanel open">
         <div className="qpanel-head">
           <div>
             <div className="eyebrow" style={{ marginBottom: 4 }}>Nueva reserva</div>
             <div style={{ fontSize: 20, fontFamily: 'var(--font-display)', color: 'var(--ink)' }}>Crear reserva</div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: 'var(--ink3)' }}>
+          <button onClick={handleClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: 'var(--ink3)' }}>
             <X size={20} />
           </button>
         </div>
+
         <div className="qpanel-body">
+          {/* Client */}
           <div className="field">
             <label className="field-l">Nombre del cliente</label>
             <input className="field-i" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} placeholder="Nombre completo" />
@@ -406,14 +447,46 @@ function NuevaReservaModal({ open, onClose, onCreated }: { open: boolean; onClos
             <label className="field-l">Teléfono <span style={{ color: 'var(--ink4)', fontWeight: 400 }}>(opcional)</span></label>
             <input className="field-i" value={clienteTel} onChange={e => setClienteTel(e.target.value)} placeholder="+52 55..." inputMode="tel" />
           </div>
+
+          {/* Vehicle picker */}
           <div className="field">
-            <label className="field-l">Vehículo</label>
-            <select className="field-i" value={vehiculoId} onChange={e => setVehiculoId(e.target.value)}
-              style={{ fontFamily: 'var(--font-sans)', fontSize: 14 }}>
-              {vehicles.map(v => <option key={v.id} value={v.id}>{v.modelo} — {v.placa}</option>)}
-              {vehicles.length === 0 && <option disabled>Sin vehículos disponibles</option>}
-            </select>
+            <label className="field-l">Vehículo disponible</label>
+            {vehicles.length === 0 ? (
+              <div style={{ fontSize: 13.5, color: 'var(--ink3)', padding: '10px 0' }}>Sin vehículos disponibles</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 220, overflowY: 'auto' }}>
+                {vehicles.map(v => {
+                  const sel = vehiculoId === v.id
+                  return (
+                    <button
+                      key={v.id}
+                      onClick={() => setVehiculoId(v.id)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 12,
+                        padding: '10px 14px', borderRadius: 10, cursor: 'pointer',
+                        border: `1.5px solid ${sel ? 'var(--primary)' : 'var(--border)'}`,
+                        background: sel ? 'oklch(96% 0.04 155)' : 'var(--paper)',
+                        textAlign: 'left',
+                      }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--ink)' }}>{v.modelo}</div>
+                        <div style={{ fontSize: 12, color: 'var(--ink3)', fontFamily: 'var(--font-mono)', marginTop: 1 }}>{v.placa}</div>
+                      </div>
+                      {v.tarifa_diaria != null && (
+                        <div style={{ fontWeight: 700, fontSize: 15, color: sel ? 'var(--primary)' : 'var(--ink)', flexShrink: 0 }}>
+                          ${fmt(v.tarifa_diaria)}
+                          <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--ink3)' }}>/día</span>
+                        </div>
+                      )}
+                      {sel && <Check size={16} color="var(--primary)" strokeWidth={2.5} style={{ flexShrink: 0 }} />}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
+
+          {/* Dates */}
           <div style={{ display: 'flex', gap: 10 }}>
             <div className="field" style={{ flex: 1 }}>
               <label className="field-l">Entrega</label>
@@ -426,11 +499,106 @@ function NuevaReservaModal({ open, onClose, onCreated }: { open: boolean; onClos
                 onChange={e => setFechaDev(e.target.value)} />
             </div>
           </div>
+
+          {/* Calculation summary */}
+          {showCalc && (
+            <div style={{
+              background: 'var(--paper-alt)', borderRadius: 12, padding: '14px 16px',
+              display: 'flex', flexDirection: 'column', gap: 8,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--ink3)' }}>
+                <span>{dias} {dias === 1 ? 'día' : 'días'} × ${fmt(tarifa)}/día</span>
+                <span>${fmt(subtotal)}</span>
+              </div>
+              {descNum > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--warn-ink)' }}>
+                  <span>Descuento</span>
+                  <span>-${fmt(descNum)}</span>
+                </div>
+              )}
+              <div style={{
+                display: 'flex', justifyContent: 'space-between',
+                fontSize: 16, fontWeight: 700, color: 'var(--ink)',
+                borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 2,
+              }}>
+                <span>Total</span>
+                <span>${fmt(total)}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Discount */}
+          {showCalc && (
+            <div className="field">
+              <label className="field-l">Descuento <span style={{ color: 'var(--ink4)', fontWeight: 400 }}>(opcional)</span></label>
+              <div className="field-money" style={{ width: '100%' }}>
+                <span>$</span>
+                <input className="field-i" value={descuento}
+                  onChange={e => setDescuento(e.target.value.replace(/[^0-9]/g, ''))}
+                  inputMode="numeric" placeholder="0" />
+              </div>
+            </div>
+          )}
+
+          {/* Deposit */}
+          <div className="field">
+            <label className="field-l">Depósito de apartado</label>
+            <div style={{ display: 'flex', gap: 8, marginBottom: tieneDeposito ? 10 : 0 }}>
+              {(['No', 'Sí'] as const).map(opt => {
+                const active = opt === 'Sí' ? tieneDeposito : !tieneDeposito
+                return (
+                  <button key={opt}
+                    onClick={() => setTieneDeposito(opt === 'Sí')}
+                    style={{
+                      flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 13.5, fontWeight: 600,
+                      border: `1.5px solid ${active ? 'var(--primary)' : 'var(--border)'}`,
+                      background: active ? 'oklch(96% 0.04 155)' : 'var(--paper)',
+                      color: active ? 'var(--primary)' : 'var(--ink3)',
+                      cursor: 'pointer',
+                    }}>
+                    {opt}
+                  </button>
+                )
+              })}
+            </div>
+            {tieneDeposito && (
+              <>
+                <div className="field-money" style={{ width: '100%', marginBottom: 8 }}>
+                  <span>$</span>
+                  <input className="field-i" value={deposito}
+                    onChange={e => setDeposito(e.target.value.replace(/[^0-9]/g, ''))}
+                    inputMode="numeric" placeholder="Monto del depósito" />
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {(['efectivo', 'transferencia'] as const).map(m => (
+                    <button key={m}
+                      onClick={() => setMetodoDeposito(m)}
+                      style={{
+                        flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                        border: `1.5px solid ${metodoDeposito === m ? 'var(--primary)' : 'var(--border)'}`,
+                        background: metodoDeposito === m ? 'oklch(96% 0.04 155)' : 'var(--paper)',
+                        color: metodoDeposito === m ? 'var(--primary)' : 'var(--ink3)',
+                        cursor: 'pointer', textTransform: 'capitalize',
+                      }}>
+                      {m === 'efectivo' ? 'Efectivo' : 'Transferencia'}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div style={{ background: 'oklch(96% 0.04 25)', border: '1px solid oklch(85% 0.1 25)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: 'oklch(40% 0.15 25)' }}>
+              {error}
+            </div>
+          )}
         </div>
+
         <div className="qpanel-foot">
           <button className="btn primary" style={{ width: '100%', justifyContent: 'center' }}
-            onClick={handleCreate}
-            disabled={working || !clienteNombre.trim() || !fechaEntrega || !fechaDev || !vehiculoId}>
+            onClick={handleCreate} disabled={!canCreate}>
             {working
               ? <><div className="spinner" style={{ width: 15, height: 15, borderWidth: 2, borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.3)' }} />Creando…</>
               : <><Check size={15} />Crear reserva</>}
@@ -461,7 +629,7 @@ export default function ReservationsScreen() {
   async function fetchReservas() {
     const { data, error } = await db
       .from('reservas')
-      .select('*, clientes(nombre, apellido, telefono), vehiculos(modelo, placa, anio, tarifa_diaria)')
+      .select('*, clientes(nombre, telefono), vehiculos(modelo, placa, anio, tarifa_diaria)')
       .order('fecha_entrega', { ascending: true })
     if (error) console.error('fetchReservas:', error)
     setReservas((data as ReservaConDetalle[]) ?? [])

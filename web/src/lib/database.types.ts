@@ -122,6 +122,6 @@ export type Cotizacion = Database['public']['Tables']['cotizaciones']['Row']
 export type Solicitud  = Database['public']['Tables']['solicitudes']['Row']
 
 export interface ReservaConDetalle extends Reserva {
-  clientes:  { nombre: string; apellido: string | null; telefono: string | null } | null
+  clientes:  { nombre: string; telefono: string | null } | null
   vehiculos: { modelo: string; placa: string; anio: number | null; tarifa_diaria: number | null } | null
 }

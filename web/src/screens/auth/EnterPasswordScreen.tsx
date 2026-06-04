@@ -1,50 +1,95 @@
 import { useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Lock, Eye, EyeOff } from 'lucide-react'
-import { sampleUsers } from '../../data/sampleData'
-import AvatarCircle from '../../components/AvatarCircle'
+import { useNavigate, useSearchParams, Navigate } from 'react-router-dom'
+import { ArrowLeft, Lock, Eye, EyeOff, Car } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../state/auth'
 
 export default function EnterPasswordScreen() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const email = decodeURIComponent(params.get('email') ?? '')
-  const user = sampleUsers.find(u => u.email === email)
+  const { session } = useAuth()
 
-  const [password, setPassword] = useState('')
+  const [password, setPassword]       = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError]             = useState<string | null>(null)
+  const [loading, setLoading]         = useState(false)
 
-  function onLogin() {
-    if (password.length < 6) { setError('Contraseña incorrecta'); return }
-    navigate('/app/home', { replace: true })
+  // Already authenticated — go to app
+  if (session) return <Navigate to="/app/home" replace />
+
+  // No email in URL — back to login
+  if (!email) return <Navigate to="/" replace />
+
+  async function onLogin() {
+    if (!password) { setError('Ingresa tu contraseña'); return }
+    setLoading(true)
+    setError(null)
+    const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
+    setLoading(false)
+    if (authError) {
+      setError('Correo o contraseña incorrectos')
+    }
+    // On success, onAuthStateChange fires → session updates → Navigate above redirects to /app/home
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col max-w-md mx-auto">
-      {/* Back button */}
-      <div className="px-2 pt-3">
+    <div style={{
+      minHeight: '100dvh',
+      background: 'var(--paper)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '24px 20px',
+    }}>
+      <div style={{
+        width: '100%', maxWidth: 420,
+        background: 'var(--card)',
+        borderRadius: 'var(--radius)',
+        boxShadow: 'var(--shadow-pop)',
+        padding: '44px 40px',
+        position: 'relative',
+      }}>
+        {/* Back button */}
         <button
           onClick={() => navigate(-1)}
-          className="p-2 rounded-full hover:bg-background transition-colors"
+          style={{
+            position: 'absolute', top: 16, left: 16,
+            background: 'none', border: 'none', cursor: 'pointer',
+            padding: 8, borderRadius: 8, color: 'var(--ink3)',
+            display: 'flex', alignItems: 'center',
+          }}
         >
-          <ArrowLeft size={22} style={{ color: 'var(--ink)' }} />
+          <ArrowLeft size={20} />
         </button>
-      </div>
 
-      <div className="px-6 flex-1">
-        <AvatarCircle initials={user?.initials ?? '?'} size={60} />
-
-        <div className="mt-4 mb-2">
-          <h1 className="text-2xl font-bold font-serif" style={{ color: 'var(--ink)' }}>
-            Hola, {user?.firstName ?? ''}
-          </h1>
+        {/* Icon */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24, marginTop: 8 }}>
+          <div style={{
+            width: 64, height: 64, borderRadius: 20,
+            background: 'var(--primary-soft)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Car size={32} color="var(--primary)" />
+          </div>
         </div>
-        <p className="text-sm mb-8" style={{ color: 'var(--ink3)' }}>{email}</p>
+
+        <h1 style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 26, fontWeight: 400,
+          color: 'var(--ink)', margin: '0 0 6px',
+          textAlign: 'center',
+        }}>
+          Bienvenido
+        </h1>
+        <p style={{ fontSize: 14, color: 'var(--ink3)', margin: '0 0 28px', textAlign: 'center' }}>
+          {email}
+        </p>
 
         {/* Password field */}
-        <div className="relative mb-1">
-          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
-            <Lock size={18} style={{ color: 'var(--ink3)' }} />
+        <div style={{ position: 'relative', marginBottom: error ? 6 : 20 }}>
+          <div style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+            <Lock size={17} color={error ? 'var(--danger)' : 'var(--ink3)'} />
           </div>
           <input
             type={showPassword ? 'text' : 'password'}
@@ -52,35 +97,45 @@ export default function EnterPasswordScreen() {
             onChange={e => { setPassword(e.target.value); setError(null) }}
             onKeyDown={e => e.key === 'Enter' && onLogin()}
             placeholder="Contraseña"
-            className="w-full pl-11 pr-12 py-3.5 border rounded-xl text-sm font-sans outline-none transition-colors"
+            autoFocus
+            autoComplete="current-password"
             style={{
-              borderColor: error ? 'var(--danger)' : password ? 'var(--primary)' : 'var(--card-line)',
-              color: 'var(--ink)',
+              width: '100%', boxSizing: 'border-box',
+              padding: '13px 48px 13px 44px',
+              border: `1.5px solid ${error ? 'var(--danger)' : password ? 'var(--primary)' : 'var(--card-line)'}`,
+              borderRadius: 12,
+              fontSize: 14, fontFamily: 'var(--font-sans)',
+              color: 'var(--ink)', background: 'var(--paper)',
+              outline: 'none', transition: 'border-color 150ms',
             }}
           />
           <button
             onClick={() => setShowPassword(v => !v)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 p-1"
+            style={{
+              position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+              background: 'none', border: 'none', cursor: 'pointer',
+              padding: 4, color: 'var(--ink3)', display: 'flex', alignItems: 'center',
+            }}
           >
-            {showPassword
-              ? <EyeOff size={18} style={{ color: 'var(--ink3)' }} />
-              : <Eye size={18} style={{ color: 'var(--ink3)' }} />}
+            {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
           </button>
         </div>
-        {error && <p className="text-xs mb-4" style={{ color: 'var(--danger)' }}>{error}</p>}
-        {!error && <div className="mb-4" />}
+        {error && (
+          <p style={{ fontSize: 12, color: 'var(--danger)', margin: '0 0 16px 2px' }}>{error}</p>
+        )}
 
         <button
           onClick={onLogin}
-          className="w-full py-3.5 rounded-xl text-white font-semibold text-base mb-3 transition-opacity active:opacity-80"
-          style={{ background: 'var(--primary)' }}
+          disabled={loading}
+          className="btn primary"
+          style={{ width: '100%', padding: '14px', fontSize: 15, justifyContent: 'center', opacity: loading ? 0.7 : 1 }}
         >
-          Iniciar sesión
+          {loading ? 'Iniciando sesión…' : 'Iniciar sesión'}
         </button>
 
-        <button className="w-full py-2 text-sm text-center" style={{ color: 'var(--ink2)' }}>
-          ¿Olvidaste tu contraseña? Contacta al administrador
-        </button>
+        <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--ink4)', marginTop: 18, lineHeight: 1.5 }}>
+          ¿Olvidaste tu contraseña?<br />Contacta al administrador del sistema.
+        </p>
       </div>
     </div>
   )

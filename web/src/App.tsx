@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Menu } from 'lucide-react'
-import { AuthProvider } from './state/auth'
+import { AuthProvider, useAuth } from './state/auth'
 import BottomNav from './components/BottomNav'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
@@ -28,6 +28,17 @@ import { EntregaStep1Screen, EntregaStep2Screen, EntregaStep3Screen, EntregaOkSc
 import { DevolucionStep1Screen, DevolucionStep2Screen, DevolucionStep3Screen, DevolucionOkScreen } from './screens/flows/DevolucionFlow'
 
 const FLOW_PREFIXES = ['/app/caja/turno', '/app/caja/cierre', '/app/caja/justificacion', '/app/caja/ok']
+
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const { session, loading } = useAuth()
+  if (loading) return (
+    <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--paper)' }}>
+      <div className="spinner" />
+    </div>
+  )
+  if (!session) return <Navigate to="/" replace />
+  return <>{children}</>
+}
 
 function AppLayout() {
   const location = useLocation()
@@ -121,7 +132,7 @@ export default function App() {
         <Route path="/onboarding/permissions" element={<OnboardingPermissionsScreen />} />
         <Route path="/onboarding/tour"      element={<OnboardingTourScreen />} />
         <Route path="/onboarding/done"      element={<OnboardingDoneScreen />} />
-        <Route path="/app/*"                element={<AppLayout />} />
+        <Route path="/app/*"                element={<RequireAuth><AppLayout /></RequireAuth>} />
         <Route path="*"                     element={<Navigate to="/" replace />} />
       </Routes>
     </AuthProvider>

@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Home, Calendar, FileText, Car, Users, DollarSign, BarChart3, UserCheck, Settings } from 'lucide-react'
+import { Home, Calendar, FileText, Car, Users, DollarSign, BarChart3, UserCheck, Settings, LogOut } from 'lucide-react'
 import { useAuth } from '../state/auth'
 
 const NAV = [
@@ -27,7 +27,7 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { currentInitials, currentFirstName, currentRole } = useAuth()
+  const { currentInitials, currentFirstName, currentRole, signOut } = useAuth()
 
   function handleNav(path: string) {
     navigate(path)
@@ -62,10 +62,18 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         <div className="user">
           <div className="ava">{currentInitials || 'LL'}</div>
           <div className="meta">
-            <div className="nm">{currentFirstName || 'Luciano'} R.</div>
+            <div className="nm">{currentFirstName || 'Luciano'}</div>
             <div className="rl">{currentRole || 'Administrador'}</div>
           </div>
         </div>
+        <button
+          onClick={signOut}
+          className="navitem"
+          style={{ marginTop: 4, color: 'rgba(255,255,255,0.50)' }}
+        >
+          <span className="ico"><LogOut size={16} strokeWidth={1.8} /></span>
+          <span className="label-text">Cerrar sesión</span>
+        </button>
       </div>
     </nav>
   )

@@ -2,6 +2,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider } from './state/auth'
 import BottomNav from './components/BottomNav'
 import Sidebar from './components/Sidebar'
+import TopBar from './components/TopBar'
 
 import LoginScreen from './screens/auth/LoginScreen'
 import EnterPasswordScreen from './screens/auth/EnterPasswordScreen'
@@ -29,11 +30,12 @@ function AppLayout() {
   const showNav = !isFlow && !isVehicleDetail
 
   return (
-    <div className="relative min-h-screen flex" style={{ backgroundColor: '#FAFAF7' }}>
+    <div className="relative min-h-screen" style={{ backgroundColor: '#F5F5EF' }}>
       {showNav && <Sidebar />}
+      {showNav && <TopBar />}
 
-      {/* Main content — offset on desktop to account for sidebar */}
-      <div className={`flex-1 min-w-0 ${showNav ? 'md:ml-56' : ''}`}>
+      {/* Main content — offset on desktop to account for sidebar + topbar */}
+      <div className={showNav ? 'md:ml-60 md:pt-14' : ''}>
         <Routes>
           {/* Main tabs */}
           <Route path="home"              element={<HomeScreen />} />
@@ -73,7 +75,7 @@ function AppLayout() {
 function ComingSoon({ title }: { title: string }) {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-3 pb-24"
-      style={{ backgroundColor: '#FAFAF7' }}>
+      style={{ backgroundColor: '#F5F5EF' }}>
       <p className="text-3xl">🚧</p>
       <p className="text-lg font-bold font-serif" style={{ color: '#1E1E26' }}>{title}</p>
       <p className="text-sm font-sans" style={{ color: '#838390' }}>Próximamente</p>

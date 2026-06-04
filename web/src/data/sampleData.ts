@@ -27,6 +27,10 @@ export interface Vehicle {
   km: string
   currentClient?: string
   clientInfo?: string
+  fuel?: number
+  transmission?: 'Aut.' | 'Man.'
+  segment?: string
+  dailyRate?: number
 }
 
 export interface DailyKpi {
@@ -103,10 +107,10 @@ export const sampleCotizaciones: Cotizacion[] = [
 ]
 
 export const sampleFleet: Vehicle[] = [
-  { plate: 'ABC-123', model: 'Nissan Sentra', year: '2022', color: 'Azul', status: 'rentado', km: '45,200', currentClient: 'M. Pérez', clientInfo: 'vence vie' },
-  { plate: 'XYZ-908', model: 'Nissan Versa', year: '2023', color: 'Blanco', status: 'disponible', km: '12,100' },
-  { plate: 'JKL-441', model: 'Chevrolet Aveo', year: '2021', color: 'Gris', status: 'rentado', km: '78,300', currentClient: 'R. López', clientInfo: 'vence hoy' },
-  { plate: 'MNP-772', model: 'Kia Rio', year: '2023', color: 'Rojo', status: 'taller', km: '38,400', clientInfo: 'Cambio de aceite' },
-  { plate: 'QRS-115', model: 'VW Polo', year: '2022', color: 'Negro', status: 'disponible', km: '22,800' },
-  { plate: 'TUV-309', model: 'Toyota Yaris', year: '2023', color: 'Blanco', status: 'reservado', km: '8,900', clientInfo: 'jue 23 · 10:00' },
+  { plate: 'ABC-123', model: 'Nissan Sentra', year: '2022', color: 'Azul', status: 'rentado', km: '45,200', currentClient: 'M. Pérez', clientInfo: 'vence vie', fuel: 78, transmission: 'Aut.', segment: 'Sedán', dailyRate: 850 },
+  { plate: 'XYZ-908', model: 'Nissan Versa', year: '2023', color: 'Blanco', status: 'disponible', km: '12,100', fuel: 100, transmission: 'Aut.', segment: 'Sedán', dailyRate: 780 },
+  { plate: 'JKL-441', model: 'Chevrolet Aveo', year: '2021', color: 'Gris', status: 'rentado', km: '78,300', currentClient: 'R. López', clientInfo: 'vence hoy', fuel: 40, transmission: 'Man.', segment: 'Sedán', dailyRate: 700 },
+  { plate: 'MNP-772', model: 'Kia Rio', year: '2023', color: 'Rojo', status: 'taller', km: '38,400', clientInfo: 'Cambio de aceite', fuel: 60, transmission: 'Man.', segment: 'Compacto', dailyRate: 650 },
+  { plate: 'QRS-115', model: 'VW Polo', year: '2022', color: 'Negro', status: 'disponible', km: '22,800', fuel: 90, transmission: 'Man.', segment: 'Hatchback', dailyRate: 760 },
+  { plate: 'TUV-309', model: 'Toyota Yaris', year: '2023', color: 'Blanco', status: 'reservado', km: '8,900', clientInfo: 'jue 23 · 10:00', fuel: 95, transmission: 'Aut.', segment: 'Compacto', dailyRate: 700 },
 ]

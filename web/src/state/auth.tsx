@@ -7,19 +7,19 @@ interface AuthContextType {
   user: User | null
   loading: boolean
   signOut: () => Promise<void>
-  // Convenience getters derived from user_metadata
   currentEmail: string
   currentFirstName: string
   currentInitials: string
   currentRole: string
   currentBranch: string
+  isAdmin: boolean
 }
 
 const AuthContext = createContext<AuthContextType>({
   session: null, user: null, loading: true,
   signOut: async () => {},
   currentEmail: '', currentFirstName: '', currentInitials: '',
-  currentRole: '', currentBranch: '',
+  currentRole: '', currentBranch: '', isAdmin: false,
 })
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -53,7 +53,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const firstName     = meta.first_name ?? meta.nombre ?? email.split('@')[0] ?? ''
   const initials      = meta.initials  ?? firstName.slice(0, 2).toUpperCase()
   const role          = meta.role      ?? meta.rol    ?? 'Empleado'
-  const branch        = meta.branch    ?? meta.sucursal ?? 'Polanco'
+  const branch   = meta.branch ?? meta.sucursal ?? 'Polanco'
+  const isAdmin  = role === 'Administrador'
 
   return (
     <AuthContext.Provider value={{
@@ -63,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       currentInitials: initials,
       currentRole: role,
       currentBranch: branch,
+      isAdmin,
     }}>
       {children}
     </AuthContext.Provider>

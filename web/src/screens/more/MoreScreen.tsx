@@ -19,8 +19,7 @@ function ToggleRow({ on, onChange, label, sub }: { on: boolean; onChange: () => 
 
 export default function MoreScreen() {
   const navigate = useNavigate()
-  const { currentInitials, currentFirstName, currentRole } = useAuth()
-  const isAdmin = currentRole === 'admin' || currentRole === 'Administrador' || !currentRole
+  const { currentInitials, currentFirstName, currentRole, currentEmail, isAdmin } = useAuth()
   const [notif, setNotif] = useState({ mov: true, cot: true, resumen: false })
 
   return (
@@ -37,13 +36,13 @@ export default function MoreScreen() {
         <div className="card set-profile">
           <div className="avatar accent" style={{ width: 60, height: 60, fontSize: 20 }}>{currentInitials || 'LL'}</div>
           <div className="meta">
-            <h2>{currentFirstName || 'Luciano'} R.</h2>
-            <div className="mail">luciano@lucianos.mx</div>
+            <h2>{currentFirstName || 'Usuario'}</h2>
+            <div className="mail">{currentEmail}</div>
           </div>
           <span className={'chip ' + (isAdmin ? 'primary' : '')}>
             {isAdmin ? 'Administrador' : 'Operativo'}
           </span>
-          <button className="btn sm">Editar perfil</button>
+          <button className="btn sm" onClick={() => navigate('/app/edit-profile')}>Editar perfil</button>
         </div>
 
         {/* Notificaciones */}

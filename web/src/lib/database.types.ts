@@ -4,6 +4,8 @@ export type VehiculoStatus   = 'disponible' | 'rentado' | 'taller' | 'reservado'
 export type ReservaStatus    = 'pendiente' | 'confirmada' | 'entregada' | 'devuelta' | 'cancelada'
 export type CotizacionStatus = 'enviada' | 'aceptada' | 'vencida' | 'convertida'
 
+export type SolicitudEstado = 'pendiente' | 'aprobada' | 'rechazada'
+
 export interface Database {
   public: {
     Tables: {
@@ -76,12 +78,47 @@ export interface Database {
           status?: CotizacionStatus; reserva_id?: string | null
         }
       }
+      solicitudes: {
+        Row: {
+          id: string
+          tipo: string
+          tabla: string
+          registro_id: string
+          datos_actuales: Record<string, unknown> | null
+          datos_nuevos: Record<string, unknown>
+          solicitado_por: string | null
+          estado: SolicitudEstado
+          revisado_por: string | null
+          revisado_at: string | null
+          nota_rechazo: string | null
+          created_at: string
+        }
+        Insert: {
+          tipo: string; tabla: string; registro_id: string
+          datos_actuales?: Record<string, unknown> | null
+          datos_nuevos: Record<string, unknown>
+          solicitado_por?: string | null
+          estado?: SolicitudEstado
+        }
+        Update: {
+          estado?: SolicitudEstado
+          revisado_por?: string | null
+          revisado_at?: string | null
+          nota_rechazo?: string | null
+        }
+      }
     }
   }
 }
 
 // Convenience row types
-export type Vehiculo    = Database['public']['Tables']['vehiculos']['Row']
-export type Cliente     = Database['public']['Tables']['clientes']['Row']
-export type Reserva     = Database['public']['Tables']['reservas']['Row']
-export type Cotizacion  = Database['public']['Tables']['cotizaciones']['Row']
+export type Vehiculo   = Database['public']['Tables']['vehiculos']['Row']
+export type Cliente    = Database['public']['Tables']['clientes']['Row']
+export type Reserva    = Database['public']['Tables']['reservas']['Row']
+export type Cotizacion = Database['public']['Tables']['cotizaciones']['Row']
+export type Solicitud  = Database['public']['Tables']['solicitudes']['Row']
+
+export interface ReservaConDetalle extends Reserva {
+  clientes: { nombre: string; apellido: string | null; telefono: string | null } | null
+  vehiculos: { modelo: string; placa: string; anio: number | null; tarifa_diaria: number | null } | null
+}

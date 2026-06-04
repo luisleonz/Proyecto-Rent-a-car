@@ -1,17 +1,21 @@
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Home, Calendar, FileText, Car, Users, DollarSign, BarChart3, UserCheck, Settings, LogOut } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Home, Calendar, FileText, Car, Users, DollarSign, BarChart3, UserCheck, Settings, LogOut, ShieldCheck } from 'lucide-react'
 import { useAuth } from '../state/auth'
+import { supabase } from '../lib/supabase'
+
+const db = supabase as any
 
 const NAV = [
-  { id: 'inicio',     label: 'Inicio',        icon: Home,       path: '/app/home',         group: 'operacion' },
-  { id: 'reservas',   label: 'Reservas',       icon: Calendar,   path: '/app/reservations', group: 'operacion', badge: '14' },
-  { id: 'cotizacion', label: 'Cotizaciones',   icon: FileText,   path: '/app/cotizaciones', group: 'operacion' },
-  { id: 'flota',      label: 'Flota',          icon: Car,        path: '/app/vehicles',     group: 'operacion' },
-  { id: 'clientes',   label: 'Clientes',       icon: Users,      path: '/app/clientes',     group: 'operacion' },
-  { id: 'caja',       label: 'Caja',           icon: DollarSign, path: '/app/caja',         group: 'gestion' },
-  { id: 'reportes',   label: 'Reportes',       icon: BarChart3,  path: '/app/reportes',     group: 'gestion' },
-  { id: 'empleados',  label: 'Empleados',      icon: UserCheck,  path: '/app/empleados',    group: 'gestion' },
-  { id: 'ajustes',    label: 'Ajustes',        icon: Settings,   path: '/app/more',         group: 'gestion' },
+  { id: 'inicio',     label: 'Inicio',        icon: Home,       path: '/app/home',         group: 'operacion', adminOnly: false },
+  { id: 'reservas',   label: 'Reservas',       icon: Calendar,   path: '/app/reservations', group: 'operacion', adminOnly: false },
+  { id: 'cotizacion', label: 'Cotizaciones',   icon: FileText,   path: '/app/cotizaciones', group: 'operacion', adminOnly: false },
+  { id: 'flota',      label: 'Flota',          icon: Car,        path: '/app/vehicles',     group: 'operacion', adminOnly: false },
+  { id: 'clientes',   label: 'Clientes',       icon: Users,      path: '/app/clientes',     group: 'operacion', adminOnly: false },
+  { id: 'caja',       label: 'Caja',           icon: DollarSign, path: '/app/caja',         group: 'gestion',   adminOnly: false },
+  { id: 'reportes',   label: 'Reportes',       icon: BarChart3,  path: '/app/reportes',     group: 'gestion',   adminOnly: true  },
+  { id: 'empleados',  label: 'Empleados',      icon: UserCheck,  path: '/app/empleados',    group: 'gestion',   adminOnly: true  },
+  { id: 'ajustes',    label: 'Ajustes',        icon: Settings,   path: '/app/more',         group: 'gestion',   adminOnly: false },
 ]
 
 const GROUPS = [
@@ -27,7 +31,14 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { currentInitials, currentFirstName, currentRole, signOut } = useAuth()
+  const { currentInitials, currentFirstName, currentRole, signOut, isAdmin } = useAuth()
+  const [pendingCount, setPendingCount] = useState(0)
+
+  useEffect(() => {
+    if (!isAdmin) return
+    db.from('solicitudes').select('id', { count: 'exact', head: true }).eq('estado', 'pendiente')
+      .then(({ count }: { count: number | null }) => setPendingCount(count ?? 0))
+  }, [isAdmin])
 
   function handleNav(path: string) {
     navigate(path)
@@ -51,16 +62,28 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       {GROUPS.map(g => (
         <>
           <div key={g.key + '-label'} className="navlabel">{g.label}</div>
-          {NAV.filter(n => n.group === g.key).map(n => {
+          {NAV.filter(n => n.group === g.key && (!n.adminOnly || isAdmin)).map(n => {
             const active = location.pathname === n.path || location.pathname.startsWith(n.path + '/')
             return (
               <button key={n.id} className="navitem" data-active={String(active)} onClick={() => handleNav(n.path)}>
                 <span className="ico"><n.icon size={18} strokeWidth={active ? 2.4 : 1.8} /></span>
                 <span className="label-text">{n.label}</span>
-                {n.badge && <span className="badge">{n.badge}</span>}
               </button>
             )
           })}
+          {g.key === 'gestion' && isAdmin && (() => {
+            const path = '/app/autorizaciones'
+            const active = location.pathname === path
+            return (
+              <button key="autorizaciones" className="navitem" data-active={String(active)} onClick={() => handleNav(path)}>
+                <span className="ico"><ShieldCheck size={18} strokeWidth={active ? 2.4 : 1.8} /></span>
+                <span className="label-text">Autorizaciones</span>
+                {pendingCount > 0 && (
+                  <span className="badge" style={{ background: '#d68910' }}>{pendingCount}</span>
+                )}
+              </button>
+            )
+          })()}
         </>
       ))}
       <div className="foot">

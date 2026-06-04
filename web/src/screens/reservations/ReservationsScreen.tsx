@@ -366,7 +366,7 @@ function NuevaReservaModal({ open, onClose, onCreated }: { open: boolean; onClos
     const total = (v?.tarifa_diaria ?? 0) * dias
 
     const { data: cliente } = await db.from('clientes').insert({
-      nombre: clienteNombre.trim(), telefono: clienteTel.trim() || null, apellido: null, email: null,
+      nombre: clienteNombre.trim(), telefono: clienteTel.trim() || null,
     }).select('id').single()
 
     await db.from('reservas').insert({

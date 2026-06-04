@@ -627,7 +627,6 @@ export default function CotizacionesScreen() {
     const { data: cliente, error: clienteErr } = await db.from('clientes').insert({
       nombre: cot.cliente_nombre,
       telefono: cot.cliente_telefono ?? null,
-      apellido: null, email: null,
     }).select().single()
     if (clienteErr) return `Error al crear cliente: ${clienteErr.message}`
 

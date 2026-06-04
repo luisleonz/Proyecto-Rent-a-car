@@ -13,9 +13,10 @@ const NAV = [
   { id: 'flota',      label: 'Flota',          icon: Car,        path: '/app/vehicles',     group: 'operacion', adminOnly: false },
   { id: 'clientes',   label: 'Clientes',       icon: Users,      path: '/app/clientes',     group: 'operacion', adminOnly: false },
   { id: 'caja',       label: 'Caja',           icon: DollarSign, path: '/app/caja',         group: 'gestion',   adminOnly: false },
-  { id: 'reportes',   label: 'Reportes',       icon: BarChart3,  path: '/app/reportes',     group: 'gestion',   adminOnly: true  },
-  { id: 'empleados',  label: 'Empleados',      icon: UserCheck,  path: '/app/empleados',    group: 'gestion',   adminOnly: true  },
-  { id: 'ajustes',    label: 'Ajustes',        icon: Settings,   path: '/app/more',         group: 'gestion',   adminOnly: false },
+  { id: 'reportes',        label: 'Reportes',        icon: BarChart3,   path: '/app/reportes',        group: 'gestion',   adminOnly: true  },
+  { id: 'empleados',       label: 'Empleados',        icon: UserCheck,   path: '/app/empleados',       group: 'gestion',   adminOnly: true  },
+  { id: 'autorizaciones',  label: 'Autorizaciones',   icon: ShieldCheck, path: '/app/autorizaciones',  group: 'gestion',   adminOnly: true  },
+  { id: 'ajustes',         label: 'Ajustes',          icon: Settings,    path: '/app/more',            group: 'gestion',   adminOnly: false },
 ]
 
 const GROUPS = [
@@ -68,22 +69,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               <button key={n.id} className="navitem" data-active={String(active)} onClick={() => handleNav(n.path)}>
                 <span className="ico"><n.icon size={18} strokeWidth={active ? 2.4 : 1.8} /></span>
                 <span className="label-text">{n.label}</span>
-              </button>
-            )
-          })}
-          {g.key === 'gestion' && isAdmin && (() => {
-            const path = '/app/autorizaciones'
-            const active = location.pathname === path
-            return (
-              <button key="autorizaciones" className="navitem" data-active={String(active)} onClick={() => handleNav(path)}>
-                <span className="ico"><ShieldCheck size={18} strokeWidth={active ? 2.4 : 1.8} /></span>
-                <span className="label-text">Autorizaciones</span>
-                {pendingCount > 0 && (
+                {n.id === 'autorizaciones' && pendingCount > 0 && (
                   <span className="badge" style={{ background: '#d68910' }}>{pendingCount}</span>
                 )}
               </button>
             )
-          })()}
+          })}
         </>
       ))}
       <div className="foot">

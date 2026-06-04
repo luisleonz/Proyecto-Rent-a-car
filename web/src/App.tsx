@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Menu } from 'lucide-react'
 import { AuthProvider } from './state/auth'
@@ -32,6 +33,10 @@ function AppLayout() {
   const location = useLocation()
   const isFlow = FLOW_PREFIXES.some(p => location.pathname.startsWith(p))
   const showNav = !isFlow
+  const [sideOpen, setSideOpen] = useState(false)
+
+  // Close sidebar on route change
+  useEffect(() => { setSideOpen(false) }, [location.pathname])
 
   // Route → title/subtitle for mobile top bar
   const PAGE_INFO: Record<string, [string, string]> = {
@@ -46,12 +51,21 @@ function AppLayout() {
 
   return (
     <div className="app">
-      {showNav && <Sidebar />}
+      {showNav && <Sidebar isOpen={sideOpen} onClose={() => setSideOpen(false)} />}
+      {/* Backdrop — closes sidebar when tapping outside on mobile */}
+      {showNav && sideOpen && (
+        <div
+          onClick={() => setSideOpen(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 38, background: 'rgba(0,0,0,0.38)' }}
+        />
+      )}
       {showNav && <TopBar />}
       <div className="main">
         {showNav && (
           <header className="mtop">
-            <button className="iconbtn" style={{ width: 38, height: 38 }}><Menu size={19} /></button>
+            <button className="iconbtn" style={{ width: 38, height: 38 }} onClick={() => setSideOpen(v => !v)}>
+              <Menu size={19} />
+            </button>
             <div className="grow">
               <div className="title">{title}</div>
               {sub && <div className="sub">{sub}</div>}
@@ -91,17 +105,6 @@ function AppLayout() {
           </Routes>
         </div>
         {showNav && <BottomNav />}
-      </div>
-    </div>
-  )
-}
-
-function ComingSoon({ title }: { title: string }) {
-  return (
-    <div className="stub">
-      <div className="stub-card">
-        <h2>{title}</h2>
-        <p>Esta sección estará disponible próximamente.</p>
       </div>
     </div>
   )

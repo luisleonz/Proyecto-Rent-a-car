@@ -19,13 +19,23 @@ const GROUPS = [
   { key: 'gestion',   label: 'Gestión' },
 ]
 
-export default function Sidebar() {
+interface SidebarProps {
+  isOpen?: boolean
+  onClose?: () => void
+}
+
+export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const { currentInitials, currentFirstName, currentRole } = useAuth()
 
+  function handleNav(path: string) {
+    navigate(path)
+    onClose?.()
+  }
+
   return (
-    <nav className="side">
+    <nav className="side" style={isOpen ? { left: 0 } : undefined}>
       <div className="logo">
         <div className="ring">L</div>
         <div className="wm">
@@ -39,7 +49,7 @@ export default function Sidebar() {
           {NAV.filter(n => n.group === g.key).map(n => {
             const active = location.pathname === n.path || location.pathname.startsWith(n.path + '/')
             return (
-              <button key={n.id} className="navitem" data-active={String(active)} onClick={() => navigate(n.path)}>
+              <button key={n.id} className="navitem" data-active={String(active)} onClick={() => handleNav(n.path)}>
                 <span className="ico"><n.icon size={18} strokeWidth={active ? 2.4 : 1.8} /></span>
                 <span className="label-text">{n.label}</span>
                 {n.badge && <span className="badge">{n.badge}</span>}

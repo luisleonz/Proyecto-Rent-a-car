@@ -10,20 +10,33 @@ const fmt = (n: number) => new Intl.NumberFormat('en-US').format(Math.abs(n))
 const FUEL_OPTS = ['E', '1/4', '1/2', '3/4', 'F']
 const ALL_RES = [...todayReservations, ...tomorrowReservations]
 
+// ─── Layout wrapper ────────────────────────────────────────────────────────────
+function FlowPage({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="screen">
+      <div style={{ maxWidth: 540, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {children}
+      </div>
+    </div>
+  )
+}
+
 // ─── Shared components ────────────────────────────────────────────────────────
 
 function FlowTopBar({ onCancel }: { onCancel: () => void }) {
   const navigate = useNavigate()
   return (
-    <div className="flex items-center justify-between px-4 py-2.5">
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
       <button
         onClick={() => navigate(-1)}
-        className="w-9 h-9 rounded-full border border-hairline flex items-center justify-center"
-        style={{ backgroundColor: 'var(--paper-alt)' }}
+        style={{ width: 36, height: 36, borderRadius: '50%', border: '1px solid var(--card-line)', background: 'var(--card)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
       >
-        <ArrowLeft size={18} style={{ color: 'var(--ink2)' }} />
+        <ArrowLeft size={17} style={{ color: 'var(--ink2)' }} />
       </button>
-      <button onClick={onCancel} className="text-[13px] font-medium font-sans" style={{ color: 'var(--ink2)' }}>
+      <button
+        onClick={onCancel}
+        style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink2)', background: 'none', border: 0, cursor: 'pointer', fontFamily: 'inherit' }}
+      >
         Cancelar
       </button>
     </div>
@@ -33,15 +46,18 @@ function FlowTopBar({ onCancel }: { onCancel: () => void }) {
 function DevHeader({ step }: { step: number }) {
   const labels = ['inspección comparada', 'cargos finales', 'cerrar contrato']
   return (
-    <div className="px-5 pb-3.5">
-      <div className="flex gap-1.5 mb-2.5">
+    <div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
         {[0, 1, 2].map(i => (
-          <div key={i} className="flex-1 h-1 rounded-full"
-            style={{ backgroundColor: i <= step ? 'var(--primary)' : 'var(--card-line)' }} />
+          <div key={i} style={{ flex: 1, height: 4, borderRadius: 999, background: i <= step ? 'var(--primary)' : 'var(--card-line)' }} />
         ))}
       </div>
-      <p className="text-[22px] font-bold font-serif" style={{ color: 'var(--ink)' }}>Devolución</p>
-      <p className="text-xs font-sans mt-1" style={{ color: 'var(--ink2)' }}>Paso {step + 1} de 3 · {labels[step]}</p>
+      <p style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', margin: 0 }}>
+        Devolución
+      </p>
+      <p style={{ fontSize: 12, color: 'var(--ink2)', marginTop: 4 }}>
+        Paso {step + 1} de 3 · {labels[step]}
+      </p>
     </div>
   )
 }
@@ -49,46 +65,47 @@ function DevHeader({ step }: { step: number }) {
 function DevClientCard({ resId }: { resId: string }) {
   const res = ALL_RES.find(r => r.id === resId) ?? ALL_RES[0]
   return (
-    <div className="rounded-2xl border p-2.5 flex items-center gap-2.5"
-      style={{ backgroundColor: 'var(--primary-soft)', borderColor: 'var(--primary-line)' }}>
+    <div style={{ background: 'var(--primary-soft)', border: '1px solid var(--primary-line)', borderRadius: 'var(--radius-sm)', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
       <AvatarCircle initials={res.clientInitials} size={32} />
-      <p className="text-[12px] font-semibold font-sans" style={{ color: 'var(--ink)' }}>
+      <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', margin: 0 }}>
         {res.clientName} · {res.vehicle}
       </p>
     </div>
   )
 }
 
-function ContinueButton({ disabled, onClick, label = 'Continuar' }: { disabled?: boolean; onClick: () => void; label?: string }) {
+function ContinueBtn({ disabled, onClick, label = 'Continuar' }: { disabled?: boolean; onClick: () => void; label?: string }) {
   return (
-    <div className="border-t border-hairline p-4 flex-shrink-0" style={{ background: 'var(--card)' }}>
-      <button
-        disabled={disabled}
-        onClick={onClick}
-        className="w-full py-3.5 rounded-full text-sm font-semibold font-sans text-white flex items-center justify-center gap-1 transition-opacity"
-        style={{ backgroundColor: 'var(--primary)', opacity: disabled ? 0.5 : 1 }}
-      >
-        {label}
-        {label === 'Continuar' && <ChevronRight size={18} />}
-      </button>
-    </div>
+    <button
+      disabled={disabled}
+      onClick={onClick}
+      style={{
+        width: '100%', padding: '14px 0', borderRadius: 999, background: 'var(--primary)',
+        color: 'white', fontSize: 14, fontWeight: 600, border: 0, cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.45 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        fontFamily: 'inherit', marginTop: 8,
+      }}
+    >
+      {label}
+      {label === 'Continuar' && <ChevronRight size={17} />}
+    </button>
   )
 }
 
 function CompareRow({ label, value, color = 'var(--ink)' }: { label: string; value: string; color?: string }) {
   return (
-    <div className="flex justify-between items-center">
-      <p className="text-xs font-sans" style={{ color: 'var(--ink2)' }}>{label}</p>
-      <p className="text-xs font-semibold font-mono" style={{ color }}>{value}</p>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <p style={{ fontSize: 12, color: 'var(--ink2)', margin: 0 }}>{label}</p>
+      <p style={{ fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-mono)', color, margin: 0 }}>{value}</p>
     </div>
   )
 }
 
 function ChargeRow({ label, value, color = 'var(--ink)', faded = false }: { label: string; value: string; color?: string; faded?: boolean }) {
   return (
-    <div className="flex justify-between items-center" style={{ opacity: faded ? 0.5 : 1 }}>
-      <p className="text-xs font-sans flex-1 pr-2" style={{ color: 'var(--ink2)' }}>{label}</p>
-      <p className="text-[13px] font-medium font-mono" style={{ color }}>{value}</p>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', opacity: faded ? 0.5 : 1 }}>
+      <p style={{ fontSize: 12, color: 'var(--ink2)', flex: 1, paddingRight: 8, margin: 0 }}>{label}</p>
+      <p style={{ fontSize: 13, fontWeight: 500, fontFamily: 'var(--font-mono)', color, margin: 0 }}>{value}</p>
     </div>
   )
 }
@@ -112,107 +129,94 @@ export function DevolucionStep1Screen() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--paper)' }}>
-      <div className="border-b border-hairline flex-shrink-0" style={{ background: 'var(--card)' }}>
-        <FlowTopBar onCancel={() => navigate('/app/home', { replace: true })} />
-        <DevHeader step={0} />
+    <FlowPage>
+      <FlowTopBar onCancel={() => navigate('/app/reservations', { replace: true })} />
+      <DevHeader step={0} />
+      <DevClientCard resId={resId} />
+
+      {/* Comparison */}
+      <div>
+        <SectionEyebrow text="Comparar con la entrega" />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
+          <div className="card" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <p style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--ink3)', margin: 0 }}>ENTREGA · lun 20</p>
+            <CompareRow label="Km" value="45,200" />
+            <CompareRow label="Tanque" value="3/4" />
+            <CompareRow label="Daños" value="2" />
+          </div>
+          <div style={{ borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--primary-line)', background: 'var(--primary-soft)', padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--primary-dark)', margin: 0 }}>DEVOLUCIÓN · hoy</p>
+            <CompareRow label="Km" value={km} color="var(--primary)" />
+            <CompareRow label="Tanque" value={fuel} color={fuel === '3/4' || fuel === 'F' ? 'var(--primary)' : 'var(--warn-ink)'} />
+            <CompareRow label="Daños nuevos" value={String(damages)} color={damages > 0 ? 'var(--warn-ink)' : 'var(--primary)'} />
+          </div>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4">
-        <DevClientCard resId={resId} />
-
-        {/* Comparison */}
-        <div>
-          <SectionEyebrow text="Comparar con la entrega" />
-          <div className="flex gap-2 mt-2">
-            <div className="flex-1 rounded-2xl border border-hairline p-3 flex flex-col gap-1.5" style={{ background: 'var(--card)' }}>
-              <p className="text-[10px] font-semibold font-sans uppercase tracking-[0.6px]" style={{ color: 'var(--ink3)' }}>ENTREGA · lun 20</p>
-              <CompareRow label="Km" value="45,200" />
-              <CompareRow label="Tanque" value="3/4" />
-              <CompareRow label="Daños" value="2" />
-            </div>
-            <div className="flex-1 rounded-2xl border p-3 flex flex-col gap-1.5"
-              style={{ backgroundColor: 'var(--primary-soft)', borderColor: 'var(--primary-line)' }}>
-              <p className="text-[10px] font-bold font-sans uppercase tracking-[0.6px]" style={{ color: 'var(--primary-dark)' }}>DEVOLUCIÓN · hoy</p>
-              <CompareRow label="Km" value={km} color="var(--primary)" />
-              <CompareRow label="Tanque" value={fuel}
-                color={fuel === '3/4' || fuel === 'F' ? 'var(--primary)' : 'var(--warn-ink)'} />
-              <CompareRow label="Daños nuevos" value={String(damages)}
-                color={damages > 0 ? 'var(--warn-ink)' : 'var(--primary)'} />
-            </div>
+      {/* KM input */}
+      <div>
+        <SectionEyebrow text="Kilometraje actual" />
+        <div className="card" style={{ padding: 14, marginTop: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <input
+              type="text"
+              value={km}
+              onChange={e => setKm(e.target.value)}
+              style={{ flex: 1, fontFamily: 'var(--font-display)', fontSize: 22, color: 'var(--ink)', border: 0, borderBottom: '1px solid var(--card-line)', outline: 'none', background: 'transparent' }}
+            />
+            <span style={{ fontSize: 13, color: 'var(--ink3)' }}>km</span>
           </div>
+          <p style={{ fontSize: 11, color: 'var(--ink2)', marginTop: 6 }}>
+            Recorrido: {fmt(recorrido)} km en 3 días
+          </p>
         </div>
+      </div>
 
-        {/* KM input */}
-        <div>
-          <SectionEyebrow text="Kilometraje actual" />
-          <div className="rounded-2xl border border-hairline p-3.5 mt-2" style={{ background: 'var(--card)' }}>
-            <div className="flex items-baseline gap-2">
-              <input
-                type="text"
-                value={km}
-                onChange={e => setKm(e.target.value)}
-                className="flex-1 font-serif outline-none border-b"
-                style={{ fontSize: 22, color: 'var(--ink)', borderColor: 'var(--card-line)' }}
-              />
-              <span className="text-sm font-sans" style={{ color: 'var(--ink3)' }}>km</span>
-            </div>
-            <p className="text-[11px] font-sans mt-1.5" style={{ color: 'var(--ink2)' }}>
-              Recorrido: {fmt(recorrido)} km en 3 días
-            </p>
-          </div>
-        </div>
-
-        {/* Fuel */}
-        <div>
-          <SectionEyebrow text="Nivel del tanque" />
-          <div className="flex gap-1.5 mt-2">
-            {FUEL_OPTS.map(opt => {
-              const sel = opt === fuel
-              return (
-                <button key={opt} onClick={() => setFuel(opt)}
-                  className="flex-1 py-2.5 rounded-xl border flex items-center justify-center transition-colors"
-                  style={{
-                    backgroundColor: sel ? 'var(--primary-soft)' : 'white',
-                    borderColor: sel ? 'var(--primary)' : 'var(--card-line)',
-                    borderWidth: sel ? 1.5 : 1,
-                  }}>
-                  <span className="text-sm font-serif" style={{ color: sel ? 'var(--primary)' : 'var(--ink)', fontWeight: sel ? 600 : 400 }}>
-                    {opt}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Damages */}
-        <div>
-          <SectionEyebrow text="Daños nuevos (si los hay)" />
-          <button
-            onClick={() => setDamages(d => d + 1)}
-            className="w-full rounded-2xl border border-hairline p-3.5 flex flex-col items-center gap-2 mt-2"
-            style={{ background: 'var(--card)' }}
-          >
-            <div className="w-full h-[70px] rounded-xl flex items-center justify-center gap-2" style={{ backgroundColor: 'var(--paper-alt)' }}>
-              <span style={{ fontSize: 28 }}>🚗</span>
-              {damages > 0 && <span className="text-sm" style={{ color: 'var(--warn-ink)' }}>{damages}⚠</span>}
-            </div>
-            <p className="text-[11px] font-sans" style={{ color: damages > 0 ? 'var(--warn-ink)' : 'var(--ink3)' }}>
-              {damages === 0 ? 'Sin daños nuevos — toca para marcar' : `${damages} daño(s) nuevo(s)`}
-            </p>
-            {damages > 0 && (
-              <button onClick={e => { e.stopPropagation(); setDamages(0) }}
-                className="text-[11px] font-sans" style={{ color: 'var(--ink2)' }}>
-                Limpiar
+      {/* Fuel */}
+      <div>
+        <SectionEyebrow text="Nivel del tanque" />
+        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+          {FUEL_OPTS.map(opt => {
+            const sel = opt === fuel
+            return (
+              <button key={opt} onClick={() => setFuel(opt)}
+                style={{
+                  flex: 1, padding: '10px 0', borderRadius: 'var(--radius-sm)', border: `${sel ? 1.5 : 1}px solid ${sel ? 'var(--primary)' : 'var(--card-line)'}`,
+                  background: sel ? 'var(--primary-soft)' : 'var(--card)', cursor: 'pointer', fontFamily: 'var(--font-display)',
+                  fontSize: 14, color: sel ? 'var(--primary)' : 'var(--ink)', fontWeight: sel ? 600 : 400,
+                }}>
+                {opt}
               </button>
-            )}
-          </button>
+            )
+          })}
         </div>
       </div>
 
-      <ContinueButton onClick={handleContinue} />
-    </div>
+      {/* Damages */}
+      <div>
+        <SectionEyebrow text="Daños nuevos (si los hay)" />
+        <button
+          onClick={() => setDamages(d => d + 1)}
+          className="card"
+          style={{ width: '100%', marginTop: 8, padding: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, cursor: 'pointer', fontFamily: 'inherit', border: '1px solid var(--card-line)' }}
+        >
+          <div style={{ width: '100%', height: 70, borderRadius: 10, background: 'var(--paper-alt)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <span style={{ fontSize: 28 }}>🚗</span>
+            {damages > 0 && <span style={{ fontSize: 14, color: 'var(--warn-ink)' }}>{damages}⚠</span>}
+          </div>
+          <p style={{ fontSize: 11, color: damages > 0 ? 'var(--warn-ink)' : 'var(--ink3)' }}>
+            {damages === 0 ? 'Sin daños nuevos — toca para marcar' : `${damages} daño(s) nuevo(s)`}
+          </p>
+          {damages > 0 && (
+            <button onClick={e => { e.stopPropagation(); setDamages(0) }} style={{ fontSize: 11, color: 'var(--ink2)', background: 'none', border: 0, cursor: 'pointer', fontFamily: 'inherit' }}>
+              Limpiar
+            </button>
+          )}
+        </button>
+      </div>
+
+      <ContinueBtn onClick={handleContinue} />
+    </FlowPage>
   )
 }
 
@@ -225,76 +229,66 @@ export function DevolucionStep2Screen() {
   const isCharge = s.toCharge > 0
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--paper)' }}>
-      <div className="border-b border-hairline flex-shrink-0" style={{ background: 'var(--card)' }}>
-        <FlowTopBar onCancel={() => navigate('/app/home', { replace: true })} />
-        <DevHeader step={1} />
+    <FlowPage>
+      <FlowTopBar onCancel={() => navigate('/app/reservations', { replace: true })} />
+      <DevHeader step={1} />
+
+      {/* Contract summary */}
+      <div className="card" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <SectionEyebrow text="Resumen del contrato" />
+        <ChargeRow label="Renta · 3 días" value="$2,400" />
+        <ChargeRow label="Seguro" value="$300" />
+        <ChargeRow label="Depósito recibido" value={`$${fmt(s.depositAmount)}`} color="var(--primary)" />
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4">
-        {/* Contract summary */}
-        <div className="rounded-2xl border border-hairline p-4 flex flex-col gap-1.5" style={{ background: 'var(--card)' }}>
-          <SectionEyebrow text="Resumen del contrato" />
-          <div className="mt-1 flex flex-col gap-1.5">
-            <ChargeRow label="Renta · 3 días" value="$2,400" />
-            <ChargeRow label="Seguro" value="$300" />
-            <ChargeRow label="Depósito recibido" value={`$${fmt(s.depositAmount)}`} color="var(--primary)" />
-          </div>
-        </div>
-
-        {/* Extra charges */}
-        <div className="rounded-2xl border border-hairline p-4 flex flex-col gap-2" style={{ background: 'var(--card)' }}>
-          <SectionEyebrow text="Cargos extra" />
-          <div className="mt-1 flex flex-col gap-2">
-            <ChargeRow
-              label={s.kmExtra > 0 ? `Km extra (${s.kmExtra} km × $3)` : 'Km dentro del límite'}
-              value={`$${fmt(s.kmExtra * 3)}`}
-              faded={s.kmExtra === 0}
-            />
-            <ChargeRow
-              label={s.fuelDeficit > 0 ? `Diferencia tanque (${s.fuelDeficit}/4 × $80)` : 'Tanque correcto'}
-              value={`$${fmt(s.fuelDeficit * 80)}`}
-              faded={s.fuelDeficit === 0}
-            />
-            <ChargeRow
-              label={s.newDamageCount > 0 ? `Daños nuevos (${s.newDamageCount} × $800 estim.)` : 'Sin daños nuevos'}
-              value={`$${fmt(s.newDamageCount * 800)}`}
-              color={s.newDamageCount > 0 ? 'var(--warn-ink)' : 'var(--ink)'}
-              faded={s.newDamageCount === 0}
-            />
-            <div className="h-px" style={{ backgroundColor: 'var(--card-line)' }} />
-            <div className="flex justify-between">
-              <p className="text-[13px] font-semibold font-sans" style={{ color: 'var(--ink)' }}>Subtotal extras</p>
-              <p className="text-[15px] font-semibold font-mono" style={{ color: 'var(--ink)' }}>${fmt(s.extraCharges)}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Balance */}
-        <div className="rounded-2xl border p-[18px]"
-          style={{
-            backgroundColor: isCharge ? 'var(--danger)' : 'var(--primary-soft)',
-            borderColor: isCharge ? 'var(--danger)' : 'var(--primary-line)',
-          }}>
-          <p className="text-[10px] font-semibold font-sans uppercase tracking-[1px]"
-            style={{ color: isCharge ? 'rgba(255,255,255,0.75)' : 'var(--primary-dark)' }}>
-            {isCharge ? 'COBRAR AL CLIENTE' : 'DEVOLVER AL CLIENTE'}
-          </p>
-          <p className="font-serif mt-1.5" style={{ fontSize: 42, letterSpacing: '-1px', lineHeight: '44px', color: isCharge ? 'white' : 'var(--primary)' }}>
-            ${fmt(isCharge ? s.toCharge : s.toReturn)}
-          </p>
-          <p className="text-[11px] font-sans mt-1.5"
-            style={{ color: isCharge ? 'rgba(255,255,255,0.8)' : 'var(--ink2)' }}>
-            {isCharge
-              ? `Extras ($${fmt(s.extraCharges)}) excedieron depósito ($${fmt(s.depositAmount)})`
-              : `Del depósito de $${fmt(s.depositAmount)} retenemos $${fmt(s.extraCharges)} por extras`
-            }
-          </p>
+      {/* Extra charges */}
+      <div className="card" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <SectionEyebrow text="Cargos extra" />
+        <ChargeRow
+          label={s.kmExtra > 0 ? `Km extra (${s.kmExtra} km × $3)` : 'Km dentro del límite'}
+          value={`$${fmt(s.kmExtra * 3)}`}
+          faded={s.kmExtra === 0}
+        />
+        <ChargeRow
+          label={s.fuelDeficit > 0 ? `Diferencia tanque (${s.fuelDeficit}/4 × $80)` : 'Tanque correcto'}
+          value={`$${fmt(s.fuelDeficit * 80)}`}
+          faded={s.fuelDeficit === 0}
+        />
+        <ChargeRow
+          label={s.newDamageCount > 0 ? `Daños nuevos (${s.newDamageCount} × $800 estim.)` : 'Sin daños nuevos'}
+          value={`$${fmt(s.newDamageCount * 800)}`}
+          color={s.newDamageCount > 0 ? 'var(--warn-ink)' : 'var(--ink)'}
+          faded={s.newDamageCount === 0}
+        />
+        <div style={{ height: 1, background: 'var(--card-line)' }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', margin: 0 }}>Subtotal extras</p>
+          <p style={{ fontSize: 15, fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--ink)', margin: 0 }}>${fmt(s.extraCharges)}</p>
         </div>
       </div>
 
-      <ContinueButton onClick={() => navigate(`/app/devolucion/${resId}/3`)} />
-    </div>
+      {/* Balance */}
+      <div style={{
+        borderRadius: 'var(--radius)', padding: 18,
+        background: isCharge ? 'var(--danger)' : 'var(--primary-soft)',
+        border: `1px solid ${isCharge ? 'var(--danger)' : 'var(--primary-line)'}`,
+      }}>
+        <p style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, margin: 0, color: isCharge ? 'rgba(255,255,255,0.75)' : 'var(--primary-dark)' }}>
+          {isCharge ? 'COBRAR AL CLIENTE' : 'DEVOLVER AL CLIENTE'}
+        </p>
+        <p style={{ fontFamily: 'var(--font-display)', fontSize: 42, letterSpacing: -1, lineHeight: '44px', marginTop: 6, color: isCharge ? 'white' : 'var(--primary)' }}>
+          ${fmt(isCharge ? s.toCharge : s.toReturn)}
+        </p>
+        <p style={{ fontSize: 11, marginTop: 6, color: isCharge ? 'rgba(255,255,255,0.8)' : 'var(--ink2)' }}>
+          {isCharge
+            ? `Extras ($${fmt(s.extraCharges)}) excedieron depósito ($${fmt(s.depositAmount)})`
+            : `Del depósito de $${fmt(s.depositAmount)} retenemos $${fmt(s.extraCharges)} por extras`
+          }
+        </p>
+      </div>
+
+      <ContinueBtn onClick={() => navigate(`/app/devolucion/${resId}/3`)} />
+    </FlowPage>
   )
 }
 
@@ -322,100 +316,88 @@ export function DevolucionStep3Screen() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--paper)' }}>
-      <div className="border-b border-hairline flex-shrink-0" style={{ background: 'var(--card)' }}>
-        <FlowTopBar onCancel={() => navigate('/app/home', { replace: true })} />
-        <DevHeader step={2} />
-      </div>
+    <FlowPage>
+      <FlowTopBar onCancel={() => navigate('/app/reservations', { replace: true })} />
+      <DevHeader step={2} />
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4">
-        {/* Return method */}
-        <div className="rounded-2xl border border-hairline p-3.5" style={{ background: 'var(--card)' }}>
-          <SectionEyebrow text="Forma de devolución" />
-          <div className="flex gap-1.5 mt-2.5">
-            {RETURN_METHODS.map(({ id, label }) => {
-              const sel = id === returnMethod
-              return (
-                <button key={id} onClick={() => setReturnMethod(id)}
-                  className="flex-1 py-2.5 rounded-xl border flex items-center justify-center"
-                  style={{
-                    backgroundColor: sel ? 'var(--primary-soft)' : 'white',
-                    borderColor: sel ? 'var(--primary)' : 'var(--card-line)',
-                    borderWidth: sel ? 1.5 : 1,
-                  }}>
-                  <span className="text-[11px] font-semibold font-sans" style={{ color: sel ? 'var(--primary)' : 'var(--ink)' }}>{label}</span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Photo */}
-        <div>
-          <SectionEyebrow text="Foto final del auto" />
-          <button
-            onClick={() => setPhotoTaken(true)}
-            className="w-full rounded-2xl border mt-2 transition-colors"
-            style={{
-              backgroundColor: photoTaken ? 'var(--primary-soft)' : 'white',
-              borderColor: photoTaken ? 'var(--primary-line)' : 'var(--card-line)',
-              borderWidth: photoTaken ? 1.5 : 1,
-            }}
-          >
-            <div className="m-2 h-[90px] rounded-xl flex items-center justify-center gap-2"
-              style={{ backgroundColor: photoTaken ? 'rgba(184,223,200,0.3)' : 'var(--paper-alt)' }}>
-              {photoTaken ? (
-                <div className="flex flex-col items-center gap-1">
-                  <span style={{ fontSize: 28 }}>📷</span>
-                  <p className="text-xs font-semibold font-sans" style={{ color: 'var(--primary-dark)' }}>✓ Foto de cierre</p>
-                </div>
-              ) : (
-                <>
-                  <span style={{ fontSize: 20 }}>📷</span>
-                  <p className="text-[13px] font-semibold font-sans" style={{ color: 'var(--ink2)' }}>Tomar foto de cierre</p>
-                </>
-              )}
-            </div>
-          </button>
-        </div>
-
-        {/* Signature */}
-        <div>
-          <SectionEyebrow text="Firma del cliente" />
-          <button
-            onClick={() => setSigned(true)}
-            className="w-full rounded-2xl border mt-2 transition-colors"
-            style={{
-              backgroundColor: signed ? 'var(--primary-soft)' : 'white',
-              borderColor: signed ? 'var(--primary-line)' : 'var(--card-line)',
-              borderWidth: signed ? 1.5 : 1,
-              minHeight: 88,
-            }}
-          >
-            <div className="flex flex-col items-center justify-center py-4 gap-1.5">
-              {signed ? (
-                <p className="text-[13px] font-semibold font-sans" style={{ color: 'var(--primary-dark)' }}>✓ Conforme con la devolución</p>
-              ) : (
-                <>
-                  <p className="font-mono text-xs tracking-[2px]" style={{ color: 'var(--ink4)' }}>— — — — — — — — — — — —</p>
-                  <p className="text-xs font-sans" style={{ color: 'var(--ink3)' }}>Toca para firmar conformidad</p>
-                </>
-              )}
-            </div>
-          </button>
-        </div>
-
-        {/* Receipt */}
-        <div className="rounded-2xl border border-hairline px-3.5 py-3 flex items-center gap-3" style={{ background: 'var(--card)' }}>
-          <div className="w-[22px] h-[22px] rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--primary)' }}>
-            <Check size={14} className="text-white" />
-          </div>
-          <p className="text-xs font-sans" style={{ color: 'var(--ink)' }}>Enviar comprobante y recibir calificación</p>
+      {/* Return method */}
+      <div className="card" style={{ padding: 14 }}>
+        <SectionEyebrow text="Forma de devolución" />
+        <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+          {RETURN_METHODS.map(({ id, label }) => {
+            const sel = id === returnMethod
+            return (
+              <button key={id} onClick={() => setReturnMethod(id)}
+                style={{
+                  flex: 1, padding: '10px 0', borderRadius: 'var(--radius-sm)', border: `${sel ? 1.5 : 1}px solid ${sel ? 'var(--primary)' : 'var(--card-line)'}`,
+                  background: sel ? 'var(--primary-soft)' : 'white', cursor: 'pointer', fontFamily: 'inherit',
+                  fontSize: 11, fontWeight: 600, color: sel ? 'var(--primary)' : 'var(--ink)',
+                }}>
+                {label}
+              </button>
+            )
+          })}
         </div>
       </div>
 
-      <ContinueButton disabled={!ready} onClick={handleCerrar} label="Cerrar contrato" />
-    </div>
+      {/* Photo */}
+      <div>
+        <SectionEyebrow text="Foto final del auto" />
+        <button
+          onClick={() => setPhotoTaken(true)}
+          style={{
+            width: '100%', marginTop: 8, borderRadius: 'var(--radius-sm)', border: `${photoTaken ? 1.5 : 1}px solid ${photoTaken ? 'var(--primary-line)' : 'var(--card-line)'}`,
+            background: photoTaken ? 'var(--primary-soft)' : 'var(--card)', cursor: 'pointer', fontFamily: 'inherit',
+          }}
+        >
+          <div style={{ margin: 8, height: 90, borderRadius: 10, background: photoTaken ? 'rgba(184,223,200,0.3)' : 'var(--paper-alt)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            {photoTaken ? (
+              <>
+                <span style={{ fontSize: 28 }}>📷</span>
+                <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary-dark)', margin: 0 }}>✓ Foto de cierre</p>
+              </>
+            ) : (
+              <>
+                <span style={{ fontSize: 20 }}>📷</span>
+                <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', margin: 0 }}>Tomar foto de cierre</p>
+              </>
+            )}
+          </div>
+        </button>
+      </div>
+
+      {/* Signature */}
+      <div>
+        <SectionEyebrow text="Firma del cliente" />
+        <button
+          onClick={() => setSigned(true)}
+          style={{
+            width: '100%', marginTop: 8, borderRadius: 'var(--radius-sm)', border: `${signed ? 1.5 : 1}px solid ${signed ? 'var(--primary-line)' : 'var(--card-line)'}`,
+            background: signed ? 'var(--primary-soft)' : 'var(--card)', cursor: 'pointer', fontFamily: 'inherit', minHeight: 88,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}
+        >
+          {signed ? (
+            <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--primary-dark)', margin: 0 }}>✓ Conforme con la devolución</p>
+          ) : (
+            <>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: 2, color: 'var(--ink4)', margin: 0 }}>— — — — — — — — — — — —</p>
+              <p style={{ fontSize: 12, color: 'var(--ink3)', margin: 0 }}>Toca para firmar conformidad</p>
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Receipt row */}
+      <div className="card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ width: 22, height: 22, borderRadius: 8, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Check size={13} color="white" />
+        </div>
+        <p style={{ fontSize: 12.5, color: 'var(--ink)', margin: 0 }}>Enviar comprobante y recibir calificación</p>
+      </div>
+
+      <ContinueBtn disabled={!ready} onClick={handleCerrar} label="Cerrar contrato" />
+    </FlowPage>
   )
 }
 
@@ -428,52 +410,45 @@ export function DevolucionOkScreen() {
   const aDevolver = devolucionState.toReturn
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden" style={{ backgroundColor: 'var(--primary-deep)' }}>
-      <div className="absolute w-[320px] h-[320px] rounded-full pointer-events-none"
-        style={{ backgroundColor: 'oklch(0.52 0.13 155 / 0.4)', top: -120, right: -50 }} />
+    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden', background: 'var(--primary-deep)' }}>
+      <div style={{ position: 'absolute', width: 320, height: 320, borderRadius: '50%', background: 'oklch(0.52 0.13 155 / 0.4)', top: -120, right: -50, pointerEvents: 'none' }} />
 
-      <div className="flex-1 flex flex-col justify-between px-7 pt-16 pb-8 relative z-10">
-        <div className="flex flex-col gap-[18px]">
-          <div className="w-[72px] h-[72px] rounded-full flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: 'var(--primary)' }}>
-            <Check size={36} className="text-white" />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '64px 28px 32px', position: 'relative', zIndex: 1 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Check size={36} color="white" />
           </div>
-
           <div>
-            <p className="text-[11px] font-semibold font-sans uppercase" style={{ color: 'rgba(255,255,255,0.6)', letterSpacing: '1.5px' }}>
-              CONTRATO CERRADO
-            </p>
-            <p className="font-serif text-white mt-1.5" style={{ fontSize: 34, lineHeight: '1.15' }}>
+            <p style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1.5, color: 'rgba(255,255,255,0.6)', margin: 0 }}>CONTRATO CERRADO</p>
+            <p style={{ fontFamily: 'var(--font-display)', fontSize: 34, color: 'white', lineHeight: 1.15, marginTop: 6 }}>
               ¡Listo!<br />Auto devuelto y disponible.
             </p>
           </div>
-
-          <div className="rounded-2xl border p-4 flex flex-col gap-2"
-            style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.15)' }}>
+          <div style={{ borderRadius: 'var(--radius)', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
             {[
               { label: 'Cliente', value: res.clientName },
               { label: 'Devuelto al cliente', value: `$${fmt(aDevolver)}` },
               { label: 'Auto', value: res.vehicle },
               { label: 'Estado', value: '● Disponible' },
             ].map(({ label, value }) => (
-              <div key={label} className="flex justify-between">
-                <p className="text-xs font-sans" style={{ color: 'rgba(255,255,255,0.65)' }}>{label}</p>
-                <p className="text-xs font-sans font-medium text-white">{value}</p>
+              <div key={label} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', margin: 0 }}>{label}</p>
+                <p style={{ fontSize: 12, color: 'white', fontWeight: 500, margin: 0 }}>{value}</p>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="flex flex-col gap-2.5">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <button
             onClick={() => navigate('/app/home', { replace: true })}
-            className="w-full py-3.5 rounded-full text-sm font-semibold font-sans"
-            style={{ backgroundColor: 'white', color: 'var(--ink)' }}
+            style={{ width: '100%', padding: '14px 0', borderRadius: 999, background: 'white', color: 'var(--ink)', fontSize: 14, fontWeight: 600, border: 0, cursor: 'pointer', fontFamily: 'inherit' }}
           >
             Volver al inicio
           </button>
-          <button className="w-full py-3.5 rounded-full text-sm font-semibold font-sans border"
-            style={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)' }}>
+          <button
+            style={{ width: '100%', padding: '14px 0', borderRadius: 999, background: 'transparent', color: 'white', fontSize: 14, fontWeight: 600, border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', fontFamily: 'inherit' }}
+          >
             💬  Enviar comprobante
           </button>
         </div>

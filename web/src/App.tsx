@@ -26,7 +26,7 @@ import { CajaTurnoScreen, CajaCierreScreen, CajaJustificacionScreen, CajaOkScree
 import { EntregaStep1Screen, EntregaStep2Screen, EntregaStep3Screen, EntregaOkScreen } from './screens/flows/EntregaFlow'
 import { DevolucionStep1Screen, DevolucionStep2Screen, DevolucionStep3Screen, DevolucionOkScreen } from './screens/flows/DevolucionFlow'
 
-const FLOW_PREFIXES = ['/app/caja/turno', '/app/caja/cierre', '/app/caja/justificacion', '/app/caja/ok', '/app/entrega', '/app/devolucion']
+const FLOW_PREFIXES = ['/app/caja/turno', '/app/caja/cierre', '/app/caja/justificacion', '/app/caja/ok']
 
 function AppLayout() {
   const location = useLocation()

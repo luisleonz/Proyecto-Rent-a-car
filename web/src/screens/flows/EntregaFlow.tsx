@@ -11,20 +11,33 @@ const FUEL_OPTS = ['E', '1/4', '1/2', '3/4', 'F']
 const PHOTO_SLOTS = ['frente', 'lat. izq', 'lat. der', 'trasera', 'interior', 'tablero']
 const ALL_RES = [...todayReservations, ...tomorrowReservations]
 
+// ─── Layout wrapper ────────────────────────────────────────────────────────────
+function FlowPage({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="screen">
+      <div style={{ maxWidth: 540, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {children}
+      </div>
+    </div>
+  )
+}
+
 // ─── Shared components ────────────────────────────────────────────────────────
 
 function FlowTopBar({ onCancel }: { onCancel: () => void }) {
   const navigate = useNavigate()
   return (
-    <div className="flex items-center justify-between px-4 py-2.5">
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
       <button
         onClick={() => navigate(-1)}
-        className="w-9 h-9 rounded-full border border-hairline flex items-center justify-center"
-        style={{ backgroundColor: 'var(--paper-alt)' }}
+        style={{ width: 36, height: 36, borderRadius: '50%', border: '1px solid var(--card-line)', background: 'var(--card)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
       >
-        <ArrowLeft size={18} style={{ color: 'var(--ink2)' }} />
+        <ArrowLeft size={17} style={{ color: 'var(--ink2)' }} />
       </button>
-      <button onClick={onCancel} className="text-[13px] font-medium font-sans" style={{ color: 'var(--ink2)' }}>
+      <button
+        onClick={onCancel}
+        style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink2)', background: 'none', border: 0, cursor: 'pointer', fontFamily: 'inherit' }}
+      >
         Cancelar
       </button>
     </div>
@@ -34,15 +47,18 @@ function FlowTopBar({ onCancel }: { onCancel: () => void }) {
 function EntregaHeader({ step }: { step: number }) {
   const labels = ['documentos y firma', 'inspección + fotos', 'cobro']
   return (
-    <div className="px-5 pb-3.5">
-      <div className="flex gap-1.5 mb-2.5">
+    <div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
         {[0, 1, 2].map(i => (
-          <div key={i} className="flex-1 h-1 rounded-full"
-            style={{ backgroundColor: i <= step ? 'var(--primary)' : 'var(--card-line)' }} />
+          <div key={i} style={{ flex: 1, height: 4, borderRadius: 999, background: i <= step ? 'var(--primary)' : 'var(--card-line)' }} />
         ))}
       </div>
-      <p className="text-[22px] font-bold font-serif" style={{ color: 'var(--ink)' }}>Entrega · check-in</p>
-      <p className="text-xs font-sans mt-1" style={{ color: 'var(--ink2)' }}>Paso {step + 1} de 3 · {labels[step]}</p>
+      <p style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', margin: 0 }}>
+        Entrega · check-in
+      </p>
+      <p style={{ fontSize: 12, color: 'var(--ink2)', marginTop: 4 }}>
+        Paso {step + 1} de 3 · {labels[step]}
+      </p>
     </div>
   )
 }
@@ -50,32 +66,33 @@ function EntregaHeader({ step }: { step: number }) {
 function ClientCard({ resId }: { resId: string }) {
   const res = ALL_RES.find(r => r.id === resId) ?? ALL_RES[0]
   return (
-    <div className="rounded-2xl border p-3.5 flex items-center gap-3"
-      style={{ backgroundColor: 'var(--primary-soft)', borderColor: 'var(--primary-line)' }}>
-      <AvatarCircle initials={res.clientInitials} size={42} />
+    <div style={{ background: 'var(--primary-soft)', border: '1px solid var(--primary-line)', borderRadius: 'var(--radius-sm)', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <AvatarCircle initials={res.clientInitials} size={40} />
       <div>
-        <p className="text-sm font-semibold font-sans" style={{ color: 'var(--ink)' }}>{res.clientName}</p>
-        <p className="text-[11px] font-sans mt-0.5" style={{ color: 'var(--ink2)' }}>
-          {res.vehicle} · {res.type} · 3 días
+        <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', margin: 0 }}>{res.clientName}</p>
+        <p style={{ fontSize: 11.5, color: 'var(--ink2)', marginTop: 2 }}>
+          {res.vehicle} · Entrega · 3 días
         </p>
       </div>
     </div>
   )
 }
 
-function ContinueButton({ disabled, onClick }: { disabled?: boolean; onClick: () => void }) {
+function ContinueBtn({ disabled, onClick, label = 'Continuar' }: { disabled?: boolean; onClick: () => void; label?: string }) {
   return (
-    <div className="border-t border-hairline p-4 flex-shrink-0" style={{ background: 'var(--card)' }}>
-      <button
-        disabled={disabled}
-        onClick={onClick}
-        className="w-full py-3.5 rounded-full text-sm font-semibold font-sans text-white flex items-center justify-center gap-1 transition-opacity"
-        style={{ backgroundColor: 'var(--primary)', opacity: disabled ? 0.5 : 1 }}
-      >
-        Continuar
-        <ChevronRight size={18} />
-      </button>
-    </div>
+    <button
+      disabled={disabled}
+      onClick={onClick}
+      style={{
+        width: '100%', padding: '14px 0', borderRadius: 999, background: 'var(--primary)',
+        color: 'white', fontSize: 14, fontWeight: 600, border: 0, cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.45 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        fontFamily: 'inherit', marginTop: 8,
+      }}
+    >
+      {label}
+      {label === 'Continuar' && <ChevronRight size={17} />}
+    </button>
   )
 }
 
@@ -104,77 +121,67 @@ export function EntregaStep1Screen() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--paper)' }}>
-      <div className="border-b border-hairline flex-shrink-0" style={{ background: 'var(--card)' }}>
-        <FlowTopBar onCancel={() => navigate('/app/home', { replace: true })} />
-        <EntregaHeader step={0} />
-      </div>
+    <FlowPage>
+      <FlowTopBar onCancel={() => navigate('/app/reservations', { replace: true })} />
+      <EntregaHeader step={0} />
+      <ClientCard resId={resId} />
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
-        <ClientCard resId={resId} />
-
+      <div>
         <SectionEyebrow text="Verificar documentos" />
-        {DOCS.map(({ key, label, hint }) => {
-          const ok = docs[key]
-          return (
-            <button
-              key={key}
-              onClick={() => setDocs(d => ({ ...d, [key]: !ok }))}
-              className="w-full rounded-2xl border text-left transition-colors"
-              style={{
-                backgroundColor: ok ? 'var(--primary-soft)' : 'white',
-                borderColor: ok ? 'var(--primary-line)' : 'var(--card-line)',
-                borderWidth: ok ? 1.5 : 1,
-              }}
-            >
-              <div className="flex items-center gap-3 px-3.5 py-3">
-                <div className="w-[22px] h-[22px] rounded-full flex items-center justify-center flex-shrink-0 border-2"
-                  style={{
-                    backgroundColor: ok ? 'var(--primary)' : 'transparent',
-                    borderColor: ok ? 'var(--primary)' : 'var(--card-line)',
-                  }}>
-                  {ok && <Check size={12} className="text-white" />}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+          {DOCS.map(({ key, label, hint }) => {
+            const ok = docs[key]
+            return (
+              <button
+                key={key}
+                onClick={() => setDocs(d => ({ ...d, [key]: !ok }))}
+                style={{
+                  width: '100%', borderRadius: 'var(--radius-sm)', border: `${ok ? 1.5 : 1}px solid ${ok ? 'var(--primary-line)' : 'var(--card-line)'}`,
+                  background: ok ? 'var(--primary-soft)' : 'var(--card)', textAlign: 'left', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', fontFamily: 'inherit',
+                }}
+              >
+                <div style={{ width: 22, height: 22, borderRadius: '50%', border: `2px solid ${ok ? 'var(--primary)' : 'var(--card-line)'}`, background: ok ? 'var(--primary)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {ok && <Check size={12} color="white" />}
                 </div>
-                <div className="flex-1">
-                  <p className="text-[13px] font-semibold font-sans" style={{ color: ok ? 'var(--primary-dark)' : 'var(--ink)' }}>{label}</p>
-                  <p className="text-[11px] font-sans mt-0.5" style={{ color: 'var(--ink2)' }}>{hint}</p>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: ok ? 'var(--primary-dark)' : 'var(--ink)', margin: 0 }}>{label}</p>
+                  <p style={{ fontSize: 11, color: 'var(--ink2)', marginTop: 2 }}>{hint}</p>
                 </div>
                 {!ok && (
-                  <span className="text-[11px] font-semibold font-sans px-2.5 py-1 rounded-full border border-hairline" style={{ color: 'var(--ink2)' }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink2)', border: '1px solid var(--card-line)', borderRadius: 999, padding: '3px 10px' }}>
                     Subir
                   </span>
                 )}
-              </div>
-            </button>
-          )
-        })}
+              </button>
+            )
+          })}
+        </div>
+      </div>
 
+      <div>
         <SectionEyebrow text="Firma del cliente" />
         <button
           onClick={() => setSigned(true)}
-          className="w-full rounded-2xl border transition-colors"
           style={{
-            backgroundColor: signed ? 'var(--primary-soft)' : 'white',
-            borderColor: signed ? 'var(--primary-line)' : 'var(--card-line)',
-            borderWidth: signed ? 1.5 : 1,
-            minHeight: 90,
+            width: '100%', marginTop: 8, borderRadius: 'var(--radius-sm)', border: `${signed ? 1.5 : 1}px solid ${signed ? 'var(--primary-line)' : 'var(--card-line)'}`,
+            background: signed ? 'var(--primary-soft)' : 'var(--card)', cursor: 'pointer', minHeight: 90,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, fontFamily: 'inherit',
           }}
         >
-          <div className="flex flex-col items-center justify-center py-4 px-4 gap-1.5">
-            {signed ? (
-              <p className="text-[13px] font-semibold font-sans" style={{ color: 'var(--primary-dark)' }}>✓ Firmado</p>
-            ) : (
-              <>
-                <p className="font-mono text-xs tracking-[2px]" style={{ color: 'var(--ink4)' }}>— — — — — — — — — — — —</p>
-                <p className="text-xs font-sans" style={{ color: 'var(--ink3)' }}>Toca para firmar</p>
-              </>
-            )}
-          </div>
+          {signed ? (
+            <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--primary-dark)' }}>✓ Firmado</p>
+          ) : (
+            <>
+              <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: 2, color: 'var(--ink4)' }}>— — — — — — — — — — — —</p>
+              <p style={{ fontSize: 12, color: 'var(--ink3)' }}>Toca para firmar</p>
+            </>
+          )}
         </button>
       </div>
 
-      <ContinueButton disabled={!ready} onClick={handleContinue} />
-    </div>
+      <ContinueBtn disabled={!ready} onClick={handleContinue} />
+    </FlowPage>
   )
 }
 
@@ -198,119 +205,108 @@ export function EntregaStep2Screen() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--paper)' }}>
-      <div className="border-b border-hairline flex-shrink-0" style={{ background: 'var(--card)' }}>
-        <FlowTopBar onCancel={() => navigate('/app/home', { replace: true })} />
-        <EntregaHeader step={1} />
+    <FlowPage>
+      <FlowTopBar onCancel={() => navigate('/app/reservations', { replace: true })} />
+      <EntregaHeader step={1} />
+
+      {/* KM + Tank summary */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div className="card" style={{ padding: 14 }}>
+          <SectionEyebrow text="Tanque" />
+          <p style={{ fontSize: 24, fontFamily: 'var(--font-display)', color: 'var(--primary)', marginTop: 6 }}>{fuel}</p>
+        </div>
+        <div className="card" style={{ padding: 14 }}>
+          <SectionEyebrow text="Kilometraje" />
+          <p style={{ fontSize: 20, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginTop: 6 }}>{km}</p>
+          <p style={{ fontSize: 11, color: 'var(--ink3)' }}>km</p>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4">
-        {/* KM + Tank info cards */}
-        <div className="flex gap-2.5">
-          <div className="flex-1 rounded-2xl border border-hairline p-3" style={{ background: 'var(--card)' }}>
-            <SectionEyebrow text="Tanque" />
-            <p className="font-serif mt-2" style={{ fontSize: 24, color: 'var(--primary)' }}>{fuel}</p>
-          </div>
-          <div className="flex-1 rounded-2xl border border-hairline p-3" style={{ background: 'var(--card)' }}>
-            <SectionEyebrow text="Kilometraje" />
-            <p className="font-serif mt-2" style={{ fontSize: 20, color: 'var(--ink)' }}>{km}</p>
-            <p className="text-[11px] font-sans" style={{ color: 'var(--ink3)' }}>km</p>
-          </div>
-        </div>
-
-        {/* Fuel selector */}
-        <div>
-          <SectionEyebrow text="Nivel del tanque" />
-          <div className="flex gap-1.5 mt-2">
-            {FUEL_OPTS.map(opt => {
-              const sel = opt === fuel
-              return (
-                <button
-                  key={opt}
-                  onClick={() => setFuel(opt)}
-                  className="flex-1 py-2.5 rounded-xl border flex items-center justify-center transition-colors"
-                  style={{
-                    backgroundColor: sel ? 'var(--primary-soft)' : 'white',
-                    borderColor: sel ? 'var(--primary)' : 'var(--card-line)',
-                    borderWidth: sel ? 1.5 : 1,
-                  }}
-                >
-                  <span className="text-sm font-serif" style={{ color: sel ? 'var(--primary)' : 'var(--ink)', fontWeight: sel ? 600 : 400 }}>
-                    {opt}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Damages */}
-        <div>
-          <SectionEyebrow text="Daños existentes (toca para marcar)" />
-          <button
-            onClick={() => setDamages(d => d + 1)}
-            className="w-full rounded-2xl border border-hairline p-3.5 flex flex-col items-center gap-2 mt-2"
-            style={{ background: 'var(--card)' }}
-          >
-            <div className="w-full h-[80px] rounded-xl flex items-center justify-center" style={{ backgroundColor: 'var(--paper-alt)' }}>
-              <span className="text-[13px] font-sans" style={{ color: 'var(--ink3)' }}>🚗  Vista del vehículo  🚗</span>
-            </div>
-            <p className="text-[11px] font-sans" style={{ color: damages > 0 ? 'var(--warn-ink)' : 'var(--ink3)' }}>
-              {damages === 0 ? 'Sin daños marcados — toca para agregar' : `${damages} daño(s) marcado(s)`}
-            </p>
-            {damages > 0 && (
+      {/* Fuel selector */}
+      <div>
+        <SectionEyebrow text="Nivel del tanque" />
+        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+          {FUEL_OPTS.map(opt => {
+            const sel = opt === fuel
+            return (
               <button
-                onClick={e => { e.stopPropagation(); setDamages(0) }}
-                className="text-[11px] font-sans" style={{ color: 'var(--ink2)' }}
+                key={opt}
+                onClick={() => setFuel(opt)}
+                style={{
+                  flex: 1, padding: '10px 0', borderRadius: 'var(--radius-sm)', border: `${sel ? 1.5 : 1}px solid ${sel ? 'var(--primary)' : 'var(--card-line)'}`,
+                  background: sel ? 'var(--primary-soft)' : 'var(--card)', cursor: 'pointer', fontFamily: 'var(--font-display)',
+                  fontSize: 14, color: sel ? 'var(--primary)' : 'var(--ink)', fontWeight: sel ? 600 : 400,
+                }}
               >
-                Limpiar
+                {opt}
               </button>
-            )}
-          </button>
-        </div>
-
-        {/* Photos */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <SectionEyebrow text="Fotos de entrega" />
-            <span className="text-[11px] font-semibold font-sans" style={{ color: photoCount >= 3 ? 'var(--primary)' : 'var(--warn-ink)' }}>
-              {photoCount} / {PHOTO_SLOTS.length}
-            </span>
-          </div>
-          <div className="grid grid-cols-3 gap-1.5">
-            {PHOTO_SLOTS.map((slot, idx) => {
-              const has = idx < photoCount
-              return (
-                <button
-                  key={slot}
-                  onClick={() => !has && setPhotoCount(idx + 1)}
-                  className="aspect-square rounded-xl border flex flex-col items-center justify-center gap-1"
-                  style={{
-                    backgroundColor: has ? 'var(--paper-alt)' : 'transparent',
-                    borderColor: has ? 'var(--card-line)' : 'var(--ink4)',
-                    borderWidth: has ? 1 : 1.5,
-                  }}
-                >
-                  {has ? (
-                    <>
-                      <span style={{ fontSize: 20 }}>📷</span>
-                      <span className="text-[9px] font-sans" style={{ color: 'var(--ink3)' }}>{slot}</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-lg font-light" style={{ color: 'var(--ink4)' }}>+</span>
-                      <span className="text-[9px] font-sans" style={{ color: 'var(--ink4)' }}>{slot}</span>
-                    </>
-                  )}
-                </button>
-              )
-            })}
-          </div>
+            )
+          })}
         </div>
       </div>
 
-      <ContinueButton disabled={!ready} onClick={handleContinue} />
-    </div>
+      {/* Damages */}
+      <div>
+        <SectionEyebrow text="Daños existentes (toca para marcar)" />
+        <button
+          onClick={() => setDamages(d => d + 1)}
+          className="card"
+          style={{ width: '100%', marginTop: 8, padding: '14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, cursor: 'pointer', fontFamily: 'inherit', border: '1px solid var(--card-line)' }}
+        >
+          <div style={{ width: '100%', height: 70, borderRadius: 10, background: 'var(--paper-alt)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontSize: 13, color: 'var(--ink3)' }}>🚗  Vista del vehículo  🚗</span>
+          </div>
+          <p style={{ fontSize: 11, color: damages > 0 ? 'var(--warn-ink)' : 'var(--ink3)' }}>
+            {damages === 0 ? 'Sin daños marcados — toca para agregar' : `${damages} daño(s) marcado(s)`}
+          </p>
+          {damages > 0 && (
+            <button onClick={e => { e.stopPropagation(); setDamages(0) }} style={{ fontSize: 11, color: 'var(--ink2)', background: 'none', border: 0, cursor: 'pointer', fontFamily: 'inherit' }}>
+              Limpiar
+            </button>
+          )}
+        </button>
+      </div>
+
+      {/* Photos */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <SectionEyebrow text="Fotos de entrega" />
+          <span style={{ fontSize: 11, fontWeight: 600, color: photoCount >= 3 ? 'var(--primary)' : 'var(--warn-ink)' }}>
+            {photoCount} / {PHOTO_SLOTS.length}
+          </span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+          {PHOTO_SLOTS.map((slot, idx) => {
+            const has = idx < photoCount
+            return (
+              <button
+                key={slot}
+                onClick={() => !has && setPhotoCount(idx + 1)}
+                style={{
+                  aspectRatio: '1', borderRadius: 10, border: `${has ? 1 : 1.5}px solid ${has ? 'var(--card-line)' : 'var(--ink4)'}`,
+                  background: has ? 'var(--paper-alt)' : 'transparent', display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center', gap: 4, cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                {has ? (
+                  <>
+                    <span style={{ fontSize: 20 }}>📷</span>
+                    <span style={{ fontSize: 9, color: 'var(--ink3)' }}>{slot}</span>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ fontSize: 18, color: 'var(--ink4)', fontWeight: 300 }}>+</span>
+                    <span style={{ fontSize: 9, color: 'var(--ink4)' }}>{slot}</span>
+                  </>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <ContinueBtn disabled={!ready} onClick={handleContinue} />
+    </FlowPage>
   )
 }
 
@@ -339,95 +335,76 @@ export function EntregaStep3Screen() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--paper)' }}>
-      <div className="border-b border-hairline flex-shrink-0" style={{ background: 'var(--card)' }}>
-        <FlowTopBar onCancel={() => navigate('/app/home', { replace: true })} />
-        <EntregaHeader step={2} />
+    <FlowPage>
+      <FlowTopBar onCancel={() => navigate('/app/reservations', { replace: true })} />
+      <EntregaHeader step={2} />
+
+      {/* Amount card */}
+      <div style={{ borderRadius: 'var(--radius)', padding: 18, background: 'var(--primary)' }}>
+        <p style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, color: 'rgba(255,255,255,0.7)', margin: 0 }}>A COBRAR AHORA</p>
+        <p style={{ fontFamily: 'var(--font-display)', fontSize: 42, color: 'white', letterSpacing: -1, lineHeight: '44px', marginTop: 4 }}>
+          ${fmt(TOTAL)}
+        </p>
+        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 6 }}>
+          $2,400 renta · $300 seguro · $2,000 depósito
+        </p>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4">
-        {/* Amount card */}
-        <div className="rounded-[18px] p-[18px]" style={{ backgroundColor: 'var(--primary)' }}>
-          <p className="text-[10px] font-semibold font-sans uppercase tracking-[1px]" style={{ color: 'rgba(255,255,255,0.7)' }}>
-            A COBRAR AHORA
-          </p>
-          <p className="font-serif text-white mt-1" style={{ fontSize: 42, letterSpacing: '-1px', lineHeight: '44px' }}>
-            ${fmt(TOTAL)}
-          </p>
-          <p className="text-[11px] font-sans mt-1.5" style={{ color: 'rgba(255,255,255,0.7)' }}>
-            $2,400 renta · $300 seguro · $2,000 depósito
-          </p>
-        </div>
-
-        {/* Payment method */}
-        <div>
-          <SectionEyebrow text="Método de pago" />
-          <div className="flex gap-1.5 mt-2">
-            {PAYMENT_METHODS.map(({ id, label }) => {
-              const sel = id === method
-              return (
-                <button
-                  key={id}
-                  onClick={() => setMethod(id)}
-                  className="flex-1 py-3 rounded-xl border flex items-center justify-center transition-colors"
-                  style={{
-                    backgroundColor: sel ? 'var(--primary-soft)' : 'white',
-                    borderColor: sel ? 'var(--primary)' : 'var(--card-line)',
-                    borderWidth: sel ? 1.5 : 1,
-                  }}
-                >
-                  <span className="text-[11px] font-semibold font-sans" style={{ color: sel ? 'var(--primary)' : 'var(--ink)' }}>
-                    {label}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Cash input */}
-        {method === 'cash' && (
-          <div className="rounded-2xl border border-hairline p-3.5" style={{ background: 'var(--card)' }}>
-            <SectionEyebrow text="Recibido" />
-            <div className="flex items-baseline gap-1 mt-2 mb-3">
-              <span className="font-serif" style={{ fontSize: 22, color: 'var(--ink3)' }}>$</span>
-              <input
-                type="number"
-                value={amount}
-                onChange={e => setAmount(e.target.value)}
-                className="flex-1 font-serif outline-none border-b"
-                style={{ fontSize: 28, color: 'var(--ink)', borderColor: 'var(--card-line)' }}
-              />
-            </div>
-            <div className="flex justify-between">
-              <span className="text-[13px] font-sans" style={{ color: 'var(--ink2)' }}>Cambio</span>
-              <span className="text-base font-semibold font-mono"
-                style={{ color: change >= 0 ? 'var(--primary)' : 'var(--danger)' }}>
-                ${fmt(Math.abs(change))}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* WhatsApp */}
-        <div className="rounded-2xl border border-hairline px-3.5 py-3 flex items-center gap-3" style={{ background: 'var(--card)' }}>
-          <div className="w-[22px] h-[22px] rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--primary)' }}>
-            <Check size={14} className="text-white" />
-          </div>
-          <p className="text-xs font-sans" style={{ color: 'var(--ink)' }}>Enviar recibo por WhatsApp al cliente</p>
+      {/* Payment method */}
+      <div>
+        <SectionEyebrow text="Método de pago" />
+        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+          {PAYMENT_METHODS.map(({ id, label }) => {
+            const sel = id === method
+            return (
+              <button
+                key={id}
+                onClick={() => setMethod(id)}
+                style={{
+                  flex: 1, padding: '12px 0', borderRadius: 'var(--radius-sm)', border: `${sel ? 1.5 : 1}px solid ${sel ? 'var(--primary)' : 'var(--card-line)'}`,
+                  background: sel ? 'var(--primary-soft)' : 'var(--card)', cursor: 'pointer', fontFamily: 'inherit',
+                  fontSize: 11, fontWeight: 600, color: sel ? 'var(--primary)' : 'var(--ink)',
+                }}
+              >
+                {label}
+              </button>
+            )
+          })}
         </div>
       </div>
 
-      <div className="border-t border-hairline p-4 flex-shrink-0" style={{ background: 'var(--card)' }}>
-        <button
-          onClick={handleCobrar}
-          className="w-full py-3.5 rounded-full text-sm font-semibold font-sans text-white"
-          style={{ backgroundColor: 'var(--primary)' }}
-        >
-          Cobrar y entregar auto
-        </button>
+      {/* Cash input */}
+      {method === 'cash' && (
+        <div className="card" style={{ padding: 14 }}>
+          <SectionEyebrow text="Recibido" />
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginTop: 8, marginBottom: 12 }}>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 22, color: 'var(--ink3)' }}>$</span>
+            <input
+              type="number"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              style={{ flex: 1, fontFamily: 'var(--font-display)', fontSize: 28, color: 'var(--ink)', border: 0, borderBottom: '1px solid var(--card-line)', outline: 'none', background: 'transparent' }}
+            />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 13, color: 'var(--ink2)' }}>Cambio</span>
+            <span style={{ fontSize: 15, fontWeight: 600, fontFamily: 'var(--font-mono)', color: change >= 0 ? 'var(--primary)' : 'var(--danger)' }}>
+              ${fmt(Math.abs(change))}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* WhatsApp row */}
+      <div className="card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ width: 22, height: 22, borderRadius: 8, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Check size={13} color="white" />
+        </div>
+        <p style={{ fontSize: 12.5, color: 'var(--ink)' }}>Enviar recibo por WhatsApp al cliente</p>
       </div>
-    </div>
+
+      <ContinueBtn label="Cobrar y entregar auto" onClick={handleCobrar} />
+    </FlowPage>
   )
 }
 
@@ -440,51 +417,44 @@ export function EntregaOkScreen() {
   const firstName = res.clientName.split(' ')[0]
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden" style={{ backgroundColor: 'var(--primary-deep)' }}>
-      <div className="absolute w-[320px] h-[320px] rounded-full pointer-events-none"
-        style={{ backgroundColor: 'oklch(0.52 0.13 155 / 0.4)', top: -120, right: -50 }} />
+    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden', background: 'var(--primary-deep)' }}>
+      <div style={{ position: 'absolute', width: 320, height: 320, borderRadius: '50%', background: 'oklch(0.52 0.13 155 / 0.4)', top: -120, right: -50, pointerEvents: 'none' }} />
 
-      <div className="flex-1 flex flex-col justify-between px-7 pt-16 pb-8 relative z-10">
-        <div className="flex flex-col gap-[18px]">
-          <div className="w-[72px] h-[72px] rounded-full flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: 'var(--primary)' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '64px 28px 32px', position: 'relative', zIndex: 1 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <span style={{ fontSize: 32 }}>🔑</span>
           </div>
-
           <div>
-            <p className="text-[11px] font-semibold font-sans uppercase" style={{ color: 'rgba(255,255,255,0.6)', letterSpacing: '1.5px' }}>
-              ENTREGA COMPLETADA
-            </p>
-            <p className="font-serif text-white mt-1.5" style={{ fontSize: 34, lineHeight: '1.15' }}>
+            <p style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1.5, color: 'rgba(255,255,255,0.6)', margin: 0 }}>ENTREGA COMPLETADA</p>
+            <p style={{ fontFamily: 'var(--font-display)', fontSize: 34, color: 'white', lineHeight: 1.15, marginTop: 6 }}>
               ¡Auto entregado!<br />¡Buen viaje, {firstName}!
             </p>
           </div>
-
-          <div className="rounded-2xl border p-4 flex flex-col gap-2"
-            style={{ backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.15)' }}>
+          <div style={{ borderRadius: 'var(--radius)', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
             {[
               { label: 'Cobrado', value: `$${fmt(TOTAL)}` },
               { label: 'Devuelve', value: 'Vie 24 may · 18:00' },
               { label: 'Recordatorio', value: '1 día antes' },
             ].map(({ label, value }) => (
-              <div key={label} className="flex justify-between">
-                <p className="text-xs font-sans" style={{ color: 'rgba(255,255,255,0.65)' }}>{label}</p>
-                <p className="text-xs font-sans font-medium text-white">{value}</p>
+              <div key={label} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', margin: 0 }}>{label}</p>
+                <p style={{ fontSize: 12, color: 'white', fontWeight: 500, margin: 0 }}>{value}</p>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="flex flex-col gap-2.5">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <button
             onClick={() => navigate('/app/home', { replace: true })}
-            className="w-full py-3.5 rounded-full text-sm font-semibold font-sans"
-            style={{ backgroundColor: 'white', color: 'var(--ink)' }}
+            style={{ width: '100%', padding: '14px 0', borderRadius: 999, background: 'white', color: 'var(--ink)', fontSize: 14, fontWeight: 600, border: 0, cursor: 'pointer', fontFamily: 'inherit' }}
           >
             Volver al inicio
           </button>
-          <button className="w-full py-3.5 rounded-full text-sm font-semibold font-sans border"
-            style={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)' }}>
+          <button
+            style={{ width: '100%', padding: '14px 0', borderRadius: 999, background: 'transparent', color: 'white', fontSize: 14, fontWeight: 600, border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', fontFamily: 'inherit' }}
+          >
             💬  Reenviar recibo
           </button>
         </div>

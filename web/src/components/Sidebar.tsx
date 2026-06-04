@@ -34,6 +34,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     onClose?.()
   }
 
+  async function handleSignOut() {
+    await signOut()
+    navigate('/', { replace: true })
+  }
+
   return (
     <nav className="side" style={isOpen ? { left: 0 } : undefined}>
       <div className="logo">
@@ -67,7 +72,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
         </div>
         <button
-          onClick={signOut}
+          onClick={handleSignOut}
           className="navitem"
           style={{ marginTop: 4, color: 'rgba(255,255,255,0.50)' }}
         >

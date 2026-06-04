@@ -45,7 +45,7 @@ function AppLayout() {
     <div className="app">
       {showNav && <Sidebar />}
       {showNav && <TopBar />}
-      <div className="main" style={showNav ? { marginLeft: 248, paddingTop: 56 } : {}}>
+      <div className="main">
         {showNav && (
           <header className="mtop">
             <button className="iconbtn" style={{ width: 38, height: 38 }}><Menu size={19} /></button>

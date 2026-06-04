@@ -1,112 +1,253 @@
 import { useNavigate } from 'react-router-dom'
-import { Bell, Wrench } from 'lucide-react'
-import { sampleKpi, todayReservations } from '../../data/sampleData'
+import { TrendingUp, Wrench, Calendar, FileText } from 'lucide-react'
+import { sampleFleet } from '../../data/sampleData'
 import { useAuth } from '../../state/auth'
-import AvatarCircle from '../../components/AvatarCircle'
-import SectionEyebrow from '../../components/SectionEyebrow'
-import StatusChip from '../../components/StatusChip'
 
+/* ── Local data ── */
+interface AgendaItem {
+  t: string
+  who: string
+  i: string
+  car: string
+  plate: string
+  type: 'Entrega' | 'Devolución'
+  urgent?: boolean
+}
+
+const TODAY_AGENDA: AgendaItem[] = [
+  { t: '10:30', who: 'Mariana Pérez',  i: 'MP', car: 'Nissan Sentra',   plate: 'ABC-123', type: 'Entrega',    urgent: true },
+  { t: '13:00', who: 'Ricardo López',  i: 'RL', car: 'Nissan Versa',    plate: 'XYZ-908', type: 'Entrega' },
+  { t: '15:00', who: 'Lupita Cruz',    i: 'LC', car: 'Chevrolet Aveo',  plate: 'JKL-441', type: 'Devolución' },
+  { t: '17:30', who: 'Jorge Díaz',     i: 'JD', car: 'Mazda CX-5',      plate: 'DEF-220', type: 'Entrega' },
+]
+
+interface IncomeMonth {
+  m: string
+  v: number
+  now?: boolean
+}
+
+const INCOME_MONTHS: IncomeMonth[] = [
+  { m: 'Ene', v: 60 },
+  { m: 'Feb', v: 72 },
+  { m: 'Mar', v: 55 },
+  { m: 'Abr', v: 85 },
+  { m: 'May', v: 100, now: true },
+  { m: 'Jun', v: 40 },
+]
+
+interface AttentionItem {
+  t: string
+  s: string
+  tone: 'warn' | 'danger' | 'primary'
+  cta: string
+}
+
+const ATTENTION: AttentionItem[] = [
+  { t: 'Mantenimiento pendiente',   s: 'Kia Rio · cambio de aceite',     tone: 'warn',    cta: 'Ver vehículo' },
+  { t: 'Reserva sin confirmar',     s: 'Toyota Yaris · jue 23 · 10:00',  tone: 'danger',  cta: 'Confirmar' },
+  { t: 'Cotización por vencer',     s: 'COT-039 · Lupita Cruz',          tone: 'primary', cta: 'Ver cot.' },
+]
+
+/* ── Sub-components ── */
+function StatCard({
+  label,
+  value,
+  foot,
+  tone,
+}: {
+  label: string
+  value: number
+  foot: string
+  tone?: string
+}) {
+  return (
+    <div className="card statcard">
+      <div className="eyebrow">{label}</div>
+      <div className={`statval mono${tone ? '' : ''}`} style={tone === 'warn' ? { color: 'var(--warn-ink)' } : tone === 'accent' ? { color: 'var(--primary)' } : undefined}>
+        {value}
+      </div>
+      <div style={{ fontSize: 12.5, color: 'var(--ink3)' }}>{foot}</div>
+    </div>
+  )
+}
+
+function PageHead({
+  eyebrow,
+  title,
+  sub,
+  actions,
+}: {
+  eyebrow: string
+  title: React.ReactNode
+  sub?: string
+  actions?: React.ReactNode
+}) {
+  return (
+    <div className="pagehead">
+      <div>
+        <div className="eyebrow">{eyebrow}</div>
+        <h1 className="h-display" style={{ fontSize: 'clamp(28px, 4cqw, 42px)', marginTop: 6 }}>{title}</h1>
+        {sub && <p style={{ fontSize: 13.5, color: 'var(--ink3)', marginTop: 4 }}>{sub}</p>}
+      </div>
+      {actions && <div className="pagehead-actions">{actions}</div>}
+    </div>
+  )
+}
+
+function AttentionIcon({ tone }: { tone: 'warn' | 'danger' | 'primary' }) {
+  if (tone === 'warn')    return <Wrench size={18} />
+  if (tone === 'danger')  return <Calendar size={18} />
+  return <FileText size={18} />
+}
+
+/* ── Main screen ── */
 export default function HomeScreen() {
   const navigate = useNavigate()
-  const { currentFirstName, currentInitials } = useAuth()
-  const kpi = sampleKpi
+  const { currentFirstName, currentRole } = useAuth()
+
+  const first = currentFirstName || 'Luciano'
+  const isAdmin = !currentRole || currentRole === 'Administrador' || currentRole === 'admin'
+
+  const counts = sampleFleet.reduce<Record<string, number>>((acc, v) => {
+    acc[v.status] = (acc[v.status] ?? 0) + 1
+    return acc
+  }, {})
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#FAFAF7' }}>
-      {/* AppBar */}
-      <div className="md:hidden bg-white px-4 py-3 flex items-center gap-3 border-b border-hairline">
-        <div className="flex-1">
-          <div className="flex items-baseline gap-1 flex-wrap">
-            <span className="text-base font-sans" style={{ color: '#1E1E26' }}>Buenos días, </span>
-            <span className="font-serif italic text-lg" style={{ color: '#2D8A56' }}>{currentFirstName || 'Luciano'}</span>
-          </div>
-          <p className="text-xs font-sans" style={{ color: '#838390' }}>Martes 21 de mayo · 12 movimientos hoy</p>
-        </div>
-        <div className="relative">
-          <Bell size={22} style={{ color: '#585868' }} />
-          <div className="absolute top-0 right-0 w-2 h-2 rounded-full" style={{ backgroundColor: '#C98A20' }} />
-        </div>
-        <AvatarCircle initials={currentInitials || 'LA'} size={36} />
-      </div>
+    <div className="screen">
+      <PageHead
+        eyebrow="Martes 21 de mayo"
+        title={<>Hola, {first}</>}
+        sub="12 movimientos hoy · 4 entregas, 2 devoluciones"
+        actions={
+          <>
+            <button className="btn sm">Cotizar</button>
+            <button className="btn sm primary">Nueva reserva</button>
+          </>
+        }
+      />
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 pb-24 flex flex-col gap-4">
-        {/* KPI dark card */}
-        <div className="rounded-2xl p-5" style={{ backgroundColor: '#1E1E26' }}>
-          <SectionEyebrow text="Ingresos de hoy" color="rgba(255,255,255,0.6)" />
-          <div className="flex items-end gap-3 mt-1.5 mb-5">
-            <span className="font-mono font-bold text-white" style={{ fontSize: 40, lineHeight: 1.1 }}>
-              {kpi.incomeToday}
-            </span>
-            <span className="text-xs font-semibold font-sans rounded-md px-2 py-0.5 mb-1"
-              style={{ backgroundColor: 'rgba(45,138,86,0.35)', color: '#7FD9A8' }}>
-              {kpi.incomeChange}
-            </span>
-          </div>
-
-          <div className="h-px w-full mb-4" style={{ backgroundColor: 'rgba(255,255,255,0.12)' }} />
-
-          <div className="flex justify-between">
-            {[
-              { label: 'Rentados', value: `${kpi.rented}/${kpi.total}`, color: '#2D8A56' },
-              { label: 'Entregas hoy', value: String(kpi.deliveries), color: 'white' },
-              { label: 'En taller', value: String(kpi.inWorkshop), color: '#C98A20' },
-            ].map(({ label, value, color }, i) => (
-              <div key={i} className="flex items-stretch gap-0">
-                {i > 0 && <div className="w-px mx-4" style={{ backgroundColor: 'rgba(255,255,255,0.1)' }} />}
-                <div className="text-center">
-                  <p className="font-mono font-bold text-xl" style={{ color }}>{value}</p>
-                  <p className="text-xs font-sans" style={{ color: 'rgba(255,255,255,0.6)' }}>{label}</p>
+      {/* Top grid: hero + spark */}
+      <div className="dash-top">
+        {isAdmin ? (
+          <div className="card dash-hero">
+            <div>
+              <div className="dash-hero-top">
+                <div className="eyebrow">Ingresos de hoy</div>
+                <span className="dash-pill">
+                  <TrendingUp size={13} />
+                  +12% sem.
+                </span>
+              </div>
+              <div className="dash-rev">$8,400</div>
+            </div>
+            <div className="dash-hero-foot">
+              <div className="dash-mini">
+                <div className="dash-mini-l">Rentados</div>
+                <div className="dash-mini-v">
+                  {counts.rentado ?? 0}<small>/{sampleFleet.length}</small>
                 </div>
+              </div>
+              <div className="dash-mini">
+                <div className="dash-mini-l">Cobrado</div>
+                <div className="dash-mini-v">$6.1k</div>
+              </div>
+              <div className="dash-mini">
+                <div className="dash-mini-l">Por cobrar</div>
+                <div className="dash-mini-v">$2.3k</div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="card dash-hero">
+            <div>
+              <div className="dash-hero-top">
+                <div className="eyebrow">Resumen operativo</div>
+              </div>
+              <div className="dash-rev">{counts.rentado ?? 0}<small style={{ fontSize: 22 }}>/{sampleFleet.length}</small></div>
+            </div>
+            <div className="dash-hero-foot">
+              <div className="dash-mini">
+                <div className="dash-mini-l">Entregas hoy</div>
+                <div className="dash-mini-v">4</div>
+              </div>
+              <div className="dash-mini">
+                <div className="dash-mini-l">Devoluciones</div>
+                <div className="dash-mini-v">2</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="card dash-spark">
+          <div className="dash-spark-head">
+            <div className="eyebrow">Ingresos · 6 meses</div>
+            <span className="h-display" style={{ fontSize: 20 }}>$184k</span>
+          </div>
+          <div className="dash-bars">
+            {INCOME_MONTHS.map(mo => (
+              <div key={mo.m} className={'dash-bar' + (mo.now ? ' now' : '')}>
+                <div className="bar" style={{ height: mo.v + '%' }} />
+                <div className="lab">{mo.m}</div>
               </div>
             ))}
           </div>
         </div>
+      </div>
 
-        {/* Agenda card */}
-        <div className="bg-white rounded-2xl border border-hairline overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-hairline">
-            <p className="text-sm font-semibold font-sans" style={{ color: '#1E1E26' }}>Agenda de hoy</p>
-            <button onClick={() => navigate('/app/reservations')}
-              className="text-xs font-sans font-medium" style={{ color: '#2D8A56' }}>
-              Ver todo
-            </button>
+      {/* Stat grid */}
+      <div className="statgrid">
+        <StatCard label="Disponibles" value={counts.disponible ?? 0} foot="listos para rentar" tone="accent" />
+        <StatCard label="Rentados"    value={counts.rentado    ?? 0} foot="en la calle" />
+        <StatCard label="Reservados"  value={counts.reservado  ?? 0} foot="próximas salidas" />
+        <StatCard label="En taller"   value={counts.taller     ?? 0} foot="mantenimiento" tone="warn" />
+      </div>
+
+      {/* Bottom grid: agenda + attention */}
+      <div className="dash-grid">
+        <div>
+          <div className="sect-head">
+            <h2 className="sect-title">Agenda de hoy</h2>
+            <span className="link" onClick={() => navigate('/app/reservations')}>Ver todo →</span>
           </div>
-          {todayReservations.map((r, i) => {
-            const urgent = r.status === 'urgent'
-            return (
-              <div key={r.id}>
-                <div className="flex items-center gap-3 px-4 py-3">
-                  <span className="font-mono text-xs w-10 flex-shrink-0 text-right"
-                    style={{ color: urgent ? '#C04040' : '#838390' }}>
-                    {r.time}
-                  </span>
-                  <AvatarCircle initials={r.clientInitials} size={36}
-                    accent={urgent ? '#C04040' : '#2D8A56'} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold font-sans truncate" style={{ color: '#1E1E26' }}>{r.clientName}</p>
-                    <p className="text-xs font-sans truncate" style={{ color: '#838390' }}>{r.vehicle}</p>
+          <div className="card tilelist">
+            {TODAY_AGENDA.map((e, i) => (
+              <button key={i} className="agenda-row">
+                <span className="agenda-time">{e.t}</span>
+                <div className="avatar accent" style={{ width: 38, height: 38, fontSize: 13 }}>{e.i}</div>
+                <div className="agenda-main">
+                  <div className="agenda-who">{e.who}</div>
+                  <div className="agenda-car">
+                    {e.car} · <span className="mono">{e.plate}</span>
                   </div>
-                  <StatusChip status={r.type.toLowerCase()} />
                 </div>
-                {i < todayReservations.length - 1 && (
-                  <div className="h-px mx-4" style={{ backgroundColor: '#EAEAE4' }} />
-                )}
-              </div>
-            )
-          })}
+                <span className={'chip sm ' + (e.type === 'Entrega' ? 'primary' : 'warn')}>
+                  {e.type}
+                </span>
+                {e.urgent && <span className="chip sm danger">Pronto</span>}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Alert card */}
-        <div className="rounded-xl border p-3.5 flex items-center gap-3"
-          style={{ backgroundColor: '#FEF8EC', borderColor: 'rgba(201,138,32,0.3)' }}>
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: 'rgba(201,138,32,0.15)' }}>
-            <Wrench size={18} style={{ color: '#C98A20' }} />
+        <div>
+          <div className="sect-head">
+            <h2 className="sect-title">Atención requerida</h2>
           </div>
-          <div>
-            <p className="text-xs font-semibold font-sans" style={{ color: '#1E1E26' }}>Mantenimiento pendiente</p>
-            <p className="text-xs font-sans" style={{ color: '#585868' }}>Kia Rio · cambio de aceite vencido</p>
+          <div className="card tilelist">
+            {ATTENTION.map((a, i) => (
+              <div key={i} className="tilerow">
+                <div className={'tile-ic ' + a.tone}>
+                  <AttentionIcon tone={a.tone} />
+                </div>
+                <div className="tile-main">
+                  <div className="tile-l">{a.t}</div>
+                  <div className="tile-s">{a.s}</div>
+                </div>
+                <span className="link" style={{ fontSize: 12.5 }}>{a.cta}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>

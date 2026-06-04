@@ -6,8 +6,8 @@ function req(met: boolean, text: string) {
   return (
     <div className="flex items-center gap-2 py-1">
       <div className="w-3.5 h-3.5 rounded-full flex-shrink-0"
-        style={{ backgroundColor: met ? '#2D8A56' : '#BCBCC4' }} />
-      <span className="text-xs font-sans" style={{ color: met ? '#2D8A56' : '#838390' }}>{text}</span>
+        style={{ background: met ? 'var(--primary)' : 'var(--ink4)' }} />
+      <span className="text-xs font-sans" style={{ color: met ? 'var(--primary-dark)' : 'var(--ink3)' }}>{text}</span>
     </div>
   )
 }
@@ -30,25 +30,26 @@ export default function OnboardingPasswordScreen() {
       {/* Header */}
       <div className="flex items-center gap-2 px-2 pt-3 pb-0">
         <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-background">
-          <ArrowLeft size={22} style={{ color: '#1E1E26' }} />
+          <ArrowLeft size={22} style={{ color: 'var(--ink)' }} />
         </button>
         <div>
-          <p className="text-base font-semibold font-sans" style={{ color: '#1E1E26' }}>Tu contraseña</p>
-          <p className="text-xs font-sans" style={{ color: '#838390' }}>Paso 1 de 4</p>
+          <p className="text-base font-semibold font-sans" style={{ color: 'var(--ink)' }}>Tu contraseña</p>
+          <p className="text-xs font-sans" style={{ color: 'var(--ink3)' }}>Paso 1 de 4</p>
         </div>
       </div>
 
       {/* Progress */}
       <div className="flex gap-1 px-5 mt-2 mb-7">
         {[0,1,2,3].map(i => (
-          <div key={i} className="h-1 flex-1 rounded-full" style={{ backgroundColor: i === 0 ? '#2D8A56' : '#EAEAE4' }} />
+          <div key={i} className="h-1 flex-1 rounded-full"
+            style={{ background: i === 0 ? 'var(--primary)' : 'var(--card-line)' }} />
         ))}
       </div>
 
       <div className="px-5 pb-8 flex flex-col gap-4">
         <div>
-          <h2 className="text-2xl font-bold font-serif mb-1.5" style={{ color: '#1E1E26' }}>Crea tu contraseña</h2>
-          <p className="text-sm font-sans" style={{ color: '#585868' }}>Será la que usarás para entrar a Lucianos cada vez.</p>
+          <h2 className="text-2xl font-bold font-serif mb-1.5" style={{ color: 'var(--ink)' }}>Crea tu contraseña</h2>
+          <p className="text-sm font-sans" style={{ color: 'var(--ink2)' }}>Será la que usarás para entrar a Lucianos cada vez.</p>
         </div>
 
         {/* Password */}
@@ -58,11 +59,16 @@ export default function OnboardingPasswordScreen() {
             value={password}
             onChange={e => setPassword(e.target.value)}
             placeholder="Nueva contraseña"
-            className="w-full px-4 pr-12 py-3.5 border rounded-xl text-sm font-sans text-ink outline-none"
-            style={{ borderColor: password ? '#2D8A56' : '#EAEAE4' }}
+            className="w-full px-4 pr-12 py-3.5 border rounded-xl text-sm font-sans outline-none"
+            style={{
+              borderColor: password ? 'var(--primary)' : 'var(--card-line)',
+              color: 'var(--ink)',
+            }}
           />
           <button onClick={() => setShowP(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2">
-            {showP ? <EyeOff size={18} style={{ color: '#838390' }} /> : <Eye size={18} style={{ color: '#838390' }} />}
+            {showP
+              ? <EyeOff size={18} style={{ color: 'var(--ink3)' }} />
+              : <Eye size={18} style={{ color: 'var(--ink3)' }} />}
           </button>
         </div>
 
@@ -73,17 +79,22 @@ export default function OnboardingPasswordScreen() {
             value={confirm}
             onChange={e => setConfirm(e.target.value)}
             placeholder="Confirmar contraseña"
-            className="w-full px-4 pr-12 py-3.5 border rounded-xl text-sm font-sans text-ink outline-none"
-            style={{ borderColor: confirm ? '#2D8A56' : '#EAEAE4' }}
+            className="w-full px-4 pr-12 py-3.5 border rounded-xl text-sm font-sans outline-none"
+            style={{
+              borderColor: confirm ? 'var(--primary)' : 'var(--card-line)',
+              color: 'var(--ink)',
+            }}
           />
           <button onClick={() => setShowC(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2">
-            {showC ? <EyeOff size={18} style={{ color: '#838390' }} /> : <Eye size={18} style={{ color: '#838390' }} />}
+            {showC
+              ? <EyeOff size={18} style={{ color: 'var(--ink3)' }} />
+              : <Eye size={18} style={{ color: 'var(--ink3)' }} />}
           </button>
         </div>
 
         {/* Requirements */}
-        <div className="rounded-xl p-4" style={{ backgroundColor: '#E8F5EE' }}>
-          <p className="text-xs font-semibold mb-2" style={{ color: '#1A5231' }}>Requisitos</p>
+        <div className="rounded-xl p-4" style={{ background: 'var(--primary-soft)' }}>
+          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--primary-dark)' }}>Requisitos</p>
           {req(hasLength, 'Mínimo 8 caracteres')}
           {req(hasUpper, 'Al menos una mayúscula')}
           {req(hasNumber, 'Al menos un número')}
@@ -93,13 +104,13 @@ export default function OnboardingPasswordScreen() {
         {/* 2FA toggle */}
         <div className="rounded-xl border border-hairline p-4 flex items-center gap-3">
           <div className="flex-1">
-            <p className="text-sm font-semibold font-sans" style={{ color: '#1E1E26' }}>Verificación en 2 pasos</p>
-            <p className="text-xs font-sans" style={{ color: '#838390' }}>Recomendado para mayor seguridad</p>
+            <p className="text-sm font-semibold font-sans" style={{ color: 'var(--ink)' }}>Verificación en 2 pasos</p>
+            <p className="text-xs font-sans" style={{ color: 'var(--ink3)' }}>Recomendado para mayor seguridad</p>
           </div>
           <button
             onClick={() => setTwoFactor(v => !v)}
             className="relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors"
-            style={{ backgroundColor: twoFactor ? '#2D8A56' : '#BCBCC4' }}
+            style={{ background: twoFactor ? 'var(--primary)' : 'var(--ink4)' }}
           >
             <span
               className="inline-block h-5 w-5 rounded-full bg-white shadow transition-transform mt-0.5"
@@ -109,9 +120,9 @@ export default function OnboardingPasswordScreen() {
         </div>
 
         {/* Warning */}
-        <div className="rounded-xl p-3 flex gap-2" style={{ backgroundColor: '#FEF8EC' }}>
-          <Info size={16} style={{ color: '#C98A20', flexShrink: 0, marginTop: 1 }} />
-          <p className="text-xs font-sans leading-relaxed" style={{ color: '#585868' }}>
+        <div className="rounded-xl p-3 flex gap-2" style={{ background: 'var(--warn-soft)' }}>
+          <Info size={16} style={{ color: 'var(--warn-ink)', flexShrink: 0, marginTop: 1 }} />
+          <p className="text-xs font-sans leading-relaxed" style={{ color: 'var(--ink2)' }}>
             Esta contraseña es personal. No la compartas con nadie, ni con el administrador.
           </p>
         </div>
@@ -119,7 +130,7 @@ export default function OnboardingPasswordScreen() {
         <button
           onClick={() => navigate('/onboarding/permissions')}
           className="w-full py-3.5 rounded-xl text-white font-semibold text-base transition-opacity active:opacity-80"
-          style={{ backgroundColor: '#2D8A56' }}
+          style={{ background: 'var(--primary)' }}
         >
           Continuar
         </button>

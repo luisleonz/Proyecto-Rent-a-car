@@ -27,7 +27,7 @@ export default function EnterPasswordScreen() {
           onClick={() => navigate(-1)}
           className="p-2 rounded-full hover:bg-background transition-colors"
         >
-          <ArrowLeft size={22} style={{ color: '#1E1E26' }} />
+          <ArrowLeft size={22} style={{ color: 'var(--ink)' }} />
         </button>
       </div>
 
@@ -35,16 +35,16 @@ export default function EnterPasswordScreen() {
         <AvatarCircle initials={user?.initials ?? '?'} size={60} />
 
         <div className="mt-4 mb-2">
-          <h1 className="text-2xl font-bold font-serif" style={{ color: '#1E1E26' }}>
+          <h1 className="text-2xl font-bold font-serif" style={{ color: 'var(--ink)' }}>
             Hola, {user?.firstName ?? ''}
           </h1>
         </div>
-        <p className="text-sm mb-8" style={{ color: '#838390' }}>{email}</p>
+        <p className="text-sm mb-8" style={{ color: 'var(--ink3)' }}>{email}</p>
 
         {/* Password field */}
         <div className="relative mb-1">
           <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
-            <Lock size={18} style={{ color: '#838390' }} />
+            <Lock size={18} style={{ color: 'var(--ink3)' }} />
           </div>
           <input
             type={showPassword ? 'text' : 'password'}
@@ -52,30 +52,33 @@ export default function EnterPasswordScreen() {
             onChange={e => { setPassword(e.target.value); setError(null) }}
             onKeyDown={e => e.key === 'Enter' && onLogin()}
             placeholder="Contraseña"
-            className="w-full pl-11 pr-12 py-3.5 border rounded-xl text-sm font-sans text-ink outline-none transition-colors"
-            style={{ borderColor: error ? '#C04040' : password ? '#2D8A56' : '#EAEAE4' }}
+            className="w-full pl-11 pr-12 py-3.5 border rounded-xl text-sm font-sans outline-none transition-colors"
+            style={{
+              borderColor: error ? 'var(--danger)' : password ? 'var(--primary)' : 'var(--card-line)',
+              color: 'var(--ink)',
+            }}
           />
           <button
             onClick={() => setShowPassword(v => !v)}
             className="absolute right-3 top-1/2 -translate-y-1/2 p-1"
           >
             {showPassword
-              ? <EyeOff size={18} style={{ color: '#838390' }} />
-              : <Eye size={18} style={{ color: '#838390' }} />}
+              ? <EyeOff size={18} style={{ color: 'var(--ink3)' }} />
+              : <Eye size={18} style={{ color: 'var(--ink3)' }} />}
           </button>
         </div>
-        {error && <p className="text-xs mb-4" style={{ color: '#C04040' }}>{error}</p>}
+        {error && <p className="text-xs mb-4" style={{ color: 'var(--danger)' }}>{error}</p>}
         {!error && <div className="mb-4" />}
 
         <button
           onClick={onLogin}
           className="w-full py-3.5 rounded-xl text-white font-semibold text-base mb-3 transition-opacity active:opacity-80"
-          style={{ backgroundColor: '#2D8A56' }}
+          style={{ background: 'var(--primary)' }}
         >
           Iniciar sesión
         </button>
 
-        <button className="w-full py-2 text-sm text-center" style={{ color: '#585868' }}>
+        <button className="w-full py-2 text-sm text-center" style={{ color: 'var(--ink2)' }}>
           ¿Olvidaste tu contraseña? Contacta al administrador
         </button>
       </div>

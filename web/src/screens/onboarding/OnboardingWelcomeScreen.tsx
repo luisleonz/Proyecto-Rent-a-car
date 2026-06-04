@@ -9,10 +9,10 @@ export default function OnboardingWelcomeScreen() {
   const { currentFirstName } = useAuth()
 
   return (
-    <div className="min-h-screen flex flex-col px-6 pt-8 max-w-md mx-auto" style={{ backgroundColor: '#1A5231' }}>
+    <div className="min-h-screen flex flex-col px-6 pt-8 max-w-md mx-auto" style={{ background: 'var(--side-bg)' }}>
       {/* Logo */}
       <div className="flex items-center gap-3 mb-10">
-        <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#2D8A56' }}>
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'var(--primary)' }}>
           <Car size={26} className="text-white" />
         </div>
         <span className="text-xl font-bold font-serif text-white">Lucianos</span>
@@ -41,7 +41,7 @@ export default function OnboardingWelcomeScreen() {
       <button
         onClick={() => navigate('/onboarding/password')}
         className="w-full py-3.5 rounded-xl font-semibold text-base mt-10 mb-6 transition-opacity active:opacity-80"
-        style={{ backgroundColor: 'white', color: '#1A5231' }}
+        style={{ background: 'white', color: 'var(--side-bg)' }}
       >
         Empezar configuración
       </button>

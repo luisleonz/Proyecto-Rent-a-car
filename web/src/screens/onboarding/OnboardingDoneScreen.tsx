@@ -7,7 +7,7 @@ export default function OnboardingDoneScreen() {
   const { currentFirstName, currentRole, currentBranch } = useAuth()
 
   return (
-    <div className="min-h-screen flex flex-col px-6 max-w-md mx-auto" style={{ backgroundColor: '#2D8A56' }}>
+    <div className="min-h-screen flex flex-col px-6 max-w-md mx-auto" style={{ background: 'var(--primary)' }}>
       <div className="flex-1 flex flex-col items-center justify-center pt-12">
         {/* Icon */}
         <div className="w-24 h-24 rounded-full flex items-center justify-center mb-7"
@@ -46,7 +46,7 @@ export default function OnboardingDoneScreen() {
       <button
         onClick={() => navigate('/app/home', { replace: true })}
         className="w-full py-3.5 rounded-xl font-bold text-base mb-5 transition-opacity active:opacity-80"
-        style={{ backgroundColor: 'white', color: '#2D8A56' }}
+        style={{ background: 'white', color: 'var(--primary-dark)' }}
       >
         Entrar al panel
       </button>

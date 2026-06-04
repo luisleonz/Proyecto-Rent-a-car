@@ -31,8 +31,7 @@ const FLOW_PREFIXES = ['/app/caja/turno', '/app/caja/cierre', '/app/caja/justifi
 function AppLayout() {
   const location = useLocation()
   const isFlow = FLOW_PREFIXES.some(p => location.pathname.startsWith(p))
-  const isVehicleDetail = location.pathname.startsWith('/app/vehicles/') && location.pathname.split('/').length > 3
-  const showNav = !isFlow && !isVehicleDetail
+  const showNav = !isFlow
 
   // Route → title/subtitle for mobile top bar
   const PAGE_INFO: Record<string, [string, string]> = {

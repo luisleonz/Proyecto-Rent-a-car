@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Plus, ChevronRight, X, Check, Clock } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
@@ -423,6 +424,14 @@ export default function ReservationsScreen() {
   const [panelRes, setPanelRes]         = useState<ReservaConDetalle | null>(null)
   const [panelOpen, setPanelOpen]       = useState(false)
   const [modalOpen, setModalOpen]       = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setModalOpen(true)
+      setSearchParams({}, { replace: true })
+    }
+  }, [])
 
   async function fetchReservas() {
     const { data } = await supabase

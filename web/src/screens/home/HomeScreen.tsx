@@ -104,10 +104,9 @@ function AttentionIcon({ tone }: { tone: 'warn' | 'danger' | 'primary' }) {
 /* ── Main screen ── */
 export default function HomeScreen() {
   const navigate = useNavigate()
-  const { currentFirstName, currentRole } = useAuth()
+  const { currentFirstName, isAdmin } = useAuth()
 
   const first = currentFirstName || 'Luciano'
-  const isAdmin = !currentRole || currentRole === 'Administrador' || currentRole === 'admin'
 
   const counts = sampleFleet.reduce<Record<string, number>>((acc, v) => {
     acc[v.status] = (acc[v.status] ?? 0) + 1
@@ -122,8 +121,8 @@ export default function HomeScreen() {
         sub="12 movimientos hoy · 4 entregas, 2 devoluciones"
         actions={
           <>
-            <button className="btn sm">Cotizar</button>
-            <button className="btn sm primary">Nueva reserva</button>
+            <button className="btn sm" onClick={() => navigate('/app/cotizaciones')}>Cotizar</button>
+            <button className="btn sm primary" onClick={() => navigate('/app/reservations?new=1')}>Nueva reserva</button>
           </>
         }
       />

@@ -601,6 +601,51 @@ body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; color
 .perm-l.off { color: var(--ink3); }
 .perm-s { font-size: 10.5px; color: var(--ink3); margin-top: 2px; }
 
+/* ── Vehicle Detail ── */
+.backlink { display: inline-flex; align-items: center; gap: 5px; margin-bottom: 16px; border: 0; background: transparent; color: var(--ink2); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.backlink:hover { color: var(--primary); }
+.detail-grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: var(--gap); align-items: start; }
+@container app (max-width: 900px) { .detail-grid { grid-template-columns: 1fr; } }
+.detail-left { display: flex; flex-direction: column; gap: var(--gap); }
+.detail-right { display: flex; flex-direction: column; gap: var(--gap); }
+.gallery-strip { display: flex; gap: 8px; padding: 12px; }
+.thumb { flex: 1; aspect-ratio: 4/3; border-radius: 10px; background: var(--paper-alt); border: 1px solid var(--card-line); display: flex; align-items: center; justify-content: center; color: var(--ink4); cursor: pointer; overflow: hidden; }
+.thumb.on { border-color: var(--primary); color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+.thumb svg { width: 60%; }
+.detail-id { padding: var(--pad); }
+.detail-idhead { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.detail-title { font-size: 30px; line-height: 1.15; margin-top: 5px; text-wrap: balance; }
+.detail-plate { font-size: 14px; font-weight: 600; color: var(--ink); background: var(--paper-alt); border: 1px solid var(--card-line); padding: 6px 11px; border-radius: 9px; white-space: nowrap; }
+.detail-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 18px; }
+.detail-actions { padding: var(--pad); }
+.detail-actions-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+.detail-status { font-size: 15px; color: var(--ink); margin-top: 5px; }
+.detail-rate { text-align: right; white-space: nowrap; }
+.detail-rate .h-display { font-size: 30px; }
+.detail-rate small { font-size: 12px; color: var(--ink3); }
+.detail-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+.detail-specs { padding: var(--pad); }
+.spec-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.spectile { display: flex; align-items: center; gap: 12px; padding: 13px; border-radius: var(--radius-sm); background: var(--paper-alt); border: 1px solid var(--card-line); }
+.spectile-ic { width: 38px; height: 38px; flex-shrink: 0; border-radius: 10px; background: var(--primary-soft); color: var(--primary-dark); display: flex; align-items: center; justify-content: center; }
+.spectile-v { font-size: 14.5px; font-weight: 650; color: var(--ink); }
+.spectile-l { font-size: 11.5px; color: var(--ink3); margin-top: 1px; }
+.fuel-row { margin-top: 16px; }
+.fuel-head { display: flex; justify-content: space-between; align-items: center; font-size: 13.5px; color: var(--ink2); margin-bottom: 8px; }
+.fuel-head span { display: inline-flex; align-items: center; gap: 6px; }
+.meter { height: 9px; border-radius: 999px; background: var(--paper-alt); border: 1px solid var(--card-line); overflow: hidden; }
+.meter span { display: block; height: 100%; border-radius: 999px; }
+.detail-history { padding: var(--pad); }
+.timeline { display: flex; flex-direction: column; }
+.tl-item { display: flex; gap: 13px; padding: 12px 0; border-bottom: 1px solid var(--hairline); position: relative; }
+.tl-item:last-child { border-bottom: 0; padding-bottom: 0; }
+.tl-dot { margin-top: 6px; }
+.tl-body { flex: 1; min-width: 0; }
+.tl-row1 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.tl-row1 strong { font-size: 14px; color: var(--ink); }
+.tl-date { font-size: 12px; color: var(--ink3); white-space: nowrap; }
+.tl-note { font-size: 13px; color: var(--ink2); margin-top: 2px; }
+
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--ink4); border-radius: 999px; border: 3px solid transparent; background-clip: padding-box; }

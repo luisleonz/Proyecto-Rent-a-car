@@ -1,102 +1,230 @@
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, MoreVertical, User, CalendarDays, Wrench, History, ChevronRight } from 'lucide-react'
-import { sampleFleet, todayReservations, tomorrowReservations } from '../../data/sampleData'
-import StatusChip from '../../components/StatusChip'
+import { ChevronLeft, Key, Check, Wrench, FileText } from 'lucide-react'
+import { sampleFleet, Vehicle } from '../../data/sampleData'
+
+/* ── Tone → colors ── */
+const TONES: Record<string, [string, string]> = {
+  blue:  ['oklch(0.62 0.10 245)', 'oklch(0.90 0.04 245)'],
+  slate: ['oklch(0.55 0.02 240)', 'oklch(0.92 0.01 240)'],
+  rose:  ['oklch(0.62 0.13 20)',  'oklch(0.92 0.04 20)'],
+  ink:   ['oklch(0.40 0.01 240)', 'oklch(0.88 0.01 240)'],
+  sand:  ['oklch(0.70 0.06 75)',  'oklch(0.93 0.03 80)'],
+  white: ['oklch(0.72 0.01 240)', 'oklch(0.95 0.005 240)'],
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  disponible: 'Disponible', rentado: 'Rentado', taller: 'En taller', reservado: 'Reservado',
+}
+const STATUS_CHIP: Record<string, string> = {
+  disponible: 'primary', rentado: 'primary', taller: 'warn', reservado: '',
+}
+const STATUS_DOT: Record<string, string> = {
+  disponible: 'primary', rentado: 'primary', taller: 'warn', reservado: 'neutral',
+}
+
+const VEH_HISTORY = [
+  { t: 'Devolución',     who: 'Mariana Pérez',   note: 'Sin daños · tanque lleno',        d: '18 may 2026', dot: 'primary' },
+  { t: 'Entrega',        who: 'Mariana Pérez',   note: '3 días · contrato #4471',          d: '15 may 2026', dot: 'primary' },
+  { t: 'Mantenimiento',  who: 'Taller central',  note: 'Cambio de aceite · 45,000 km',    d: '02 may 2026', dot: 'warn'    },
+  { t: 'Devolución',     who: 'Pedro Soto',      note: 'Rayón menor puerta trasera',      d: '21 abr 2026', dot: 'neutral' },
+]
+
+const GALLERY = ['Frente', '3/4', 'Interior', 'Tablero']
+
+/* ── CarPhoto ── */
+function CarPhoto({ v, height = 200 }: { v: Vehicle; height?: number }) {
+  const [body, bg] = TONES[v.tone ?? 'slate'] ?? TONES.slate
+  const glass = 'rgba(255,255,255,0.42)'
+  return (
+    <div className="photo" style={{ height, background: bg, color: body }}>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <svg viewBox="0 0 200 72" fill="none" style={{ width: '70%' }}>
+          <path d="M12 50 C12 44 15 42 20 42 L48 42 C54 27 70 17 100 15 C130 13 152 23 162 42 L182 42 C187 42 190 44 190 50 L190 58 C190 62 187 64 182 64 L18 64 C14 64 12 62 12 58 Z" fill={body} />
+          <path d="M52 42 C56 26 70 17 100 15 C130 13 148 24 156 42 Z" fill={body} opacity="0.85" />
+          <path d="M112 16 L154 42 L132 42 Z" fill={glass} />
+          <path d="M58 42 L82 42 L74 22 Z" fill={glass} />
+          <circle cx="54"  cy="64" r="14" fill="oklch(0.18 0.005 240)" />
+          <circle cx="54"  cy="64" r="7"  fill="oklch(0.40 0.008 240)" />
+          <circle cx="54"  cy="64" r="3"  fill="oklch(0.62 0.008 240)" />
+          <circle cx="154" cy="64" r="14" fill="oklch(0.18 0.005 240)" />
+          <circle cx="154" cy="64" r="7"  fill="oklch(0.40 0.008 240)" />
+          <circle cx="154" cy="64" r="3"  fill="oklch(0.62 0.008 240)" />
+        </svg>
+      </div>
+    </div>
+  )
+}
+
+/* ── SpecTile ── */
+function SpecTile({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="spectile">
+      <div className="spectile-ic">{icon}</div>
+      <div>
+        <div className="spectile-v">{value}</div>
+        <div className="spectile-l">{label}</div>
+      </div>
+    </div>
+  )
+}
 
 export default function VehicleDetailScreen() {
   const { plate } = useParams<{ plate: string }>()
   const navigate = useNavigate()
-  const vehicle = sampleFleet.find(v => v.plate === plate) ?? sampleFleet[0]
-  const allRes = [...todayReservations, ...tomorrowReservations]
-  const devRes = allRes.find(r => r.type.toLowerCase() === 'devolución') ?? allRes[0]
+  const v = sampleFleet.find(veh => veh.plate === plate) ?? sampleFleet[0]
+  const [gallery, setGallery] = useState(0)
 
-  const sections = [
-    ...(vehicle.status === 'rentado' && vehicle.currentClient
-      ? [{ icon: User, title: 'Renta actual', subtitle: `${vehicle.currentClient} · ${vehicle.clientInfo ?? ''}`, color: '#2D8A56' }]
-      : []),
-    { icon: CalendarDays, title: 'Próximas reservas', subtitle: '2 reservas programadas', color: '#4444AA' },
-    { icon: Wrench, title: 'Mantenimiento', subtitle: 'Último servicio: hace 3 meses', color: '#C98A20' },
-    { icon: History, title: 'Historial de rentas', subtitle: '18 rentas completadas', color: '#838390' },
-  ]
+  const fuelPct = v.fuel ?? 75
+  const fuelColor = fuelPct < 35 ? 'var(--danger)' : fuelPct < 60 ? 'var(--warn)' : 'var(--primary)'
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#FAFAF7' }}>
-      {/* AppBar */}
-      <div className="md:hidden bg-white flex items-center gap-1 px-2 py-2 border-b border-hairline">
-        <button onClick={() => navigate(-1)} className="p-2">
-          <ArrowLeft size={22} style={{ color: '#1E1E26' }} />
-        </button>
-        <p className="flex-1 text-base font-semibold font-sans" style={{ color: '#1E1E26' }}>{vehicle.model}</p>
-        <button className="p-2"><MoreVertical size={20} style={{ color: '#585868' }} /></button>
-      </div>
+    <div className="screen detail">
+      <button className="backlink" onClick={() => navigate('/app/vehicles')}>
+        <ChevronLeft size={16} />
+        Volver a flota
+      </button>
 
-      <div className="flex-1 overflow-y-auto pb-24">
-        {/* Dark hero */}
-        <div className="p-5" style={{ backgroundColor: '#1E1E26' }}>
-          {/* Stylized car silhouette */}
-          <div className="flex flex-col items-center gap-1 py-4 mb-4">
-            <div className="rounded-3xl" style={{ width: 180, height: 38, backgroundColor: 'rgba(255,255,255,0.06)' }} />
-            <div className="rounded-xl" style={{ width: 220, height: 34, backgroundColor: 'rgba(255,255,255,0.08)' }} />
-          </div>
-
-          {/* Plate + status */}
-          <div className="flex items-center gap-3 mb-1">
-            <span className="font-mono font-semibold text-white" style={{ fontSize: 20 }}>{vehicle.plate}</span>
-            <StatusChip status={vehicle.status} />
-          </div>
-          <p className="text-xs font-sans mb-5" style={{ color: 'rgba(255,255,255,0.6)' }}>
-            {vehicle.model} · {vehicle.year} · {vehicle.color}
-          </p>
-
-          <div className="h-px mb-4" style={{ backgroundColor: 'rgba(255,255,255,0.1)' }} />
-
-          <div className="flex justify-between">
-            {[
-              { label: 'Kilometraje', value: `${vehicle.km} km` },
-              { label: 'Combustible', value: '3/4' },
-              { label: 'Tarifa diaria', value: '$680' },
-            ].map(({ label, value }) => (
-              <div key={label}>
-                <p className="font-mono font-bold text-base text-white">{value}</p>
-                <p className="text-xs font-sans" style={{ color: 'rgba(255,255,255,0.55)' }}>{label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Sections card */}
-        <div className="mx-4 mt-4 bg-white rounded-2xl border border-hairline overflow-hidden">
-          {sections.map(({ icon: Icon, title, subtitle, color }, i) => (
-            <div key={title}>
-              <div className="flex items-center gap-3 px-4 py-3.5">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: color + '18' }}>
-                  <Icon size={18} style={{ color }} />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold font-sans" style={{ color: '#1E1E26' }}>{title}</p>
-                  <p className="text-xs font-sans" style={{ color: '#838390' }}>{subtitle}</p>
-                </div>
-                <ChevronRight size={16} style={{ color: '#BCBCC4' }} />
-              </div>
-              {i < sections.length - 1 && <div className="h-px ml-16" style={{ backgroundColor: '#EAEAE4' }} />}
+      <div className="detail-grid">
+        {/* LEFT — gallery + identity */}
+        <div className="detail-left">
+          <div className="card" style={{ overflow: 'hidden' }}>
+            <CarPhoto v={v} height={260} />
+            <div className="gallery-strip">
+              {GALLERY.map((g, i) => (
+                <button key={g} className={'thumb' + (i === gallery ? ' on' : '')} onClick={() => setGallery(i)}>
+                  <svg viewBox="0 0 200 72" fill="none" style={{ width: '60%' }}>
+                    <path d="M12 50 C12 44 15 42 20 42 L48 42 C54 27 70 17 100 15 C130 13 152 23 162 42 L182 42 C187 42 190 44 190 50 L190 58 C190 62 187 64 182 64 L18 64 C14 64 12 62 12 58 Z" fill="currentColor" opacity="0.6" />
+                  </svg>
+                </button>
+              ))}
             </div>
-          ))}
+          </div>
+
+          <div className="card detail-id">
+            <div className="detail-idhead">
+              <div>
+                <div className="eyebrow">{v.segment ?? 'Sedán'} · {v.year}</div>
+                <h1 className="h-display detail-title">{v.model}</h1>
+              </div>
+              <div className="detail-plate mono">{v.plate}</div>
+            </div>
+            <div className="detail-chips">
+              <span className={'chip ' + (STATUS_CHIP[v.status] || '')}>
+                <span className={'dot ' + (STATUS_DOT[v.status] || 'neutral')} />
+                {STATUS_LABEL[v.status] ?? v.status}
+              </span>
+              <span className="chip">{v.color}</span>
+              {v.transmission && <span className="chip">{v.transmission}</span>}
+              <span className="chip">5 asientos</span>
+            </div>
+          </div>
         </div>
 
-        {/* Action button */}
-        <div className="px-4 mt-6">
-          <button
-            disabled={vehicle.status !== 'rentado'}
-            onClick={() => vehicle.status === 'rentado' && navigate(`/app/devolucion/${devRes.id}/1`)}
-            className="w-full py-3.5 rounded-xl text-white font-semibold text-base transition-opacity"
-            style={{
-              backgroundColor: vehicle.status === 'rentado' ? '#2D8A56' : '#BCBCC4',
-              opacity: vehicle.status === 'rentado' ? 1 : 0.7,
-            }}
-          >
-            {vehicle.status === 'rentado' ? 'Registrar devolución' : 'No disponible'}
-          </button>
+        {/* RIGHT — actions, specs, history */}
+        <div className="detail-right">
+          {/* Actions */}
+          <div className="card detail-actions">
+            <div className="detail-actions-head">
+              <div>
+                <div className="eyebrow">Estado actual</div>
+                {v.status === 'rentado' && (
+                  <div className="detail-status">Rentado a <strong>{v.currentClient}</strong>{v.clientInfo ? ` · ${v.clientInfo}` : ''}</div>
+                )}
+                {v.status === 'taller' && (
+                  <div className="detail-status">En taller — {v.clientInfo}</div>
+                )}
+                {v.status === 'reservado' && (
+                  <div className="detail-status">Reservado · {v.clientInfo}</div>
+                )}
+                {v.status === 'disponible' && (
+                  <div className="detail-status">Disponible para rentar</div>
+                )}
+              </div>
+              {v.dailyRate && (
+                <div className="detail-rate">
+                  <span className="h-display">${v.dailyRate.toLocaleString('es-MX')}</span>
+                  <small>/día</small>
+                </div>
+              )}
+            </div>
+            <div className="detail-btns">
+              {v.status === 'disponible' && (
+                <button className="btn primary"><Key size={15} />Crear reserva</button>
+              )}
+              {v.status === 'rentado' && (
+                <button className="btn primary" onClick={() => navigate('/app/devolucion/3/1')}>
+                  <Check size={15} />Registrar devolución
+                </button>
+              )}
+              {v.status === 'reservado' && (
+                <button className="btn primary"><Key size={15} />Entregar ahora</button>
+              )}
+              {v.status === 'taller' && (
+                <button className="btn primary"><Check size={15} />Marcar listo</button>
+              )}
+              <button className="btn"><Wrench size={15} />Enviar a taller</button>
+              <button className="btn ghost"><FileText size={15} />Historial</button>
+            </div>
+          </div>
+
+          {/* Specs */}
+          <div className="card detail-specs">
+            <div className="eyebrow" style={{ marginBottom: 14 }}>Especificaciones</div>
+            <div className="spec-tiles">
+              <SpecTile
+                icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="18" height="18"><path d="M4 14a8 8 0 1 1 16 0"/><path d="M12 14l4-3"/><circle cx="12" cy="14" r="1.2" fill="currentColor" stroke="none"/></svg>}
+                label="Kilometraje"
+                value={v.km + ' km'}
+              />
+              <SpecTile
+                icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="18" height="18"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>}
+                label="Transmisión"
+                value={v.transmission ?? 'Aut.'}
+              />
+              <SpecTile
+                icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="18" height="18"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 5-6 8-6s6.5 2 8 6"/></svg>}
+                label="Capacidad"
+                value="5 personas"
+              />
+              <SpecTile
+                icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="18" height="18"><path d="M3 14l2-5a2 2 0 0 1 2-1.4h10a2 2 0 0 1 2 1.4l2 5v5h-3v-2H6v2H3v-5z"/><circle cx="7.5" cy="15.5" r="1.5"/><circle cx="16.5" cy="15.5" r="1.5"/></svg>}
+                label="Segmento"
+                value={v.segment ?? 'Sedán'}
+              />
+            </div>
+            <div className="fuel-row">
+              <div className="fuel-head">
+                <span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="15" height="15"><rect x="5" y="4" width="9" height="16" rx="1.5"/><path d="M5 10h9M16 8l3 3v6a2 2 0 0 1-2 2 2 2 0 0 1-2-2V8z"/></svg>
+                  Combustible
+                </span>
+                <strong>{fuelPct}%</strong>
+              </div>
+              <div className="meter">
+                <span style={{ width: fuelPct + '%', background: fuelColor }} />
+              </div>
+            </div>
+          </div>
+
+          {/* History */}
+          <div className="card detail-history">
+            <div className="eyebrow" style={{ marginBottom: 6 }}>Actividad reciente</div>
+            <div className="timeline">
+              {VEH_HISTORY.map((h, i) => (
+                <div key={i} className="tl-item">
+                  <span className={'tl-dot dot ' + h.dot} />
+                  <div className="tl-body">
+                    <div className="tl-row1">
+                      <strong>{h.t}</strong>
+                      <span className="tl-date">{h.d}</span>
+                    </div>
+                    <div className="tl-note">{h.who} · {h.note}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

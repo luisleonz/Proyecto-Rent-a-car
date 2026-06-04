@@ -20,11 +20,11 @@ function FlowTopBar({ onCancel }: { onCancel: () => void }) {
       <button
         onClick={() => navigate(-1)}
         className="w-9 h-9 rounded-full border border-hairline flex items-center justify-center"
-        style={{ backgroundColor: '#F2F1EC' }}
+        style={{ backgroundColor: 'var(--paper-alt)' }}
       >
-        <ArrowLeft size={18} style={{ color: '#585868' }} />
+        <ArrowLeft size={18} style={{ color: 'var(--ink2)' }} />
       </button>
-      <button onClick={onCancel} className="text-[13px] font-medium font-sans" style={{ color: '#585868' }}>
+      <button onClick={onCancel} className="text-[13px] font-medium font-sans" style={{ color: 'var(--ink2)' }}>
         Cancelar
       </button>
     </div>
@@ -38,11 +38,11 @@ function EntregaHeader({ step }: { step: number }) {
       <div className="flex gap-1.5 mb-2.5">
         {[0, 1, 2].map(i => (
           <div key={i} className="flex-1 h-1 rounded-full"
-            style={{ backgroundColor: i <= step ? '#2D8A56' : '#EAEAE4' }} />
+            style={{ backgroundColor: i <= step ? 'var(--primary)' : 'var(--card-line)' }} />
         ))}
       </div>
-      <p className="text-[22px] font-bold font-serif" style={{ color: '#1E1E26' }}>Entrega · check-in</p>
-      <p className="text-xs font-sans mt-1" style={{ color: '#585868' }}>Paso {step + 1} de 3 · {labels[step]}</p>
+      <p className="text-[22px] font-bold font-serif" style={{ color: 'var(--ink)' }}>Entrega · check-in</p>
+      <p className="text-xs font-sans mt-1" style={{ color: 'var(--ink2)' }}>Paso {step + 1} de 3 · {labels[step]}</p>
     </div>
   )
 }
@@ -51,11 +51,11 @@ function ClientCard({ resId }: { resId: string }) {
   const res = ALL_RES.find(r => r.id === resId) ?? ALL_RES[0]
   return (
     <div className="rounded-2xl border p-3.5 flex items-center gap-3"
-      style={{ backgroundColor: '#E8F5EE', borderColor: '#B8DFC8' }}>
+      style={{ backgroundColor: 'var(--primary-soft)', borderColor: 'var(--primary-line)' }}>
       <AvatarCircle initials={res.clientInitials} size={42} />
       <div>
-        <p className="text-sm font-semibold font-sans" style={{ color: '#1E1E26' }}>{res.clientName}</p>
-        <p className="text-[11px] font-sans mt-0.5" style={{ color: '#585868' }}>
+        <p className="text-sm font-semibold font-sans" style={{ color: 'var(--ink)' }}>{res.clientName}</p>
+        <p className="text-[11px] font-sans mt-0.5" style={{ color: 'var(--ink2)' }}>
           {res.vehicle} · {res.type} · 3 días
         </p>
       </div>
@@ -65,12 +65,12 @@ function ClientCard({ resId }: { resId: string }) {
 
 function ContinueButton({ disabled, onClick }: { disabled?: boolean; onClick: () => void }) {
   return (
-    <div className="bg-white border-t border-hairline p-4 flex-shrink-0">
+    <div className="border-t border-hairline p-4 flex-shrink-0" style={{ background: 'var(--card)' }}>
       <button
         disabled={disabled}
         onClick={onClick}
         className="w-full py-3.5 rounded-full text-sm font-semibold font-sans text-white flex items-center justify-center gap-1 transition-opacity"
-        style={{ backgroundColor: '#2D8A56', opacity: disabled ? 0.5 : 1 }}
+        style={{ backgroundColor: 'var(--primary)', opacity: disabled ? 0.5 : 1 }}
       >
         Continuar
         <ChevronRight size={18} />
@@ -104,8 +104,8 @@ export function EntregaStep1Screen() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#FAFAF7' }}>
-      <div className="bg-white border-b border-hairline flex-shrink-0">
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--paper)' }}>
+      <div className="border-b border-hairline flex-shrink-0" style={{ background: 'var(--card)' }}>
         <FlowTopBar onCancel={() => navigate('/app/home', { replace: true })} />
         <EntregaHeader step={0} />
       </div>
@@ -122,25 +122,25 @@ export function EntregaStep1Screen() {
               onClick={() => setDocs(d => ({ ...d, [key]: !ok }))}
               className="w-full rounded-2xl border text-left transition-colors"
               style={{
-                backgroundColor: ok ? '#E8F5EE' : 'white',
-                borderColor: ok ? '#B8DFC8' : '#EAEAE4',
+                backgroundColor: ok ? 'var(--primary-soft)' : 'white',
+                borderColor: ok ? 'var(--primary-line)' : 'var(--card-line)',
                 borderWidth: ok ? 1.5 : 1,
               }}
             >
               <div className="flex items-center gap-3 px-3.5 py-3">
                 <div className="w-[22px] h-[22px] rounded-full flex items-center justify-center flex-shrink-0 border-2"
                   style={{
-                    backgroundColor: ok ? '#2D8A56' : 'transparent',
-                    borderColor: ok ? '#2D8A56' : '#EAEAE4',
+                    backgroundColor: ok ? 'var(--primary)' : 'transparent',
+                    borderColor: ok ? 'var(--primary)' : 'var(--card-line)',
                   }}>
                   {ok && <Check size={12} className="text-white" />}
                 </div>
                 <div className="flex-1">
-                  <p className="text-[13px] font-semibold font-sans" style={{ color: ok ? '#1F6B40' : '#1E1E26' }}>{label}</p>
-                  <p className="text-[11px] font-sans mt-0.5" style={{ color: '#585868' }}>{hint}</p>
+                  <p className="text-[13px] font-semibold font-sans" style={{ color: ok ? 'var(--primary-dark)' : 'var(--ink)' }}>{label}</p>
+                  <p className="text-[11px] font-sans mt-0.5" style={{ color: 'var(--ink2)' }}>{hint}</p>
                 </div>
                 {!ok && (
-                  <span className="text-[11px] font-semibold font-sans px-2.5 py-1 rounded-full border border-hairline" style={{ color: '#585868' }}>
+                  <span className="text-[11px] font-semibold font-sans px-2.5 py-1 rounded-full border border-hairline" style={{ color: 'var(--ink2)' }}>
                     Subir
                   </span>
                 )}
@@ -154,19 +154,19 @@ export function EntregaStep1Screen() {
           onClick={() => setSigned(true)}
           className="w-full rounded-2xl border transition-colors"
           style={{
-            backgroundColor: signed ? '#E8F5EE' : 'white',
-            borderColor: signed ? '#B8DFC8' : '#EAEAE4',
+            backgroundColor: signed ? 'var(--primary-soft)' : 'white',
+            borderColor: signed ? 'var(--primary-line)' : 'var(--card-line)',
             borderWidth: signed ? 1.5 : 1,
             minHeight: 90,
           }}
         >
           <div className="flex flex-col items-center justify-center py-4 px-4 gap-1.5">
             {signed ? (
-              <p className="text-[13px] font-semibold font-sans" style={{ color: '#1F6B40' }}>✓ Firmado</p>
+              <p className="text-[13px] font-semibold font-sans" style={{ color: 'var(--primary-dark)' }}>✓ Firmado</p>
             ) : (
               <>
-                <p className="font-mono text-xs tracking-[2px]" style={{ color: '#BCBCC4' }}>— — — — — — — — — — — —</p>
-                <p className="text-xs font-sans" style={{ color: '#838390' }}>Toca para firmar</p>
+                <p className="font-mono text-xs tracking-[2px]" style={{ color: 'var(--ink4)' }}>— — — — — — — — — — — —</p>
+                <p className="text-xs font-sans" style={{ color: 'var(--ink3)' }}>Toca para firmar</p>
               </>
             )}
           </div>
@@ -198,8 +198,8 @@ export function EntregaStep2Screen() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#FAFAF7' }}>
-      <div className="bg-white border-b border-hairline flex-shrink-0">
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--paper)' }}>
+      <div className="border-b border-hairline flex-shrink-0" style={{ background: 'var(--card)' }}>
         <FlowTopBar onCancel={() => navigate('/app/home', { replace: true })} />
         <EntregaHeader step={1} />
       </div>
@@ -207,14 +207,14 @@ export function EntregaStep2Screen() {
       <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4">
         {/* KM + Tank info cards */}
         <div className="flex gap-2.5">
-          <div className="flex-1 bg-white rounded-2xl border border-hairline p-3">
+          <div className="flex-1 rounded-2xl border border-hairline p-3" style={{ background: 'var(--card)' }}>
             <SectionEyebrow text="Tanque" />
-            <p className="font-serif mt-2" style={{ fontSize: 24, color: '#2D8A56' }}>{fuel}</p>
+            <p className="font-serif mt-2" style={{ fontSize: 24, color: 'var(--primary)' }}>{fuel}</p>
           </div>
-          <div className="flex-1 bg-white rounded-2xl border border-hairline p-3">
+          <div className="flex-1 rounded-2xl border border-hairline p-3" style={{ background: 'var(--card)' }}>
             <SectionEyebrow text="Kilometraje" />
-            <p className="font-serif mt-2" style={{ fontSize: 20, color: '#1E1E26' }}>{km}</p>
-            <p className="text-[11px] font-sans" style={{ color: '#838390' }}>km</p>
+            <p className="font-serif mt-2" style={{ fontSize: 20, color: 'var(--ink)' }}>{km}</p>
+            <p className="text-[11px] font-sans" style={{ color: 'var(--ink3)' }}>km</p>
           </div>
         </div>
 
@@ -230,12 +230,12 @@ export function EntregaStep2Screen() {
                   onClick={() => setFuel(opt)}
                   className="flex-1 py-2.5 rounded-xl border flex items-center justify-center transition-colors"
                   style={{
-                    backgroundColor: sel ? '#E8F5EE' : 'white',
-                    borderColor: sel ? '#2D8A56' : '#EAEAE4',
+                    backgroundColor: sel ? 'var(--primary-soft)' : 'white',
+                    borderColor: sel ? 'var(--primary)' : 'var(--card-line)',
                     borderWidth: sel ? 1.5 : 1,
                   }}
                 >
-                  <span className="text-sm font-serif" style={{ color: sel ? '#2D8A56' : '#1E1E26', fontWeight: sel ? 600 : 400 }}>
+                  <span className="text-sm font-serif" style={{ color: sel ? 'var(--primary)' : 'var(--ink)', fontWeight: sel ? 600 : 400 }}>
                     {opt}
                   </span>
                 </button>
@@ -249,18 +249,19 @@ export function EntregaStep2Screen() {
           <SectionEyebrow text="Daños existentes (toca para marcar)" />
           <button
             onClick={() => setDamages(d => d + 1)}
-            className="w-full bg-white rounded-2xl border border-hairline p-3.5 flex flex-col items-center gap-2 mt-2"
+            className="w-full rounded-2xl border border-hairline p-3.5 flex flex-col items-center gap-2 mt-2"
+            style={{ background: 'var(--card)' }}
           >
-            <div className="w-full h-[80px] rounded-xl flex items-center justify-center" style={{ backgroundColor: '#F2F1EC' }}>
-              <span className="text-[13px] font-sans" style={{ color: '#838390' }}>🚗  Vista del vehículo  🚗</span>
+            <div className="w-full h-[80px] rounded-xl flex items-center justify-center" style={{ backgroundColor: 'var(--paper-alt)' }}>
+              <span className="text-[13px] font-sans" style={{ color: 'var(--ink3)' }}>🚗  Vista del vehículo  🚗</span>
             </div>
-            <p className="text-[11px] font-sans" style={{ color: damages > 0 ? '#C98A20' : '#838390' }}>
+            <p className="text-[11px] font-sans" style={{ color: damages > 0 ? 'var(--warn-ink)' : 'var(--ink3)' }}>
               {damages === 0 ? 'Sin daños marcados — toca para agregar' : `${damages} daño(s) marcado(s)`}
             </p>
             {damages > 0 && (
               <button
                 onClick={e => { e.stopPropagation(); setDamages(0) }}
-                className="text-[11px] font-sans" style={{ color: '#585868' }}
+                className="text-[11px] font-sans" style={{ color: 'var(--ink2)' }}
               >
                 Limpiar
               </button>
@@ -272,7 +273,7 @@ export function EntregaStep2Screen() {
         <div>
           <div className="flex items-center justify-between mb-2">
             <SectionEyebrow text="Fotos de entrega" />
-            <span className="text-[11px] font-semibold font-sans" style={{ color: photoCount >= 3 ? '#2D8A56' : '#C98A20' }}>
+            <span className="text-[11px] font-semibold font-sans" style={{ color: photoCount >= 3 ? 'var(--primary)' : 'var(--warn-ink)' }}>
               {photoCount} / {PHOTO_SLOTS.length}
             </span>
           </div>
@@ -285,20 +286,20 @@ export function EntregaStep2Screen() {
                   onClick={() => !has && setPhotoCount(idx + 1)}
                   className="aspect-square rounded-xl border flex flex-col items-center justify-center gap-1"
                   style={{
-                    backgroundColor: has ? '#F2F1EC' : 'transparent',
-                    borderColor: has ? '#EAEAE4' : '#BCBCC4',
+                    backgroundColor: has ? 'var(--paper-alt)' : 'transparent',
+                    borderColor: has ? 'var(--card-line)' : 'var(--ink4)',
                     borderWidth: has ? 1 : 1.5,
                   }}
                 >
                   {has ? (
                     <>
                       <span style={{ fontSize: 20 }}>📷</span>
-                      <span className="text-[9px] font-sans" style={{ color: '#838390' }}>{slot}</span>
+                      <span className="text-[9px] font-sans" style={{ color: 'var(--ink3)' }}>{slot}</span>
                     </>
                   ) : (
                     <>
-                      <span className="text-lg font-light" style={{ color: '#BCBCC4' }}>+</span>
-                      <span className="text-[9px] font-sans" style={{ color: '#BCBCC4' }}>{slot}</span>
+                      <span className="text-lg font-light" style={{ color: 'var(--ink4)' }}>+</span>
+                      <span className="text-[9px] font-sans" style={{ color: 'var(--ink4)' }}>{slot}</span>
                     </>
                   )}
                 </button>
@@ -338,15 +339,15 @@ export function EntregaStep3Screen() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#FAFAF7' }}>
-      <div className="bg-white border-b border-hairline flex-shrink-0">
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--paper)' }}>
+      <div className="border-b border-hairline flex-shrink-0" style={{ background: 'var(--card)' }}>
         <FlowTopBar onCancel={() => navigate('/app/home', { replace: true })} />
         <EntregaHeader step={2} />
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4">
         {/* Amount card */}
-        <div className="rounded-[18px] p-[18px]" style={{ backgroundColor: '#2D8A56' }}>
+        <div className="rounded-[18px] p-[18px]" style={{ backgroundColor: 'var(--primary)' }}>
           <p className="text-[10px] font-semibold font-sans uppercase tracking-[1px]" style={{ color: 'rgba(255,255,255,0.7)' }}>
             A COBRAR AHORA
           </p>
@@ -370,12 +371,12 @@ export function EntregaStep3Screen() {
                   onClick={() => setMethod(id)}
                   className="flex-1 py-3 rounded-xl border flex items-center justify-center transition-colors"
                   style={{
-                    backgroundColor: sel ? '#E8F5EE' : 'white',
-                    borderColor: sel ? '#2D8A56' : '#EAEAE4',
+                    backgroundColor: sel ? 'var(--primary-soft)' : 'white',
+                    borderColor: sel ? 'var(--primary)' : 'var(--card-line)',
                     borderWidth: sel ? 1.5 : 1,
                   }}
                 >
-                  <span className="text-[11px] font-semibold font-sans" style={{ color: sel ? '#2D8A56' : '#1E1E26' }}>
+                  <span className="text-[11px] font-semibold font-sans" style={{ color: sel ? 'var(--primary)' : 'var(--ink)' }}>
                     {label}
                   </span>
                 </button>
@@ -386,22 +387,22 @@ export function EntregaStep3Screen() {
 
         {/* Cash input */}
         {method === 'cash' && (
-          <div className="bg-white rounded-2xl border border-hairline p-3.5">
+          <div className="rounded-2xl border border-hairline p-3.5" style={{ background: 'var(--card)' }}>
             <SectionEyebrow text="Recibido" />
             <div className="flex items-baseline gap-1 mt-2 mb-3">
-              <span className="font-serif" style={{ fontSize: 22, color: '#838390' }}>$</span>
+              <span className="font-serif" style={{ fontSize: 22, color: 'var(--ink3)' }}>$</span>
               <input
                 type="number"
                 value={amount}
                 onChange={e => setAmount(e.target.value)}
                 className="flex-1 font-serif outline-none border-b"
-                style={{ fontSize: 28, color: '#1E1E26', borderColor: '#EAEAE4' }}
+                style={{ fontSize: 28, color: 'var(--ink)', borderColor: 'var(--card-line)' }}
               />
             </div>
             <div className="flex justify-between">
-              <span className="text-[13px] font-sans" style={{ color: '#585868' }}>Cambio</span>
+              <span className="text-[13px] font-sans" style={{ color: 'var(--ink2)' }}>Cambio</span>
               <span className="text-base font-semibold font-mono"
-                style={{ color: change >= 0 ? '#2D8A56' : '#C04040' }}>
+                style={{ color: change >= 0 ? 'var(--primary)' : 'var(--danger)' }}>
                 ${fmt(Math.abs(change))}
               </span>
             </div>
@@ -409,19 +410,19 @@ export function EntregaStep3Screen() {
         )}
 
         {/* WhatsApp */}
-        <div className="bg-white rounded-2xl border border-hairline px-3.5 py-3 flex items-center gap-3">
-          <div className="w-[22px] h-[22px] rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#2D8A56' }}>
+        <div className="rounded-2xl border border-hairline px-3.5 py-3 flex items-center gap-3" style={{ background: 'var(--card)' }}>
+          <div className="w-[22px] h-[22px] rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--primary)' }}>
             <Check size={14} className="text-white" />
           </div>
-          <p className="text-xs font-sans" style={{ color: '#1E1E26' }}>Enviar recibo por WhatsApp al cliente</p>
+          <p className="text-xs font-sans" style={{ color: 'var(--ink)' }}>Enviar recibo por WhatsApp al cliente</p>
         </div>
       </div>
 
-      <div className="bg-white border-t border-hairline p-4 flex-shrink-0">
+      <div className="border-t border-hairline p-4 flex-shrink-0" style={{ background: 'var(--card)' }}>
         <button
           onClick={handleCobrar}
           className="w-full py-3.5 rounded-full text-sm font-semibold font-sans text-white"
-          style={{ backgroundColor: '#2D8A56' }}
+          style={{ backgroundColor: 'var(--primary)' }}
         >
           Cobrar y entregar auto
         </button>
@@ -439,14 +440,14 @@ export function EntregaOkScreen() {
   const firstName = res.clientName.split(' ')[0]
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden" style={{ backgroundColor: '#1A5231' }}>
+    <div className="min-h-screen flex flex-col relative overflow-hidden" style={{ backgroundColor: 'var(--primary-deep)' }}>
       <div className="absolute w-[320px] h-[320px] rounded-full pointer-events-none"
-        style={{ backgroundColor: 'rgba(45,138,86,0.4)', top: -120, right: -50 }} />
+        style={{ backgroundColor: 'oklch(0.52 0.13 155 / 0.4)', top: -120, right: -50 }} />
 
       <div className="flex-1 flex flex-col justify-between px-7 pt-16 pb-8 relative z-10">
         <div className="flex flex-col gap-[18px]">
           <div className="w-[72px] h-[72px] rounded-full flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: '#2D8A56' }}>
+            style={{ backgroundColor: 'var(--primary)' }}>
             <span style={{ fontSize: 32 }}>🔑</span>
           </div>
 
@@ -478,7 +479,7 @@ export function EntregaOkScreen() {
           <button
             onClick={() => navigate('/app/home', { replace: true })}
             className="w-full py-3.5 rounded-full text-sm font-semibold font-sans"
-            style={{ backgroundColor: 'white', color: '#1E1E26' }}
+            style={{ backgroundColor: 'white', color: 'var(--ink)' }}
           >
             Volver al inicio
           </button>

@@ -1,60 +1,99 @@
 import { useState } from 'react'
-import { User, Minus, Plus, Send } from 'lucide-react'
-import AvatarCircle from '../../components/AvatarCircle'
-import { sampleCotizaciones, VEHICLE_TYPES, INSURANCE_OPTIONS, Cotizacion } from '../../data/sampleData'
+import { Check } from 'lucide-react'
+import { sampleCotizaciones, sampleFleet, INSURANCE_OPTIONS, Cotizacion, Vehicle } from '../../data/sampleData'
 
 const fmt = (n: number) => new Intl.NumberFormat('es-MX').format(n)
 
-const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  enviada:  { bg: 'rgba(68,68,170,0.15)', text: '#8888DD', label: 'Enviada' },
-  aceptada: { bg: 'rgba(45,138,86,0.2)',  text: '#7FD9A8', label: 'Aceptada' },
-  vencida:  { bg: 'rgba(255,255,255,0.1)', text: 'rgba(255,255,255,0.4)', label: 'Vencida' },
+const STATUS_CHIP: Record<string, string> = {
+  enviada:  '',
+  aceptada: 'primary',
+  vencida:  '',
 }
 
-const STATUS_STYLES_LIGHT: Record<string, { bg: string; text: string; label: string }> = {
-  enviada:  { bg: '#EEF4FF', text: '#4444AA', label: 'Enviada' },
-  aceptada: { bg: '#E8F5EE', text: '#2D8A56', label: 'Aceptada' },
-  vencida:  { bg: '#F0F0F0', text: '#838390', label: 'Vencida' },
+const STATUS_LABEL: Record<string, string> = {
+  enviada:  'Enviada',
+  aceptada: 'Aceptada',
+  vencida:  'Vencida',
 }
 
-const FILTER_TABS = ['Todas', 'Enviada', 'Aceptada', 'Vencida']
+const STATUS_DOT: Record<string, string> = {
+  enviada:  'neutral',
+  aceptada: '',
+  vencida:  'neutral',
+}
 
-function CotizacionRow({ c }: { c: Cotizacion }) {
-  const s = STATUS_STYLES_LIGHT[c.status]
+const FILTER_TABS = ['Todas', 'Enviadas', 'Aceptadas', 'Vencidas']
+
+const FILTER_MAP: Record<string, string> = {
+  'Enviadas':  'enviada',
+  'Aceptadas': 'aceptada',
+  'Vencidas':  'vencida',
+}
+
+/* ─── Quote row ─────────────────────────────────────────────── */
+function QuoteRow({ c }: { c: Cotizacion }) {
   const total = c.days * c.dailyRate + c.insuranceCost - c.discount
+  const chipClass = STATUS_CHIP[c.status] ?? ''
+  const dotClass  = STATUS_DOT[c.status] ?? ''
+
   return (
-    <button className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors active:bg-gray-50 hover:bg-gray-50">
-      <AvatarCircle initials={c.clientInitials} size={40} />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold font-sans truncate" style={{ color: '#1E1E26' }}>{c.clientName}</p>
-        <p className="text-xs font-sans" style={{ color: '#838390' }}>
-          {c.id} · {c.vehicleType} · {c.days}d · {c.date}
-        </p>
+    <button className="qrow">
+      <div className="avatar" style={{ width: 38, height: 38, fontSize: 13 }}>
+        {c.clientInitials}
       </div>
-      <div className="flex flex-col items-end gap-1 flex-shrink-0">
-        <span className="font-mono text-xs font-bold" style={{ color: '#1E1E26' }}>${fmt(total)}</span>
-        <span
-          className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-          style={{ backgroundColor: s.bg, color: s.text }}
-        >
-          {s.label}
+      <div className="qrow-main">
+        <div className="qrow-who">{c.clientName}</div>
+        <div className="qrow-meta">
+          {c.id} · {c.vehicleType}{c.plate ? ` · ${c.plate}` : ''} · {c.days}d · {c.date}
+        </div>
+      </div>
+      <div className="qrow-end">
+        <span className="qrow-total mono">${fmt(total)}</span>
+        <span className={`chip sm ${chipClass}`}>
+          <span className={`dot ${dotClass}`} />
+          {STATUS_LABEL[c.status]}
         </span>
       </div>
     </button>
   )
 }
 
+/* ─── Vehicle option ────────────────────────────────────────── */
+function VehOption({ v, selected, onSelect }: { v: Vehicle; selected: boolean; onSelect: () => void }) {
+  return (
+    <button className={`veh-opt${selected ? ' on' : ''}`} onClick={onSelect}>
+      <span className={`veh-dot tone-${v.tone ?? 'slate'}`} />
+      <div className="veh-info">
+        <span className="veh-name">{v.model} <span className="veh-year">{v.year}</span></span>
+        <span className="veh-meta">{v.plate} · {v.segment} · {v.transmission}</span>
+      </div>
+      <div className="veh-rate">
+        <span className="vr-v">${fmt(v.dailyRate ?? 0)}</span>
+        <span className="vr-u">/día</span>
+      </div>
+      {selected && (
+        <span className="veh-check"><Check size={11} /></span>
+      )}
+    </button>
+  )
+}
+
+/* ─── Main screen ───────────────────────────────────────────── */
 export default function CotizacionesScreen() {
   const [clientName, setClientName] = useState('')
   const [days, setDays] = useState(3)
-  const [vehicleType, setVehicleType] = useState(VEHICLE_TYPES[1])
-  const [insurance, setInsurance] = useState(INSURANCE_OPTIONS[0])
   const [discount, setDiscount] = useState('')
+  const [selectedPlate, setSelectedPlate] = useState<string>(sampleFleet[0].plate)
+  const [insurance, setInsurance] = useState(INSURANCE_OPTIONS[0])
   const [filter, setFilter] = useState('Todas')
   const [sent, setSent] = useState(false)
 
+  const availableVehicles = sampleFleet.filter(v => v.status === 'disponible' || v.status === 'reservado')
+  const selectedVehicle = availableVehicles.find(v => v.plate === selectedPlate) ?? availableVehicles[0]
+
   const discountAmount = parseInt(discount) || 0
-  const subtotal = days * vehicleType.rate
+  const vehicleRate = selectedVehicle?.dailyRate ?? 0
+  const subtotal = days * vehicleRate
   const total = Math.max(0, subtotal + insurance.cost - discountAmount)
 
   const activas    = sampleCotizaciones.filter(c => c.status === 'enviada').length
@@ -62,320 +101,199 @@ export default function CotizacionesScreen() {
   const conversion = Math.round((aceptadas / sampleCotizaciones.length) * 100)
 
   const filtered = sampleCotizaciones.filter(c =>
-    filter === 'Todas' ? true : c.status === filter.toLowerCase()
+    filter === 'Todas' ? true : c.status === FILTER_MAP[filter]
   )
+
+  function handleSave() {
+    setClientName('')
+    setDays(3)
+    setDiscount('')
+    setInsurance(INSURANCE_OPTIONS[0])
+  }
 
   function handleSend() {
     setSent(true)
     setTimeout(() => setSent(false), 2500)
-    setClientName('')
-    setDays(3)
-    setDiscount('')
-    setVehicleType(VEHICLE_TYPES[1])
-    setInsurance(INSURANCE_OPTIONS[0])
+    handleSave()
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#F5F5EF' }}>
-      {/* Mobile AppBar */}
-      <div className="md:hidden bg-white px-4 py-3 flex items-center border-b border-hairline">
-        <h1 className="flex-1 text-xl font-bold font-serif" style={{ color: '#1E1E26' }}>Cotizaciones</h1>
-      </div>
-
-      {/* Page header */}
-      <div className="px-8 pt-6 pb-4">
-        <p className="text-xs font-sans uppercase tracking-widest" style={{ color: '#838390' }}>COTIZACIONES</p>
-        <h1 className="font-serif text-4xl font-bold mt-1" style={{ color: '#1E1E26' }}>Cotizaciones</h1>
-        <p className="text-sm font-sans mt-1" style={{ color: '#838390' }}>Crea y gestiona cotizaciones para clientes</p>
-      </div>
-
-      {/* Main layout: stacked mobile, 2-col desktop */}
-      <div className="flex-1 flex flex-col md:flex-row gap-5 px-8 pb-28">
-
-        {/* ── LEFT: Cotizador (dark) ── */}
-        <div className="md:w-[45%] flex-shrink-0">
-          <div
-            className="rounded-2xl p-6 flex flex-col gap-4 relative"
-            style={{ backgroundColor: '#1A2D1E' }}
-          >
-            {/* Badge top-right */}
-            <div
-              className="absolute top-5 right-5 px-2.5 py-1 rounded-full border text-[10px] font-sans font-semibold"
-              style={{ borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.55)' }}
-            >
-              Vigente 7 días
-            </div>
-
-            {/* Eyebrow + title */}
-            <div>
-              <p
-                className="text-[10px] font-sans font-semibold uppercase tracking-widest mb-1"
-                style={{ color: 'rgba(255,255,255,0.4)' }}
-              >
-                COTIZADOR
-              </p>
-              <p
-                className="font-serif italic text-2xl leading-tight"
-                style={{ color: 'white' }}
-              >
-                Nueva cotización
-              </p>
-            </div>
-
-            {/* Client input */}
-            <div
-              className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl"
-              style={{
-                backgroundColor: 'rgba(255,255,255,0.08)',
-                border: `1px solid ${clientName ? '#2D8A56' : 'rgba(255,255,255,0.15)'}`,
-              }}
-            >
-              <User size={15} style={{ color: 'rgba(255,255,255,0.4)', flexShrink: 0 }} />
-              <input
-                value={clientName}
-                onChange={e => setClientName(e.target.value)}
-                placeholder="Nombre del cliente"
-                className="flex-1 bg-transparent text-sm font-sans outline-none"
-                style={{ color: 'white' }}
-              />
-            </div>
-
-            {/* Días + Descuento row */}
-            <div className="grid grid-cols-2 gap-3">
-              {/* Días stepper */}
-              <div>
-                <label
-                  className="block text-[10px] font-sans font-semibold uppercase tracking-wide mb-2"
-                  style={{ color: 'rgba(255,255,255,0.4)' }}
-                >
-                  Días de renta
-                </label>
-                <div
-                  className="flex items-center rounded-xl overflow-hidden"
-                  style={{ backgroundColor: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}
-                >
-                  <button
-                    onClick={() => setDays(d => Math.max(1, d - 1))}
-                    className="w-9 h-9 flex items-center justify-center flex-shrink-0 transition-opacity active:opacity-70"
-                    style={{ color: 'rgba(255,255,255,0.6)' }}
-                  >
-                    <Minus size={14} />
-                  </button>
-                  <div className="flex-1 text-center">
-                    <span className="font-mono font-bold text-lg text-white">{days}</span>
-                  </div>
-                  <button
-                    onClick={() => setDays(d => d + 1)}
-                    className="w-9 h-9 flex items-center justify-center flex-shrink-0 transition-opacity active:opacity-70"
-                    style={{ color: 'rgba(255,255,255,0.6)' }}
-                  >
-                    <Plus size={14} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Descuento */}
-              <div>
-                <label
-                  className="block text-[10px] font-sans font-semibold uppercase tracking-wide mb-2"
-                  style={{ color: 'rgba(255,255,255,0.4)' }}
-                >
-                  Descuento
-                </label>
-                <div
-                  className="flex items-center gap-2 px-3 h-9 rounded-xl"
-                  style={{ backgroundColor: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}
-                >
-                  <span className="font-mono text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>$</span>
-                  <input
-                    value={discount}
-                    onChange={e => setDiscount(e.target.value.replace(/[^0-9]/g, ''))}
-                    placeholder="0"
-                    className="flex-1 bg-transparent text-sm font-mono outline-none w-0"
-                    style={{ color: 'white' }}
-                    inputMode="numeric"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Tipo de vehículo */}
-            <div>
-              <label
-                className="block text-[10px] font-sans font-semibold uppercase tracking-wide mb-2"
-                style={{ color: 'rgba(255,255,255,0.4)' }}
-              >
-                Tipo de vehículo
-              </label>
-              <div className="grid grid-cols-3 gap-1.5">
-                {VEHICLE_TYPES.map(vt => {
-                  const sel = vehicleType.label === vt.label
-                  return (
-                    <button
-                      key={vt.label}
-                      onClick={() => setVehicleType(vt)}
-                      className="flex flex-col items-start px-2.5 py-2 rounded-xl border transition-colors"
-                      style={{
-                        borderColor: sel ? '#2D8A56' : 'rgba(255,255,255,0.12)',
-                        backgroundColor: sel ? 'rgba(45,138,86,0.25)' : 'rgba(255,255,255,0.06)',
-                      }}
-                    >
-                      <span
-                        className="text-[11px] font-semibold font-sans"
-                        style={{ color: sel ? '#7FD9A8' : 'rgba(255,255,255,0.8)' }}
-                      >
-                        {vt.label}
-                      </span>
-                      <span
-                        className="text-[10px] font-mono mt-0.5"
-                        style={{ color: 'rgba(255,255,255,0.4)' }}
-                      >
-                        ${fmt(vt.rate)}/d
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Seguro */}
-            <div>
-              <label
-                className="block text-[10px] font-sans font-semibold uppercase tracking-wide mb-2"
-                style={{ color: 'rgba(255,255,255,0.4)' }}
-              >
-                Seguro
-              </label>
-              <div className="flex gap-2">
-                {INSURANCE_OPTIONS.map(opt => {
-                  const sel = insurance.label === opt.label
-                  return (
-                    <button
-                      key={opt.label}
-                      onClick={() => setInsurance(opt)}
-                      className="flex-1 py-2.5 px-2 rounded-xl border transition-colors"
-                      style={{
-                        borderColor: sel ? '#2D8A56' : 'rgba(255,255,255,0.12)',
-                        backgroundColor: sel ? 'rgba(45,138,86,0.25)' : 'rgba(255,255,255,0.06)',
-                      }}
-                    >
-                      <span
-                        className="block text-[11px] font-semibold font-sans"
-                        style={{ color: sel ? '#7FD9A8' : 'rgba(255,255,255,0.8)' }}
-                      >
-                        {opt.label}
-                      </span>
-                      <span className="block text-[10px] font-mono mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                        {opt.cost > 0 ? `$${opt.cost}` : 'gratis'}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Breakdown */}
-            <div
-              className="rounded-xl p-4 flex flex-col gap-2"
-              style={{ backgroundColor: 'rgba(0,0,0,0.2)' }}
-            >
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-sans" style={{ color: 'rgba(255,255,255,0.55)' }}>
-                  {days} días × ${fmt(vehicleType.rate)}
-                </span>
-                <span className="text-xs font-mono text-white">${fmt(subtotal)}</span>
-              </div>
-              {insurance.cost > 0 && (
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-sans" style={{ color: 'rgba(255,255,255,0.55)' }}>
-                    Seguro {insurance.label.toLowerCase()}
-                  </span>
-                  <span className="text-xs font-mono text-white">${fmt(insurance.cost)}</span>
-                </div>
-              )}
-              {discountAmount > 0 && (
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-sans" style={{ color: '#7FD9A8' }}>Descuento</span>
-                  <span className="text-xs font-mono" style={{ color: '#7FD9A8' }}>−${fmt(discountAmount)}</span>
-                </div>
-              )}
-              <div className="h-px" style={{ backgroundColor: 'rgba(255,255,255,0.12)' }} />
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-semibold font-sans text-white">Total</span>
-                <span className="text-lg font-bold font-mono text-white">${fmt(total)}</span>
-              </div>
-            </div>
-
-            {/* CTA */}
-            <button
-              onClick={handleSend}
-              disabled={!clientName.trim()}
-              className="w-full py-3.5 rounded-xl font-semibold text-sm font-sans flex items-center justify-center gap-2 transition-opacity"
-              style={{
-                backgroundColor: clientName.trim() ? '#2D8A56' : 'rgba(255,255,255,0.15)',
-                color: clientName.trim() ? 'white' : 'rgba(255,255,255,0.4)',
-              }}
-            >
-              <Send size={15} />
-              {sent ? '¡Cotización enviada!' : 'Enviar cotización'}
-            </button>
-          </div>
+    <div className="screen">
+      {/* Page head */}
+      <div className="pagehead">
+        <div>
+          <div className="eyebrow">Cotizaciones</div>
+          <h1 className="h-display" style={{ fontSize: 'clamp(28px, 4cqw, 42px)', marginTop: 6 }}>Cotizaciones</h1>
+          <p style={{ fontSize: 13.5, color: 'var(--ink3)', marginTop: 4 }}>Crea y gestiona cotizaciones para clientes</p>
         </div>
+      </div>
 
-        {/* ── RIGHT: Historial (light) ── */}
-        <div className="flex-1 min-w-0 flex flex-col gap-4">
-          {/* Stats row */}
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: 'Cotiz. activas', value: String(activas),       color: '#4444AA', bg: '#EEF4FF' },
-              { label: 'Aceptadas',      value: String(aceptadas),     color: '#2D8A56', bg: '#E8F5EE' },
-              { label: 'Conversión',     value: `${conversion}%`,      color: '#C98A20', bg: '#FEF8EC' },
-            ].map(({ label, value, color, bg }) => (
-              <div
-                key={label}
-                className="rounded-2xl px-4 py-3 text-center"
-                style={{ backgroundColor: bg, border: '1px solid #EAEAE4' }}
-              >
-                <p className="text-2xl font-bold font-mono" style={{ color }}>{value}</p>
-                <p className="text-[11px] font-sans mt-0.5" style={{ color: '#838390' }}>{label}</p>
-              </div>
-            ))}
+      {/* 2-col grid */}
+      <div className="cot-grid">
+
+        {/* ── LEFT: Builder ── */}
+        <div className="card qbuilder">
+          {/* Head */}
+          <div className="qb-head">
+            <div>
+              <div className="eyebrow">Cotizador</div>
+              <h2 className="h-display qb-title">Nueva cotización</h2>
+            </div>
+            <span className="chip">Vigente 7 días</span>
           </div>
 
-          {/* Historial header + filter tabs */}
-          <div>
-            <p className="font-serif text-lg font-bold mb-3" style={{ color: '#1E1E26' }}>Historial</p>
-            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-0.5">
-              {FILTER_TABS.map(tab => (
+          {/* Client */}
+          <div className="field">
+            <label className="field-l">Cliente</label>
+            <input
+              className="field-i"
+              placeholder="Nombre del cliente"
+              value={clientName}
+              onChange={e => setClientName(e.target.value)}
+            />
+          </div>
+
+          {/* Días + Descuento */}
+          <div className="field-row">
+            <div className="field">
+              <label className="field-l">Días de renta</label>
+              <div className="stepper">
+                <button onClick={() => setDays(d => Math.max(1, d - 1))}>−</button>
+                <span className="stepper-v mono">{days}</span>
+                <button onClick={() => setDays(d => d + 1)}>+</button>
+              </div>
+            </div>
+            <div className="field">
+              <label className="field-l">Descuento</label>
+              <div className="field-money">
+                <span>$</span>
+                <input
+                  className="field-i"
+                  placeholder="0"
+                  value={discount}
+                  onChange={e => setDiscount(e.target.value.replace(/[^0-9]/g, ''))}
+                  inputMode="numeric"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Vehicle picker */}
+          <div className="field">
+            <label className="field-l">Vehículo</label>
+            <div className="veh-pick">
+              {availableVehicles.map(v => (
+                <VehOption
+                  key={v.plate}
+                  v={v}
+                  selected={selectedPlate === v.plate}
+                  onSelect={() => setSelectedPlate(v.plate)}
+                />
+              ))}
+            </div>
+            <p className="veh-hint">Solo se muestran vehículos disponibles y reservados</p>
+          </div>
+
+          {/* Insurance chips */}
+          <div className="field">
+            <label className="field-l">Seguro</label>
+            <div className="segchips">
+              {INSURANCE_OPTIONS.map(opt => (
                 <button
-                  key={tab}
-                  onClick={() => setFilter(tab)}
-                  className="flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold font-sans transition-colors"
-                  style={{
-                    backgroundColor: filter === tab ? '#1E1E26' : '#F0F0F0',
-                    color: filter === tab ? 'white' : '#585868',
-                  }}
+                  key={opt.label}
+                  className={`segchip${insurance.label === opt.label ? ' on' : ''}`}
+                  onClick={() => setInsurance(opt)}
                 >
-                  {tab}
+                  {opt.label}
+                  <small>{opt.cost > 0 ? `$${fmt(opt.cost)}/renta` : 'sin costo'}</small>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* List */}
-          <div className="bg-white rounded-2xl overflow-hidden" style={{ border: '1px solid #EAEAE4' }}>
-            {filtered.length === 0 ? (
-              <p className="text-center text-sm font-sans py-10" style={{ color: '#BCBCC4' }}>
-                Sin cotizaciones en esta categoría
-              </p>
-            ) : filtered.map((c, i) => (
-              <div key={c.id}>
-                <CotizacionRow c={c} />
-                {i < filtered.length - 1 && (
-                  <div className="h-px mx-4" style={{ backgroundColor: '#EAEAE4' }} />
-                )}
+          {/* Breakdown */}
+          <div className="qb-breakdown">
+            <div className="qb-line">
+              <span>{days} días × ${fmt(vehicleRate)}</span>
+              <span className="mono">${fmt(subtotal)}</span>
+            </div>
+            {insurance.cost > 0 && (
+              <div className="qb-line">
+                <span>Seguro {insurance.label.toLowerCase()}</span>
+                <span className="mono">${fmt(insurance.cost)}</span>
               </div>
-            ))}
+            )}
+            {discountAmount > 0 && (
+              <div className="qb-line discount">
+                <span>Descuento</span>
+                <span className="mono">−${fmt(discountAmount)}</span>
+              </div>
+            )}
+            <div className="qb-total">
+              <span>Total</span>
+              <span className="qb-total-v">${fmt(total)}</span>
+            </div>
+            <p className="qb-note">Incluye IVA · vigencia 7 días</p>
+          </div>
+
+          {/* Actions */}
+          <div className="qb-actions">
+            <button className="btn" onClick={handleSave}>Guardar</button>
+            <button
+              className={`btn primary${sent ? ' is-sent' : ''}`}
+              onClick={handleSend}
+              disabled={!clientName.trim()}
+            >
+              {sent ? '¡Enviada!' : 'Enviar por WhatsApp'}
+            </button>
+          </div>
+        </div>
+
+        {/* ── RIGHT: History ── */}
+        <div className="qhistory">
+          {/* Stats */}
+          <div className="card qstats">
+            <div className="qstat">
+              <div className="qstat-v">{activas}</div>
+              <div className="qstat-l">Activas</div>
+            </div>
+            <div className="qstat">
+              <div className="qstat-v">{aceptadas}</div>
+              <div className="qstat-l">Aceptadas</div>
+            </div>
+            <div className="qstat">
+              <div className="qstat-v">{conversion}%</div>
+              <div className="qstat-l">Conversión</div>
+            </div>
+          </div>
+
+          {/* History list */}
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '16px 18px 12px', borderBottom: '1px solid var(--card-line)' }}>
+              <div className="qh-head">
+                <h3 className="h-display" style={{ fontSize: 18 }}>Historial</h3>
+                <div className="qh-filters">
+                  {FILTER_TABS.map(tab => (
+                    <button
+                      key={tab}
+                      className={`qhf${filter === tab ? ' on' : ''}`}
+                      onClick={() => setFilter(tab)}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="qlist" style={{ padding: '12px 14px 14px' }}>
+              {filtered.length === 0 ? (
+                <p style={{ textAlign: 'center', color: 'var(--ink4)', padding: '24px 0', fontSize: 14 }}>
+                  Sin cotizaciones en esta categoría
+                </p>
+              ) : filtered.map(c => (
+                <QuoteRow key={c.id} c={c} />
+              ))}
+            </div>
           </div>
         </div>
       </div>

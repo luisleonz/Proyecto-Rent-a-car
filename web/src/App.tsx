@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { Menu } from 'lucide-react'
 import { AuthProvider } from './state/auth'
 import BottomNav from './components/BottomNav'
 import Sidebar from './components/Sidebar'
@@ -29,43 +30,62 @@ function AppLayout() {
   const isVehicleDetail = location.pathname.startsWith('/app/vehicles/') && location.pathname.split('/').length > 3
   const showNav = !isFlow && !isVehicleDetail
 
+  // Route → title/subtitle for mobile top bar
+  const PAGE_INFO: Record<string, [string, string]> = {
+    '/app/home':         ['Inicio', '12 movimientos hoy'],
+    '/app/reservations': ['Reservas', '14 movimientos'],
+    '/app/cotizaciones': ['Cotizaciones', 'Cotizador rápido'],
+    '/app/vehicles':     ['Vehículos', '12 unidades'],
+    '/app/more':         ['Ajustes', ''],
+    '/app/caja':         ['Caja', '22 may · turno T1'],
+  }
+  const [title, sub] = PAGE_INFO[location.pathname] ?? ['', '']
+
   return (
-    <div className="relative min-h-screen" style={{ backgroundColor: '#F5F5EF' }}>
+    <div className="app">
       {showNav && <Sidebar />}
       {showNav && <TopBar />}
-
-      {/* Main content — offset on desktop to account for sidebar + topbar */}
-      <div className={showNav ? 'md:ml-60 md:pt-14' : ''}>
-        <Routes>
-          {/* Main tabs */}
-          <Route path="home"              element={<HomeScreen />} />
-          <Route path="reservations"      element={<ReservationsScreen />} />
-          <Route path="cotizaciones"      element={<CotizacionesScreen />} />
-          <Route path="vehicles"          element={<VehiclesScreen />} />
-          <Route path="vehicles/:plate"   element={<VehicleDetailScreen />} />
-          <Route path="more"              element={<MoreScreen />} />
-          {/* Stub routes for sidebar items not yet built */}
-          <Route path="clientes"          element={<ComingSoon title="Clientes" />} />
-          <Route path="reportes"          element={<ComingSoon title="Reportes" />} />
-          <Route path="empleados"         element={<ComingSoon title="Empleados" />} />
-          {/* Caja / Turno */}
-          <Route path="caja"              element={<CajaTurnoScreen />} />
-          <Route path="caja/cierre"       element={<CajaCierreScreen />} />
-          <Route path="caja/justificacion" element={<CajaJustificacionScreen />} />
-          <Route path="caja/ok"           element={<CajaOkScreen />} />
-          {/* Entrega flow */}
-          <Route path="entrega/:resId/1"  element={<EntregaStep1Screen />} />
-          <Route path="entrega/:resId/2"  element={<EntregaStep2Screen />} />
-          <Route path="entrega/:resId/3"  element={<EntregaStep3Screen />} />
-          <Route path="entrega/:resId/ok" element={<EntregaOkScreen />} />
-          {/* Devolución flow */}
-          <Route path="devolucion/:resId/1"  element={<DevolucionStep1Screen />} />
-          <Route path="devolucion/:resId/2"  element={<DevolucionStep2Screen />} />
-          <Route path="devolucion/:resId/3"  element={<DevolucionStep3Screen />} />
-          <Route path="devolucion/:resId/ok" element={<DevolucionOkScreen />} />
-          <Route path="*" element={<Navigate to="home" replace />} />
-        </Routes>
-
+      <div className="main" style={showNav ? { marginLeft: 248, paddingTop: 56 } : {}}>
+        {showNav && (
+          <header className="mtop">
+            <button className="iconbtn" style={{ width: 38, height: 38 }}><Menu size={19} /></button>
+            <div className="grow">
+              <div className="title">{title}</div>
+              {sub && <div className="sub">{sub}</div>}
+            </div>
+          </header>
+        )}
+        <div className="content">
+          <Routes>
+            {/* Main tabs */}
+            <Route path="home"              element={<HomeScreen />} />
+            <Route path="reservations"      element={<ReservationsScreen />} />
+            <Route path="cotizaciones"      element={<CotizacionesScreen />} />
+            <Route path="vehicles"          element={<VehiclesScreen />} />
+            <Route path="vehicles/:plate"   element={<VehicleDetailScreen />} />
+            <Route path="more"              element={<MoreScreen />} />
+            {/* Stub routes for sidebar items not yet built */}
+            <Route path="clientes"          element={<ComingSoon title="Clientes" />} />
+            <Route path="reportes"          element={<ComingSoon title="Reportes" />} />
+            <Route path="empleados"         element={<ComingSoon title="Empleados" />} />
+            {/* Caja / Turno */}
+            <Route path="caja"              element={<CajaTurnoScreen />} />
+            <Route path="caja/cierre"       element={<CajaCierreScreen />} />
+            <Route path="caja/justificacion" element={<CajaJustificacionScreen />} />
+            <Route path="caja/ok"           element={<CajaOkScreen />} />
+            {/* Entrega flow */}
+            <Route path="entrega/:resId/1"  element={<EntregaStep1Screen />} />
+            <Route path="entrega/:resId/2"  element={<EntregaStep2Screen />} />
+            <Route path="entrega/:resId/3"  element={<EntregaStep3Screen />} />
+            <Route path="entrega/:resId/ok" element={<EntregaOkScreen />} />
+            {/* Devolución flow */}
+            <Route path="devolucion/:resId/1"  element={<DevolucionStep1Screen />} />
+            <Route path="devolucion/:resId/2"  element={<DevolucionStep2Screen />} />
+            <Route path="devolucion/:resId/3"  element={<DevolucionStep3Screen />} />
+            <Route path="devolucion/:resId/ok" element={<DevolucionOkScreen />} />
+            <Route path="*" element={<Navigate to="home" replace />} />
+          </Routes>
+        </div>
         {showNav && <BottomNav />}
       </div>
     </div>
@@ -74,11 +94,11 @@ function AppLayout() {
 
 function ComingSoon({ title }: { title: string }) {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-3 pb-24"
-      style={{ backgroundColor: '#F5F5EF' }}>
-      <p className="text-3xl">🚧</p>
-      <p className="text-lg font-bold font-serif" style={{ color: '#1E1E26' }}>{title}</p>
-      <p className="text-sm font-sans" style={{ color: '#838390' }}>Próximamente</p>
+    <div className="stub">
+      <div className="stub-card">
+        <h2>{title}</h2>
+        <p>Esta sección estará disponible próximamente.</p>
+      </div>
     </div>
   )
 }

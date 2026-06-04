@@ -33,10 +33,6 @@ export default function TopBar() {
       </div>
       <div className="actions">
         <button className="iconbtn"><Bell size={17} /></button>
-        <div className="rolepill">
-          <button className="on">Admin</button>
-          <button>Operativo</button>
-        </div>
       </div>
     </header>
   )

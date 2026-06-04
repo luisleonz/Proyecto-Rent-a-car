@@ -1,34 +1,44 @@
 import { useState, useEffect } from 'react'
-import { Check, Download, MessageCircle } from 'lucide-react'
+import { Check, Download, MessageCircle, X, ArrowRight, RefreshCw } from 'lucide-react'
 import jsPDF from 'jspdf'
 import { supabase } from '../../lib/supabase'
-import type { Vehiculo } from '../../lib/database.types'
-import { sampleCotizaciones, INSURANCE_OPTIONS } from '../../data/sampleData'
-import type { Cotizacion } from '../../data/sampleData'
+import type { Vehiculo, Cotizacion, CotizacionStatus } from '../../lib/database.types'
+
+const db = supabase as any
 
 const fmt = (n: number) => new Intl.NumberFormat('es-MX').format(n)
 
-const STATUS_CHIP: Record<string, string> = {
-  enviada:  '',
-  aceptada: 'primary',
-  vencida:  '',
+const INSURANCE_OPTIONS = [
+  { label: 'Básico',   cost: 0 },
+  { label: 'Estándar', cost: 350 },
+  { label: 'Total',    cost: 650 },
+]
+
+const STATUS_CHIP: Record<CotizacionStatus, string> = {
+  enviada:    '',
+  aceptada:   'primary',
+  vencida:    '',
+  convertida: '',
 }
-const STATUS_LABEL: Record<string, string> = {
-  enviada:  'Enviada',
-  aceptada: 'Aceptada',
-  vencida:  'Vencida',
+const STATUS_LABEL: Record<CotizacionStatus, string> = {
+  enviada:    'Enviada',
+  aceptada:   'Aceptada',
+  vencida:    'Vencida',
+  convertida: 'Convertida',
 }
-const STATUS_DOT: Record<string, string> = {
-  enviada:  'neutral',
-  aceptada: '',
-  vencida:  'neutral',
+const STATUS_DOT: Record<CotizacionStatus, string> = {
+  enviada:    'neutral',
+  aceptada:   '',
+  vencida:    'neutral',
+  convertida: '',
 }
 
-const FILTER_TABS = ['Todas', 'Enviadas', 'Aceptadas', 'Vencidas']
-const FILTER_MAP: Record<string, string> = {
-  'Enviadas':  'enviada',
-  'Aceptadas': 'aceptada',
-  'Vencidas':  'vencida',
+const FILTER_TABS = ['Todas', 'Enviadas', 'Aceptadas', 'Vencidas', 'Convertidas']
+const FILTER_MAP: Record<string, CotizacionStatus> = {
+  'Enviadas':    'enviada',
+  'Aceptadas':   'aceptada',
+  'Vencidas':    'vencida',
+  'Convertidas': 'convertida',
 }
 
 /* ─── PDF generation ────────────────────────────────────────── */
@@ -53,7 +63,6 @@ function generatePDF(q: QuoteData): Blob {
   const ink: [number, number, number] = [30, 30, 38]
   const ink3: [number, number, number] = [120, 120, 130]
 
-  // Header
   doc.setFillColor(...green)
   doc.rect(0, 0, W, 46, 'F')
   doc.setTextColor(255, 255, 255)
@@ -72,7 +81,6 @@ function generatePDF(q: QuoteData): Blob {
   doc.text(`Emitida: ${q.date}`, W - 20, 27, { align: 'right' })
   doc.text('Vigencia: 7 días', W - 20, 34, { align: 'right' })
 
-  // Client
   doc.setTextColor(...ink3)
   doc.setFontSize(9.5)
   doc.setFont('helvetica', 'normal')
@@ -82,12 +90,10 @@ function generatePDF(q: QuoteData): Blob {
   doc.setFontSize(17)
   doc.text(q.clientName, 20, 70)
 
-  // Separator
   doc.setDrawColor(...green)
   doc.setLineWidth(0.4)
   doc.line(20, 76, W - 20, 76)
 
-  // Vehicle
   doc.setTextColor(...ink3)
   doc.setFontSize(9.5)
   doc.setFont('helvetica', 'normal')
@@ -101,7 +107,6 @@ function generatePDF(q: QuoteData): Blob {
   doc.setTextColor(...ink3)
   doc.text(`Placa: ${q.plate}   ·   ${q.days} día${q.days !== 1 ? 's' : ''} de renta`, 20, 105)
 
-  // Breakdown table
   doc.setTextColor(...ink3)
   doc.setFontSize(9.5)
   doc.text('DESGLOSE', 20, 120)
@@ -125,7 +130,6 @@ function generatePDF(q: QuoteData): Blob {
     y += 14
   })
 
-  // Total box
   doc.setFillColor(...greenSoft)
   doc.roundedRect(20, y + 2, W - 40, 20, 3, 3, 'F')
   doc.setFont('helvetica', 'bold')
@@ -136,7 +140,6 @@ function generatePDF(q: QuoteData): Blob {
   doc.setTextColor(...green)
   doc.text(`$${fmt(q.total)} MXN`, W - 27, y + 15, { align: 'right' })
 
-  // Footer
   y += 40
   doc.setDrawColor(200, 200, 205)
   doc.setLineWidth(0.3)
@@ -164,15 +167,10 @@ async function shareViaWhatsApp(q: QuoteData) {
     }
   }
 
-  // Fallback: download PDF + open WhatsApp Web with message
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
-  a.href = url
-  a.download = `cotizacion-${q.id}.pdf`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  a.href = url; a.download = `cotizacion-${q.id}.pdf`
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url)
 
   const msg = [
     `Hola ${q.clientName}! 👋`,
@@ -186,38 +184,240 @@ async function shareViaWhatsApp(q: QuoteData) {
     `Adjunto encontrará el PDF con todos los detalles.`,
     `Vigencia: 7 días · Para confirmar su reserva contáctenos.`,
   ].join('\n')
-
   window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
 }
 
 function downloadPDF(q: QuoteData) {
   const blob = generatePDF(q)
   const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `cotizacion-${q.id}.pdf`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  const a = document.createElement('a'); a.href = url; a.download = `cotizacion-${q.id}.pdf`
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url)
+}
+
+function cotizacionToQuoteData(cot: Cotizacion): QuoteData {
+  const ins = INSURANCE_OPTIONS.find(o => o.label === cot.seguro_nombre) ?? { label: cot.seguro_nombre ?? 'Básico', cost: cot.seguro_costo }
+  return {
+    id:         cot.id,
+    clientName: cot.cliente_nombre,
+    vehicle:    cot.vehiculo_modelo ?? 'Vehículo',
+    plate:      cot.vehiculo_placa  ?? '',
+    days:       cot.dias,
+    dailyRate:  cot.tarifa_diaria   ?? 0,
+    insurance:  ins,
+    discount:   cot.descuento,
+    total:      cot.total,
+    date:       new Date(cot.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }),
+  }
+}
+
+/* ─── Quote detail panel ────────────────────────────────────── */
+const toDateInput = (d: Date) => d.toISOString().split('T')[0]
+
+interface PanelProps {
+  cot: Cotizacion | null
+  open: boolean
+  onClose: () => void
+  onStatusChange: (id: string, status: CotizacionStatus) => Promise<void>
+  onConvert: (cot: Cotizacion, fechaEntrega: string, fechaDevolucion: string) => Promise<void>
+}
+
+function QuoteDetailPanel({ cot, open, onClose, onStatusChange, onConvert }: PanelProps) {
+  const [working, setWorking]         = useState(false)
+  const [confirmStep, setConfirmStep] = useState(false)
+  const today = toDateInput(new Date())
+
+  const defaultDevolucion = () => {
+    const d = new Date(); d.setDate(d.getDate() + (cot?.dias ?? 1)); return toDateInput(d)
+  }
+  const [fechaEntrega, setFechaEntrega]       = useState(today)
+  const [fechaDevolucion, setFechaDevolucion] = useState(defaultDevolucion)
+
+  if (!open && confirmStep) setConfirmStep(false)
+
+  async function handleStatus(status: CotizacionStatus) {
+    if (!cot || working) return
+    setWorking(true)
+    await onStatusChange(cot.id, status)
+    setWorking(false)
+  }
+
+  async function handleConvert() {
+    if (!cot || working) return
+    setWorking(true)
+    await onConvert(cot, fechaEntrega, fechaDevolucion)
+    setConfirmStep(false)
+    setWorking(false)
+  }
+
+  const q = cot ? cotizacionToQuoteData(cot) : null
+
+  return (
+    <>
+      {open && <div className="qpanel-overlay" onClick={onClose} />}
+      <div className={`qpanel${open ? ' open' : ''}`}>
+        {cot && q && (
+          <>
+            <div className="qpanel-head">
+              <div>
+                <div className="eyebrow" style={{ marginBottom: 4 }}>{cot.id}</div>
+                <div style={{ fontSize: 20, fontFamily: 'var(--font-display)', color: 'var(--ink)' }}>
+                  {cot.cliente_nombre}
+                </div>
+                {cot.cliente_telefono && (
+                  <div style={{ fontSize: 13, color: 'var(--ink3)', marginTop: 3 }}>{cot.cliente_telefono}</div>
+                )}
+                <div style={{ fontSize: 12, color: 'var(--ink4)', marginTop: 4 }}>
+                  {new Date(cot.created_at).toLocaleDateString('es-MX', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+                </div>
+              </div>
+              <button
+                onClick={onClose}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: 'var(--ink3)', flexShrink: 0 }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="qpanel-body">
+              <div className="qpanel-section">
+                <div className="qpanel-section-title">Vehículo</div>
+                <div style={{ background: 'var(--paper-alt)', borderRadius: 10, padding: '12px 14px' }}>
+                  <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--ink)' }}>{cot.vehiculo_modelo ?? '—'}</div>
+                  <div style={{ fontSize: 13, color: 'var(--ink3)', marginTop: 3 }}>
+                    {cot.vehiculo_placa}{cot.dias ? ` · ${cot.dias} días` : ''}
+                  </div>
+                </div>
+              </div>
+
+              <div className="qpanel-section">
+                <div className="qpanel-section-title">Desglose</div>
+                <div className="qpanel-row">
+                  <span className="lbl">{cot.dias} días × ${fmt(cot.tarifa_diaria ?? 0)}</span>
+                  <span className="val mono">${fmt(cot.dias * (cot.tarifa_diaria ?? 0))}</span>
+                </div>
+                {cot.seguro_costo > 0 && (
+                  <div className="qpanel-row">
+                    <span className="lbl">Seguro {cot.seguro_nombre}</span>
+                    <span className="val mono">${fmt(cot.seguro_costo)}</span>
+                  </div>
+                )}
+                {cot.descuento > 0 && (
+                  <div className="qpanel-row">
+                    <span className="lbl">Descuento</span>
+                    <span className="val mono" style={{ color: 'var(--primary)' }}>−${fmt(cot.descuento)}</span>
+                  </div>
+                )}
+                <div className="qpanel-total-row">
+                  <span className="lbl">Total</span>
+                  <span className="val">${fmt(cot.total)}</span>
+                </div>
+              </div>
+
+              {cot.status !== 'convertida' && (
+                <div className="qpanel-section">
+                  <div className="qpanel-section-title">Estado</div>
+                  <div className="status-btns">
+                    {(['enviada', 'aceptada', 'vencida'] as CotizacionStatus[]).map(s => (
+                      <button
+                        key={s}
+                        className={`status-btn${cot.status === s ? ` active-${s}` : ''}`}
+                        onClick={() => handleStatus(s)}
+                        disabled={working || cot.status === s}
+                      >
+                        {STATUS_LABEL[s]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {cot.status === 'convertida' && (
+                <div style={{ background: 'oklch(0.95 0.03 250)', border: '1px solid oklch(0.80 0.08 250)', borderRadius: 10, padding: '12px 14px' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'oklch(0.42 0.10 250)' }}>✓ Convertida a reserva</div>
+                  {cot.reserva_id && (
+                    <div style={{ fontSize: 12, color: 'oklch(0.55 0.08 250)', marginTop: 3 }}>ID: {cot.reserva_id}</div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="qpanel-foot">
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => downloadPDF(q)}>
+                  <Download size={15} />PDF
+                </button>
+                <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => shareViaWhatsApp(q)}>
+                  <RefreshCw size={15} />Reenviar
+                </button>
+              </div>
+              {(cot.status === 'enviada' || cot.status === 'aceptada') && (
+                confirmStep ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginBottom: 2 }}>
+                      Fechas de la reserva
+                    </div>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 11.5, color: 'var(--ink3)', marginBottom: 4 }}>Entrega</div>
+                        <input type="date" className="field-i" value={fechaEntrega}
+                          min={today}
+                          onChange={e => {
+                            setFechaEntrega(e.target.value)
+                            const d = new Date(e.target.value); d.setDate(d.getDate() + cot.dias)
+                            setFechaDevolucion(toDateInput(d))
+                          }}
+                          style={{ width: '100%', fontSize: 13 }}
+                        />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 11.5, color: 'var(--ink3)', marginBottom: 4 }}>Devolución</div>
+                        <input type="date" className="field-i" value={fechaDevolucion}
+                          min={fechaEntrega}
+                          onChange={e => setFechaDevolucion(e.target.value)}
+                          style={{ width: '100%', fontSize: 13 }}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setConfirmStep(false)} disabled={working}>
+                        Cancelar
+                      </button>
+                      <button className="btn primary" style={{ flex: 2, justifyContent: 'center' }} onClick={handleConvert} disabled={working || !fechaEntrega || !fechaDevolucion}>
+                        {working
+                          ? <><div className="spinner" style={{ width: 15, height: 15, borderWidth: 2, borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.3)' }} />Creando…</>
+                          : <><Check size={15} />Confirmar reserva</>}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button className="btn primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setConfirmStep(true)}>
+                    <ArrowRight size={15} />Convertir a reserva
+                  </button>
+                )
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </>
+  )
 }
 
 /* ─── Quote row ─────────────────────────────────────────────── */
-function QuoteRow({ c }: { c: Cotizacion }) {
-  const total = c.days * c.dailyRate + c.insuranceCost - c.discount
+function QuoteRow({ c, onClick }: { c: Cotizacion; onClick: () => void }) {
   return (
-    <button className="qrow">
+    <button className="qrow" onClick={onClick}>
       <div className="avatar" style={{ width: 38, height: 38, fontSize: 13 }}>
-        {c.clientInitials}
+        {c.cliente_nombre.slice(0, 2).toUpperCase()}
       </div>
       <div className="qrow-main">
-        <div className="qrow-who">{c.clientName}</div>
+        <div className="qrow-who">{c.cliente_nombre}</div>
         <div className="qrow-meta">
-          {c.id} · {c.vehicleType}{c.plate ? ` · ${c.plate}` : ''} · {c.days}d · {c.date}
+          {c.id} · {c.vehiculo_modelo ?? '—'}{c.vehiculo_placa ? ` · ${c.vehiculo_placa}` : ''} · {c.dias}d
         </div>
       </div>
       <div className="qrow-end">
-        <span className="qrow-total mono">${fmt(total)}</span>
+        <span className="qrow-total mono">${fmt(c.total)}</span>
         <span className={`chip sm ${STATUS_CHIP[c.status] ?? ''}`}>
           <span className={`dot ${STATUS_DOT[c.status] ?? ''}`} />
           {STATUS_LABEL[c.status]}
@@ -257,6 +457,9 @@ export default function CotizacionesScreen() {
   const [sent, setSent]                 = useState(false)
   const [vehicles, setVehicles]         = useState<Vehiculo[]>([])
   const [loadingVeh, setLoadingVeh]     = useState(true)
+  const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([])
+  const [panelOpen, setPanelOpen]       = useState(false)
+  const [panelCot, setPanelCot]         = useState<Cotizacion | null>(null)
 
   useEffect(() => {
     supabase
@@ -270,6 +473,11 @@ export default function CotizacionesScreen() {
         if (list.length > 0) setSelectedId(list[0].id)
         setLoadingVeh(false)
       })
+
+    db.from('cotizaciones').select('*').order('created_at', { ascending: false })
+      .then(({ data }: { data: Cotizacion[] | null }) => {
+        setCotizaciones(data ?? [])
+      })
   }, [])
 
   const selectedVehicle = vehicles.find(v => v.id === selectedId)
@@ -278,14 +486,6 @@ export default function CotizacionesScreen() {
   const vehicleRate    = selectedVehicle?.tarifa_diaria ?? 0
   const subtotal       = days * vehicleRate
   const total          = Math.max(0, subtotal + insurance.cost - discountAmount)
-
-  const activas   = sampleCotizaciones.filter(c => c.status === 'enviada').length
-  const aceptadas = sampleCotizaciones.filter(c => c.status === 'aceptada').length
-  const conversion = Math.round((aceptadas / sampleCotizaciones.length) * 100)
-
-  const filtered = sampleCotizaciones.filter(c =>
-    filter === 'Todas' ? true : c.status === FILTER_MAP[filter]
-  )
 
   function buildQuoteData(): QuoteData {
     const now = new Date()
@@ -305,11 +505,33 @@ export default function CotizacionesScreen() {
     }
   }
 
+  async function saveCotizacion(q: QuoteData): Promise<Cotizacion | null> {
+    const payload = {
+      id: q.id,
+      cliente_nombre: q.clientName,
+      cliente_telefono: clientPhone.trim() || null,
+      vehiculo_id: selectedVehicle?.id ?? null,
+      vehiculo_modelo: selectedVehicle ? `${selectedVehicle.modelo} ${selectedVehicle.anio ?? ''}`.trim() : null,
+      vehiculo_placa: selectedVehicle?.placa ?? null,
+      dias: q.days,
+      tarifa_diaria: q.dailyRate,
+      seguro_nombre: q.insurance.label,
+      seguro_costo: q.insurance.cost,
+      descuento: q.discount,
+      total: q.total,
+      status: 'enviada' as CotizacionStatus,
+    }
+    const { data } = await db.from('cotizaciones').insert(payload).select().single()
+    return data ?? null
+  }
+
   async function handleWhatsApp() {
     if (!clientName.trim()) return
     const q = buildQuoteData()
     setSent(true)
     setTimeout(() => setSent(false), 3000)
+    const saved = await saveCotizacion(q)
+    if (saved) setCotizaciones(prev => [saved, ...prev])
     await shareViaWhatsApp(q)
   }
 
@@ -318,8 +540,77 @@ export default function CotizacionesScreen() {
     downloadPDF(q)
   }
 
+  function openPanel(cot: Cotizacion) {
+    setPanelCot(cot)
+    setPanelOpen(true)
+  }
+
+  function closePanel() {
+    setPanelOpen(false)
+    setTimeout(() => setPanelCot(null), 280)
+  }
+
+  async function handleStatusChange(id: string, status: CotizacionStatus) {
+    const { data } = await db.from('cotizaciones').update({ status }).eq('id', id).select().single()
+    if (data) {
+      setCotizaciones(prev => prev.map(c => c.id === id ? data : c))
+      setPanelCot(data)
+    }
+  }
+
+  async function handleConvert(cot: Cotizacion, fechaEntrega: string, fechaDevolucion: string) {
+    const { data: cliente } = await db.from('clientes').insert({
+      nombre: cot.cliente_nombre,
+      telefono: cot.cliente_telefono ?? null,
+      apellido: null, email: null,
+    }).select().single()
+
+    const { data: reserva } = await db.from('reservas').insert({
+      cliente_id: cliente?.id ?? null,
+      vehiculo_id: cot.vehiculo_id ?? null,
+      fecha_entrega: fechaEntrega,
+      fecha_devolucion: fechaDevolucion,
+      status: 'confirmada',
+      total: cot.total,
+    }).select().single()
+
+    if (!reserva) return
+
+    if (cot.vehiculo_id) {
+      await db.from('vehiculos').update({
+        status: 'reservado',
+        cliente_actual: cot.cliente_nombre,
+        info_cliente: `reserva ${reserva.id.slice(0, 8)}`,
+      }).eq('id', cot.vehiculo_id)
+    }
+
+    const { data: updated } = await db
+      .from('cotizaciones').update({ status: 'convertida', reserva_id: reserva.id })
+      .eq('id', cot.id).select().single()
+
+    if (updated) {
+      setCotizaciones(prev => prev.map(c => c.id === cot.id ? updated : c))
+      setPanelCot(updated)
+    }
+  }
+
+  const activas    = cotizaciones.filter(c => c.status === 'enviada').length
+  const aceptadas  = cotizaciones.filter(c => c.status === 'aceptada').length
+  const total_cots = cotizaciones.length
+  const conversion = total_cots > 0 ? Math.round((aceptadas / total_cots) * 100) : 0
+
+  const filtered = cotizaciones.filter(c => filter === 'Todas' ? true : c.status === FILTER_MAP[filter])
+
   return (
     <div className="screen">
+      <QuoteDetailPanel
+        cot={panelCot}
+        open={panelOpen}
+        onClose={closePanel}
+        onStatusChange={handleStatusChange}
+        onConvert={handleConvert}
+      />
+
       <div className="pagehead">
         <div>
           <div className="eyebrow">Cotizaciones</div>
@@ -340,7 +631,6 @@ export default function CotizacionesScreen() {
             <span className="chip">Vigente 7 días</span>
           </div>
 
-          {/* Client */}
           <div className="field">
             <label className="field-l">Nombre del cliente</label>
             <input
@@ -362,7 +652,6 @@ export default function CotizacionesScreen() {
             />
           </div>
 
-          {/* Días + Descuento */}
           <div className="field-row">
             <div className="field">
               <label className="field-l">Días de renta</label>
@@ -387,7 +676,6 @@ export default function CotizacionesScreen() {
             </div>
           </div>
 
-          {/* Vehicle picker */}
           <div className="field">
             <label className="field-l">Vehículo</label>
             {loadingVeh ? (
@@ -412,7 +700,6 @@ export default function CotizacionesScreen() {
             <p className="veh-hint">Solo vehículos disponibles y reservados</p>
           </div>
 
-          {/* Insurance */}
           <div className="field">
             <label className="field-l">Seguro</label>
             <div className="segchips">
@@ -429,7 +716,6 @@ export default function CotizacionesScreen() {
             </div>
           </div>
 
-          {/* Breakdown */}
           <div className="qb-breakdown">
             <div className="qb-line">
               <span>{days} días × ${fmt(vehicleRate)}</span>
@@ -454,7 +740,6 @@ export default function CotizacionesScreen() {
             <p className="qb-note">Incluye IVA · vigencia 7 días</p>
           </div>
 
-          {/* Actions */}
           <div className="qb-actions">
             <button
               className="btn"
@@ -515,7 +800,7 @@ export default function CotizacionesScreen() {
                   Sin cotizaciones en esta categoría
                 </p>
               ) : filtered.map(c => (
-                <QuoteRow key={c.id} c={c} />
+                <QuoteRow key={c.id} c={c} onClick={() => openPanel(c)} />
               ))}
             </div>
           </div>

@@ -23,6 +23,7 @@ import CajaScreen from './screens/caja/CajaScreen'
 import ClientesScreen from './screens/clientes/ClientesScreen'
 import ReportesScreen from './screens/reportes/ReportesScreen'
 import EmpleadosScreen from './screens/empleados/EmpleadosScreen'
+import AutorizacionesScreen from './screens/autorizaciones/AutorizacionesScreen'
 import { CajaTurnoScreen, CajaCierreScreen, CajaJustificacionScreen, CajaOkScreen } from './screens/caja/CajaFlow'
 import { EntregaStep1Screen, EntregaStep2Screen, EntregaStep3Screen, EntregaOkScreen } from './screens/flows/EntregaFlow'
 import { DevolucionStep1Screen, DevolucionStep2Screen, DevolucionStep3Screen, DevolucionOkScreen } from './screens/flows/DevolucionFlow'
@@ -96,6 +97,7 @@ function AppLayout() {
             <Route path="clientes"          element={<ClientesScreen />} />
             <Route path="reportes"          element={<ReportesScreen />} />
             <Route path="empleados"         element={<EmpleadosScreen />} />
+            <Route path="autorizaciones"    element={<AutorizacionesScreen />} />
             {/* Caja / Turno */}
             <Route path="caja"              element={<CajaScreen />} />
             <Route path="caja/turno"        element={<CajaTurnoScreen />} />

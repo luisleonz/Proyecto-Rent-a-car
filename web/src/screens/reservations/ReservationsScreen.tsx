@@ -169,6 +169,31 @@ function ReservaPanel({ res, open, onClose, onSolicitudCreada }: PanelProps) {
                 </div>
               </div>
 
+              {/* Deposit badge */}
+              {(res.deposito > 0) && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px',
+                  background: 'oklch(95% 0.06 155)', borderRadius: 9,
+                  border: '1px solid oklch(82% 0.1 155)',
+                }}>
+                  <Check size={14} color="var(--primary)" strokeWidth={2.5} />
+                  <span style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
+                    Depósito de apartado recibido
+                  </span>
+                  <span style={{ fontSize: 13, color: 'var(--primary)', marginLeft: 'auto', fontWeight: 700 }}>
+                    ${new Intl.NumberFormat('es-MX').format(res.deposito)}
+                  </span>
+                  {res.metodo_deposito && (
+                    <span style={{
+                      fontSize: 11, padding: '2px 7px', borderRadius: 20, fontWeight: 600,
+                      background: 'oklch(88% 0.12 155)', color: 'var(--primary)',
+                    }}>
+                      {res.metodo_deposito === 'efectivo' ? 'Efectivo' : 'Transferencia'}
+                    </span>
+                  )}
+                </div>
+              )}
+
               {/* Dates & total */}
               {!editing ? (
                 <div className="qpanel-section">
@@ -434,10 +459,11 @@ export default function ReservationsScreen() {
   }, [])
 
   async function fetchReservas() {
-    const { data } = await supabase
+    const { data, error } = await db
       .from('reservas')
       .select('*, clientes(nombre, apellido, telefono), vehiculos(modelo, placa, anio, tarifa_diaria)')
       .order('fecha_entrega', { ascending: true })
+    if (error) console.error('fetchReservas:', error)
     setReservas((data as ReservaConDetalle[]) ?? [])
     setLoading(false)
   }

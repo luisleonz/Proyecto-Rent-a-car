@@ -46,17 +46,20 @@ export interface Database {
         Row: {
           id: string; cliente_id: string | null; vehiculo_id: string | null
           fecha_entrega: string; fecha_devolucion: string
-          status: ReservaStatus; total: number | null; created_at: string
+          status: ReservaStatus; total: number | null
+          deposito: number; metodo_deposito: string | null; created_at: string
         }
         Insert: {
           cliente_id?: string | null; vehiculo_id?: string | null
           fecha_entrega: string; fecha_devolucion: string
           status?: ReservaStatus; total?: number | null
+          deposito?: number; metodo_deposito?: string | null
         }
         Update: {
           cliente_id?: string | null; vehiculo_id?: string | null
           fecha_entrega?: string; fecha_devolucion?: string
           status?: ReservaStatus; total?: number | null
+          deposito?: number; metodo_deposito?: string | null
         }
       }
       cotizaciones: {
@@ -119,6 +122,6 @@ export type Cotizacion = Database['public']['Tables']['cotizaciones']['Row']
 export type Solicitud  = Database['public']['Tables']['solicitudes']['Row']
 
 export interface ReservaConDetalle extends Reserva {
-  clientes: { nombre: string; apellido: string | null; telefono: string | null } | null
+  clientes:  { nombre: string; apellido: string | null; telefono: string | null } | null
   vehiculos: { modelo: string; placa: string; anio: number | null; tarifa_diaria: number | null } | null
 }

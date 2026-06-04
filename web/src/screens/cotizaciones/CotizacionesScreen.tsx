@@ -218,12 +218,13 @@ interface PanelProps {
   open: boolean
   onClose: () => void
   onStatusChange: (id: string, status: CotizacionStatus) => Promise<void>
-  onConvert: (cot: Cotizacion, fechaEntrega: string, fechaDevolucion: string) => Promise<void>
+  onConvert: (cot: Cotizacion, fechaEntrega: string, fechaDevolucion: string, deposito: number, metodoDeposito: string | null) => Promise<string | null>
 }
 
 function QuoteDetailPanel({ cot, open, onClose, onStatusChange, onConvert }: PanelProps) {
   const [working, setWorking]         = useState(false)
   const [confirmStep, setConfirmStep] = useState(false)
+  const [convertError, setConvertError] = useState('')
   const today = toDateInput(new Date())
 
   const defaultDevolucion = () => {
@@ -231,8 +232,11 @@ function QuoteDetailPanel({ cot, open, onClose, onStatusChange, onConvert }: Pan
   }
   const [fechaEntrega, setFechaEntrega]       = useState(today)
   const [fechaDevolucion, setFechaDevolucion] = useState(defaultDevolucion)
+  const [tieneDeposito, setTieneDeposito]     = useState(false)
+  const [deposito, setDeposito]               = useState('')
+  const [metodoDeposito, setMetodoDeposito]   = useState<'efectivo' | 'transferencia'>('efectivo')
 
-  if (!open && confirmStep) setConfirmStep(false)
+  if (!open && confirmStep) { setConfirmStep(false); setConvertError('') }
 
   async function handleStatus(status: CotizacionStatus) {
     if (!cot || working) return
@@ -244,7 +248,11 @@ function QuoteDetailPanel({ cot, open, onClose, onStatusChange, onConvert }: Pan
   async function handleConvert() {
     if (!cot || working) return
     setWorking(true)
-    await onConvert(cot, fechaEntrega, fechaDevolucion)
+    setConvertError('')
+    const depositoNum = tieneDeposito ? (parseFloat(deposito) || 0) : 0
+    const metodo = tieneDeposito ? metodoDeposito : null
+    const err = await onConvert(cot, fechaEntrega, fechaDevolucion, depositoNum, metodo)
+    if (err) { setConvertError(err); setWorking(false); return }
     setConfirmStep(false)
     setWorking(false)
   }
@@ -352,10 +360,9 @@ function QuoteDetailPanel({ cot, open, onClose, onStatusChange, onConvert }: Pan
               </div>
               {(cot.status === 'enviada' || cot.status === 'aceptada') && (
                 confirmStep ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginBottom: 2 }}>
-                      Fechas de la reserva
-                    </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {/* Dates */}
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)' }}>Fechas de la reserva</div>
                     <div style={{ display: 'flex', gap: 10 }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 11.5, color: 'var(--ink3)', marginBottom: 4 }}>Entrega</div>
@@ -378,8 +385,66 @@ function QuoteDetailPanel({ cot, open, onClose, onStatusChange, onConvert }: Pan
                         />
                       </div>
                     </div>
+
+                    {/* Deposit */}
+                    <div style={{ borderTop: '1px solid var(--line)', paddingTop: 10 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', marginBottom: 8 }}>Depósito de apartado</div>
+                      <div style={{ display: 'flex', gap: 8, marginBottom: tieneDeposito ? 8 : 0 }}>
+                        {(['No', 'Sí'] as const).map(opt => (
+                          <button
+                            key={opt}
+                            onClick={() => setTieneDeposito(opt === 'Sí')}
+                            style={{
+                              flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                              border: '1.5px solid', cursor: 'pointer',
+                              borderColor: (opt === 'Sí') === tieneDeposito ? 'var(--primary)' : 'var(--line)',
+                              background:  (opt === 'Sí') === tieneDeposito ? 'var(--primary-soft)' : 'transparent',
+                              color:       (opt === 'Sí') === tieneDeposito ? 'var(--primary)' : 'var(--ink2)',
+                            }}
+                          >{opt}</button>
+                        ))}
+                      </div>
+                      {tieneDeposito && (
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 11.5, color: 'var(--ink3)', marginBottom: 4 }}>Monto</div>
+                            <div className="field-money" style={{ height: 38 }}>
+                              <span>$</span>
+                              <input
+                                className="field-i"
+                                placeholder="0"
+                                value={deposito}
+                                onChange={e => setDeposito(e.target.value.replace(/[^0-9.]/g, ''))}
+                                inputMode="decimal"
+                                style={{ fontSize: 13 }}
+                              />
+                            </div>
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 11.5, color: 'var(--ink3)', marginBottom: 4 }}>Método</div>
+                            <select
+                              className="field-i"
+                              value={metodoDeposito}
+                              onChange={e => setMetodoDeposito(e.target.value as 'efectivo' | 'transferencia')}
+                              style={{ fontSize: 13, height: 38 }}
+                            >
+                              <option value="efectivo">Efectivo</option>
+                              <option value="transferencia">Transferencia</option>
+                            </select>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Error */}
+                    {convertError && (
+                      <div style={{ fontSize: 12, color: '#c0392b', padding: '7px 10px', borderRadius: 7, background: 'oklch(96% 0.03 20)' }}>
+                        {convertError}
+                      </div>
+                    )}
+
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setConfirmStep(false)} disabled={working}>
+                      <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => { setConfirmStep(false); setConvertError('') }} disabled={working}>
                         Cancelar
                       </button>
                       <button className="btn primary" style={{ flex: 2, justifyContent: 'center' }} onClick={handleConvert} disabled={working || !fechaEntrega || !fechaDevolucion}>
@@ -558,23 +623,26 @@ export default function CotizacionesScreen() {
     }
   }
 
-  async function handleConvert(cot: Cotizacion, fechaEntrega: string, fechaDevolucion: string) {
-    const { data: cliente } = await db.from('clientes').insert({
+  async function handleConvert(cot: Cotizacion, fechaEntrega: string, fechaDevolucion: string, deposito: number, metodoDeposito: string | null): Promise<string | null> {
+    const { data: cliente, error: clienteErr } = await db.from('clientes').insert({
       nombre: cot.cliente_nombre,
       telefono: cot.cliente_telefono ?? null,
       apellido: null, email: null,
     }).select().single()
+    if (clienteErr) return `Error al crear cliente: ${clienteErr.message}`
 
-    const { data: reserva } = await db.from('reservas').insert({
+    const { data: reserva, error: reservaErr } = await db.from('reservas').insert({
       cliente_id: cliente?.id ?? null,
       vehiculo_id: cot.vehiculo_id ?? null,
       fecha_entrega: fechaEntrega,
       fecha_devolucion: fechaDevolucion,
       status: 'confirmada',
       total: cot.total,
+      deposito,
+      metodo_deposito: metodoDeposito,
     }).select().single()
-
-    if (!reserva) return
+    if (reservaErr) return `Error al crear reserva: ${reservaErr.message}`
+    if (!reserva) return 'No se pudo crear la reserva'
 
     if (cot.vehiculo_id) {
       await db.from('vehiculos').update({
@@ -592,6 +660,7 @@ export default function CotizacionesScreen() {
       setCotizaciones(prev => prev.map(c => c.id === cot.id ? updated : c))
       setPanelCot(updated)
     }
+    return null
   }
 
   const activas    = cotizaciones.filter(c => c.status === 'enviada').length

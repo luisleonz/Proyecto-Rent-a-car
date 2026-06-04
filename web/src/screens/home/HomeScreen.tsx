@@ -14,7 +14,7 @@ export default function HomeScreen() {
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#FAFAF7' }}>
       {/* AppBar */}
-      <div className="bg-white px-4 py-3 flex items-center gap-3 border-b border-hairline">
+      <div className="md:hidden bg-white px-4 py-3 flex items-center gap-3 border-b border-hairline">
         <div className="flex-1">
           <div className="flex items-baseline gap-1 flex-wrap">
             <span className="text-base font-sans" style={{ color: '#1E1E26' }}>Buenos días, </span>

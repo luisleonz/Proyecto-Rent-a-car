@@ -18,11 +18,13 @@ import VehiclesScreen from './screens/vehicles/VehiclesScreen'
 import VehicleDetailScreen from './screens/vehicles/VehicleDetailScreen'
 import MoreScreen from './screens/more/MoreScreen'
 import CotizacionesScreen from './screens/cotizaciones/CotizacionesScreen'
+import CajaScreen from './screens/caja/CajaScreen'
+import ClientesScreen from './screens/clientes/ClientesScreen'
 import { CajaTurnoScreen, CajaCierreScreen, CajaJustificacionScreen, CajaOkScreen } from './screens/caja/CajaFlow'
 import { EntregaStep1Screen, EntregaStep2Screen, EntregaStep3Screen, EntregaOkScreen } from './screens/flows/EntregaFlow'
 import { DevolucionStep1Screen, DevolucionStep2Screen, DevolucionStep3Screen, DevolucionOkScreen } from './screens/flows/DevolucionFlow'
 
-const FLOW_PREFIXES = ['/app/caja', '/app/entrega', '/app/devolucion']
+const FLOW_PREFIXES = ['/app/caja/turno', '/app/caja/cierre', '/app/caja/justificacion', '/app/caja/ok', '/app/entrega', '/app/devolucion']
 
 function AppLayout() {
   const location = useLocation()
@@ -65,11 +67,12 @@ function AppLayout() {
             <Route path="vehicles/:plate"   element={<VehicleDetailScreen />} />
             <Route path="more"              element={<MoreScreen />} />
             {/* Stub routes for sidebar items not yet built */}
-            <Route path="clientes"          element={<ComingSoon title="Clientes" />} />
+            <Route path="clientes"          element={<ClientesScreen />} />
             <Route path="reportes"          element={<ComingSoon title="Reportes" />} />
             <Route path="empleados"         element={<ComingSoon title="Empleados" />} />
             {/* Caja / Turno */}
-            <Route path="caja"              element={<CajaTurnoScreen />} />
+            <Route path="caja"              element={<CajaScreen />} />
+            <Route path="caja/turno"        element={<CajaTurnoScreen />} />
             <Route path="caja/cierre"       element={<CajaCierreScreen />} />
             <Route path="caja/justificacion" element={<CajaJustificacionScreen />} />
             <Route path="caja/ok"           element={<CajaOkScreen />} />

@@ -1,109 +1,90 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { DollarSign, Users, BarChart3, Settings, Headphones, LogOut, ChevronRight, LucideIcon } from 'lucide-react'
+import { MapPin, DollarSign, Calendar, FileText, Key, Settings, LogOut, ChevronRight } from 'lucide-react'
 import { useAuth } from '../../state/auth'
-import AvatarCircle from '../../components/AvatarCircle'
 
-interface MenuItem {
-  icon: LucideIcon
-  label: string
-  sublabel?: string
-  isDanger?: boolean
-  iconColor: string
-  iconBg: string
-  route?: string
-}
-
-const MENU_ITEMS: MenuItem[] = [
-  { icon: DollarSign, label: 'Caja / Turno', sublabel: 'Cierre del día', iconColor: '#2D8A56', iconBg: '#E8F5EE', route: '/app/caja' },
-  { icon: Users, label: 'Equipo', sublabel: '4 empleados activos', iconColor: '#4444AA', iconBg: '#EEEEFF' },
-  { icon: BarChart3, label: 'Reportes', sublabel: 'Semana actual', iconColor: '#888800', iconBg: '#FFFFF0' },
-  { icon: Settings, label: 'Configuración', iconColor: '#585868', iconBg: '#F0F0F0' },
-  { icon: Headphones, label: 'Soporte', iconColor: '#585868', iconBg: '#F0F0F0' },
-]
-
-function MenuRow({ item, onClick }: { item: MenuItem; onClick?: () => void }) {
+function ToggleRow({ on, onChange, label, sub }: { on: boolean; onChange: () => void; label: string; sub?: string }) {
   return (
-    <button onClick={onClick} className="w-full flex items-center gap-3 px-4 py-3.5 text-left">
-      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-        style={{ backgroundColor: item.iconBg }}>
-        <item.icon size={18} style={{ color: item.iconColor }} />
+    <div className="togglerow">
+      <div className="togglerow-text">
+        <div className="togglerow-l">{label}</div>
+        {sub && <div className="togglerow-s">{sub}</div>}
       </div>
-      <div className="flex-1">
-        <p className="text-sm font-medium font-sans" style={{ color: item.isDanger ? '#C04040' : '#1E1E26' }}>
-          {item.label}
-        </p>
-        {item.sublabel && (
-          <p className="text-xs font-sans" style={{ color: '#838390' }}>{item.sublabel}</p>
-        )}
-      </div>
-      {!item.isDanger && (
-        <ChevronRight size={16} style={{ color: '#BCBCC4' }} />
-      )}
-    </button>
+      <button type="button" className={'toggle' + (on ? ' on' : '')} onClick={onChange} aria-pressed={on}>
+        <span className="toggle-knob" />
+      </button>
+    </div>
   )
 }
 
 export default function MoreScreen() {
   const navigate = useNavigate()
-  const { currentFirstName, currentInitials, currentRole, currentBranch } = useAuth()
+  const { currentInitials, currentFirstName, currentRole } = useAuth()
+  const isAdmin = currentRole === 'admin' || currentRole === 'Administrador' || !currentRole
+  const [notif, setNotif] = useState({ mov: true, cot: true, resumen: false })
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#FAFAF7' }}>
-      <div className="md:hidden bg-white px-4 py-3 border-b border-hairline">
-        <h1 className="text-xl font-bold font-serif" style={{ color: '#1E1E26' }}>Más</h1>
+    <div className="screen">
+      <div className="pagehead" style={{ marginBottom: 'var(--gap)' }}>
+        <div>
+          <div className="eyebrow">Cuenta</div>
+          <h1 className="h-display" style={{ fontSize: 'clamp(28px, 4cqw, 40px)' }}>Ajustes</h1>
+          <div style={{ color: 'var(--ink3)', fontSize: 14, marginTop: 6 }}>Preferencias del negocio y de tu perfil</div>
+        </div>
       </div>
-
-      <div className="flex-1 overflow-y-auto px-4 py-5 pb-24 flex flex-col gap-3">
+      <div className="set-wrap">
         {/* Profile card */}
-        <div className="bg-white rounded-2xl border border-hairline p-4 flex items-center gap-3.5">
-          <AvatarCircle initials={currentInitials || 'LA'} size={52} />
-          <div className="flex-1">
-            <p className="text-lg font-bold font-serif" style={{ color: '#1E1E26' }}>
-              {currentFirstName || 'Luciano'}
-            </p>
-            <p className="text-xs font-sans mb-2" style={{ color: '#838390' }}>
-              {currentRole || 'Administrador'} · {currentBranch || 'Polanco'}
-            </p>
-            <span className="text-xs font-semibold font-sans px-2 py-0.5 rounded-full"
-              style={{ backgroundColor: '#E8F5EE', color: '#2D8A56' }}>
-              {currentRole === 'Administrador' ? 'Admin' : 'Mostrador'}
-            </span>
+        <div className="card set-profile">
+          <div className="avatar accent" style={{ width: 60, height: 60, fontSize: 20 }}>{currentInitials || 'LL'}</div>
+          <div className="meta">
+            <h2>{currentFirstName || 'Luciano'} R.</h2>
+            <div className="mail">luciano@lucianos.mx</div>
+          </div>
+          <span className={'chip ' + (isAdmin ? 'primary' : '')}>
+            {isAdmin ? 'Administrador' : 'Operativo'}
+          </span>
+          <button className="btn sm">Editar perfil</button>
+        </div>
+
+        {/* Notificaciones */}
+        <div className="set-section">
+          <div className="eyebrow">Notificaciones</div>
+          <div className="card set-card split">
+            <ToggleRow on={notif.mov} onChange={() => setNotif(n => ({ ...n, mov: !n.mov }))}
+              label="Entregas y devoluciones" sub="avisos 30 min antes" />
+            <ToggleRow on={notif.cot} onChange={() => setNotif(n => ({ ...n, cot: !n.cot }))}
+              label="Cotizaciones vistas" sub="cuando el cliente abre el enlace" />
+            <ToggleRow on={notif.resumen} onChange={() => setNotif(n => ({ ...n, resumen: !n.resumen }))}
+              label="Resumen diario" sub="cierre del día a las 21:00" />
           </div>
         </div>
 
-        {/* Main menu */}
-        <div className="bg-white rounded-2xl border border-hairline overflow-hidden">
-          {MENU_ITEMS.map((item, i) => (
-            <div key={item.label}>
-              <MenuRow
-                item={item}
-                onClick={item.route ? () => navigate(item.route!) : undefined}
-              />
-              {i < MENU_ITEMS.length - 1 && (
-                <div className="h-px ml-16" style={{ backgroundColor: '#EAEAE4' }} />
-              )}
+        {/* Negocio (admin only) */}
+        {isAdmin && (
+          <div className="set-section">
+            <div className="eyebrow">Negocio</div>
+            <div className="card set-card">
+              <div className="set-link"><MapPin size={17} /><span className="l">Sucursal</span><span className="v">Centro · Nogales, Son.</span><ChevronRight size={15} /></div>
+              <div className="set-link"><DollarSign size={17} /><span className="l">Moneda</span><span className="v">MXN $</span><ChevronRight size={15} /></div>
+              <div className="set-link"><Calendar size={17} /><span className="l">Métodos de pago</span><span className="v">efectivo · SPEI · TPV</span><ChevronRight size={15} /></div>
+              <div className="set-link"><FileText size={17} /><span className="l">Plantillas de contrato</span><span className="v">2 activas</span><ChevronRight size={15} /></div>
             </div>
-          ))}
+          </div>
+        )}
+
+        {/* Cuenta */}
+        <div className="set-section">
+          <div className="eyebrow">Cuenta</div>
+          <div className="card set-card">
+            <div className="set-link"><Key size={17} /><span className="l">Seguridad y 2FA</span><ChevronRight size={15} /></div>
+            <div className="set-link"><Settings size={17} /><span className="l">Sincronización y respaldo</span><ChevronRight size={15} /></div>
+            <div className="set-link danger" onClick={() => navigate('/', { replace: true })}>
+              <LogOut size={17} /><span className="l">Cerrar sesión</span>
+            </div>
+          </div>
         </div>
 
-        {/* Logout */}
-        <div className="rounded-2xl border overflow-hidden"
-          style={{ backgroundColor: '#FEEEEE', borderColor: 'rgba(192,64,64,0.2)' }}>
-          <button
-            onClick={() => navigate('/', { replace: true })}
-            className="w-full flex items-center gap-3 px-4 py-3.5"
-          >
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: '#FEEEEE' }}>
-              <LogOut size={18} style={{ color: '#C04040' }} />
-            </div>
-            <span className="text-sm font-medium font-sans" style={{ color: '#C04040' }}>Cerrar sesión</span>
-          </button>
-        </div>
-
-        <p className="text-center text-xs font-sans" style={{ color: '#838390' }}>
-          Lucianos Rent-a-Car v1.0
-        </p>
+        <div className="set-ver">Lucianos Rent-a-car · v1.0.0</div>
       </div>
     </div>
   )

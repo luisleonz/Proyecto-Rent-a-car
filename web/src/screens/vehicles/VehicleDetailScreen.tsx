@@ -22,7 +22,7 @@ export default function VehicleDetailScreen() {
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#FAFAF7' }}>
       {/* AppBar */}
-      <div className="bg-white flex items-center gap-1 px-2 py-2 border-b border-hairline">
+      <div className="md:hidden bg-white flex items-center gap-1 px-2 py-2 border-b border-hairline">
         <button onClick={() => navigate(-1)} className="p-2">
           <ArrowLeft size={22} style={{ color: '#1E1E26' }} />
         </button>

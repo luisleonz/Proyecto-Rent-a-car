@@ -55,7 +55,7 @@ export default function ReservationsScreen() {
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#FAFAF7' }}>
       {/* AppBar */}
-      <div className="bg-white px-4 py-3 flex items-center gap-1 border-b border-hairline">
+      <div className="md:hidden bg-white px-4 py-3 flex items-center gap-1 border-b border-hairline">
         <h1 className="flex-1 text-xl font-bold font-serif" style={{ color: '#1E1E26' }}>Reservas</h1>
         <button className="p-2"><CalendarDays size={20} style={{ color: '#585868' }} /></button>
         <button className="p-2"><Filter size={20} style={{ color: '#585868' }} /></button>

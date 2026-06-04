@@ -49,7 +49,7 @@ export default function MoreScreen() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#FAFAF7' }}>
-      <div className="bg-white px-4 py-3 border-b border-hairline">
+      <div className="md:hidden bg-white px-4 py-3 border-b border-hairline">
         <h1 className="text-xl font-bold font-serif" style={{ color: '#1E1E26' }}>Más</h1>
       </div>
 

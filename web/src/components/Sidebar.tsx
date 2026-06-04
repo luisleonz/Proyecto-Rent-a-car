@@ -7,15 +7,15 @@ import { supabase } from '../lib/supabase'
 const db = supabase as any
 
 const NAV = [
-  { id: 'inicio',     label: 'Inicio',        icon: Home,       path: '/app/home',         group: 'operacion' },
-  { id: 'reservas',   label: 'Reservas',       icon: Calendar,   path: '/app/reservations', group: 'operacion' },
-  { id: 'cotizacion', label: 'Cotizaciones',   icon: FileText,   path: '/app/cotizaciones', group: 'operacion' },
-  { id: 'flota',      label: 'Flota',          icon: Car,        path: '/app/vehicles',     group: 'operacion' },
-  { id: 'clientes',   label: 'Clientes',       icon: Users,      path: '/app/clientes',     group: 'operacion' },
-  { id: 'caja',       label: 'Caja',           icon: DollarSign, path: '/app/caja',         group: 'gestion' },
-  { id: 'reportes',   label: 'Reportes',       icon: BarChart3,  path: '/app/reportes',     group: 'gestion' },
-  { id: 'empleados',  label: 'Empleados',      icon: UserCheck,  path: '/app/empleados',    group: 'gestion' },
-  { id: 'ajustes',    label: 'Ajustes',        icon: Settings,   path: '/app/more',         group: 'gestion' },
+  { id: 'inicio',     label: 'Inicio',        icon: Home,       path: '/app/home',         group: 'operacion', adminOnly: false },
+  { id: 'reservas',   label: 'Reservas',       icon: Calendar,   path: '/app/reservations', group: 'operacion', adminOnly: false },
+  { id: 'cotizacion', label: 'Cotizaciones',   icon: FileText,   path: '/app/cotizaciones', group: 'operacion', adminOnly: false },
+  { id: 'flota',      label: 'Flota',          icon: Car,        path: '/app/vehicles',     group: 'operacion', adminOnly: false },
+  { id: 'clientes',   label: 'Clientes',       icon: Users,      path: '/app/clientes',     group: 'operacion', adminOnly: false },
+  { id: 'caja',       label: 'Caja',           icon: DollarSign, path: '/app/caja',         group: 'gestion',   adminOnly: false },
+  { id: 'reportes',   label: 'Reportes',       icon: BarChart3,  path: '/app/reportes',     group: 'gestion',   adminOnly: true  },
+  { id: 'empleados',  label: 'Empleados',      icon: UserCheck,  path: '/app/empleados',    group: 'gestion',   adminOnly: true  },
+  { id: 'ajustes',    label: 'Ajustes',        icon: Settings,   path: '/app/more',         group: 'gestion',   adminOnly: false },
 ]
 
 const GROUPS = [
@@ -57,7 +57,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       {GROUPS.map(g => (
         <>
           <div key={g.key + '-label'} className="navlabel">{g.label}</div>
-          {NAV.filter(n => n.group === g.key).map(n => {
+          {NAV.filter(n => n.group === g.key && (!n.adminOnly || isAdmin)).map(n => {
             const active = location.pathname === n.path || location.pathname.startsWith(n.path + '/')
             return (
               <button key={n.id} className="navitem" data-active={String(active)} onClick={() => handleNav(n.path)}>

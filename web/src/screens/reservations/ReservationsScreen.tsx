@@ -373,7 +373,7 @@ function SkeletonRow() {
 }
 
 /* ─── New reservation modal ──────────────────────────────────── */
-type VehicleOption   = { id: string; modelo: string; placa: string; tarifa_diaria: number | null }
+type VehicleOption   = { id: string; modelo: string; placa: string; tarifa_diaria: number | null; returnsToday?: boolean }
 type ClienteOption   = { id: string; nombre: string; telefono: string | null }
 
 const inits = (n: string) => {
@@ -447,9 +447,15 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
         .in('status', ['pendiente', 'confirmada', 'entregada'])
         .lt('fecha_entrega', fechaDev)
         .gt('fecha_devolucion', fechaEntrega),
-    ]).then(([vRes, rRes]) => {
-      const busy = new Set((rRes.data ?? []).map((r: any) => r.vehiculo_id))
-      const avail: VehicleOption[] = (vRes.data ?? []).filter((v: any) => !busy.has(v.id))
+      db.from('reservas').select('vehiculo_id')
+        .in('status', ['confirmada', 'entregada'])
+        .eq('fecha_devolucion', fechaEntrega),
+    ]).then(([vRes, rRes, rtRes]) => {
+      const busy       = new Set((rRes.data  ?? []).map((r: any) => r.vehiculo_id))
+      const returning  = new Set((rtRes.data ?? []).map((r: any) => r.vehiculo_id))
+      const avail: VehicleOption[] = (vRes.data ?? [])
+        .filter((v: any) => !busy.has(v.id))
+        .map((v: any) => ({ ...v, returnsToday: returning.has(v.id) }))
       setVehicles(avail)
       if (prefilledVehiculo && avail.find(v => v.id === prefilledVehiculo.id)) {
         setVehiculoId(prefilledVehiculo.id)
@@ -684,6 +690,15 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
                           <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--ink)' }}>{v.modelo}</div>
                           <div style={{ fontSize: 12, color: 'var(--ink3)', fontFamily: 'var(--font-mono)', marginTop: 1 }}>{v.placa}</div>
                         </div>
+                        {v.returnsToday && (
+                          <div style={{
+                            fontSize: 11, fontWeight: 600, color: 'oklch(55% 0.14 60)',
+                            background: 'oklch(96% 0.06 60)', border: '1px solid oklch(82% 0.12 60)',
+                            borderRadius: 6, padding: '2px 7px', flexShrink: 0, whiteSpace: 'nowrap',
+                          }}>
+                            Devuelto hoy
+                          </div>
+                        )}
                         {v.tarifa_diaria != null && (
                           <div style={{ fontWeight: 700, fontSize: 15, color: sel ? 'var(--primary)' : 'var(--ink)', flexShrink: 0 }}>
                             ${fmt(v.tarifa_diaria)}

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { Check, Download, MessageCircle, X, ArrowRight, RefreshCw } from 'lucide-react'
 import jsPDF from 'jspdf'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../state/auth'
+import { insertLog } from '../../lib/log'
 import type { Vehiculo, Cotizacion, CotizacionStatus } from '../../lib/database.types'
 
 const db = supabase as any
@@ -512,6 +514,7 @@ function VehOption({ v, selected, onSelect }: { v: Vehiculo; selected: boolean; 
 
 /* ─── Main screen ───────────────────────────────────────────── */
 export default function CotizacionesScreen() {
+  const { currentEmail } = useAuth()
   const [clientName, setClientName]     = useState('')
   const [clientPhone, setClientPhone]   = useState('')
   const [days, setDays]                 = useState(3)
@@ -596,7 +599,17 @@ export default function CotizacionesScreen() {
     setSent(true)
     setTimeout(() => setSent(false), 3000)
     const saved = await saveCotizacion(q)
-    if (saved) setCotizaciones(prev => [saved, ...prev])
+    if (saved) {
+      setCotizaciones(prev => [saved, ...prev])
+      await insertLog({
+        accion: 'crear_cotizacion',
+        entidad: 'cotizaciones',
+        entidad_id: saved.id,
+        descripcion: `Cotización ${saved.id} creada para ${q.clientName} — ${q.vehicle}`,
+        realizado_por: currentEmail,
+        datos_nuevos: { cliente: q.clientName, vehiculo: q.vehicle, total: q.total },
+      })
+    }
     await shareViaWhatsApp(q)
   }
 
@@ -675,6 +688,16 @@ export default function CotizacionesScreen() {
       setCotizaciones(prev => prev.map(c => c.id === cot.id ? updated : c))
       setPanelCot(updated)
     }
+
+    await insertLog({
+      accion: 'convertir_cotizacion',
+      entidad: 'cotizaciones',
+      entidad_id: cot.id,
+      descripcion: `Cotización ${cot.id} convertida a reserva para ${cot.cliente_nombre}`,
+      realizado_por: currentEmail,
+      datos_nuevos: { reserva_id: reserva.id, cliente: cot.cliente_nombre, vehiculo: cot.vehiculo_modelo },
+    })
+
     return null
   }
 

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { Plus, ChevronRight, X, Check, Clock } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
+import { insertLog } from '../../lib/log'
 import type { ReservaConDetalle, ReservaStatus } from '../../lib/database.types'
 
 /* ─── Constants ─────────────────────────────────────────────── */
@@ -346,6 +347,7 @@ const inits = (n: string) => {
 }
 
 function NuevaReservaModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
+  const { currentEmail } = useAuth()
   // Client search
   const [clientSearch,     setClientSearch]     = useState('')
   const [clientResults,    setClientResults]     = useState<ClienteOption[]>([])
@@ -443,7 +445,7 @@ function NuevaReservaModal({ open, onClose, onCreated }: { open: boolean; onClos
       clienteId = c?.id ?? null
     }
 
-    const { error: rErr } = await db.from('reservas').insert({
+    const { data: reservaData, error: rErr } = await db.from('reservas').insert({
       cliente_id: clienteId,
       vehiculo_id: vehiculoId,
       fecha_entrega: fechaEntrega,
@@ -452,12 +454,27 @@ function NuevaReservaModal({ open, onClose, onCreated }: { open: boolean; onClos
       total: showCalc ? total : null,
       deposito: tieneDeposito ? (Number(deposito) || 0) : 0,
       metodo_deposito: tieneDeposito ? metodoDeposito : null,
-    })
+    }).select('id').single()
     if (rErr) { setError(`Error al crear reserva: ${rErr.message}`); setWorking(false); return }
 
     await db.from('vehiculos')
       .update({ status: 'reservado', cliente_actual: clienteNombre })
       .eq('id', vehiculoId)
+
+    await insertLog({
+      accion: 'crear_reserva',
+      entidad: 'reservas',
+      entidad_id: reservaData?.id,
+      descripcion: `Nueva reserva para ${clienteNombre} — ${selectedVehicle?.modelo ?? vehiculoId}`,
+      realizado_por: currentEmail,
+      datos_nuevos: {
+        cliente: clienteNombre,
+        vehiculo: selectedVehicle?.modelo,
+        fecha_entrega: fechaEntrega,
+        fecha_devolucion: fechaDev,
+        total: showCalc ? total : null,
+      },
+    })
 
     setWorking(false)
     reset()

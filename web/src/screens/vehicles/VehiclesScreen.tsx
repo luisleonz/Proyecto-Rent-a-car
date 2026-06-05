@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, SlidersHorizontal, Gauge, Fuel, Settings2, User, X, Check } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
+import { insertLog } from '../../lib/log'
 import type { Vehiculo, VehiculoStatus } from '../../lib/database.types'
 
 const db = supabase as any
@@ -197,6 +198,7 @@ interface AgregarPanelProps {
 }
 
 function AgregarPanel({ open, onClose, onCreated, fleet }: AgregarPanelProps) {
+  const { currentEmail } = useAuth()
   const [placa,       setPlaca]       = useState('')
   const [marca,       setMarca]       = useState('')
   const [modeloNom,   setModeloNom]   = useState('')
@@ -253,6 +255,15 @@ function AgregarPanel({ open, onClose, onCreated, fleet }: AgregarPanelProps) {
     })
     setSaving(false)
     if (err) { setError(err.message); return }
+
+    await insertLog({
+      accion: 'agregar_vehiculo',
+      entidad: 'vehiculos',
+      descripcion: `Vehículo ${modelo} (${placa.trim().toUpperCase()}) agregado a la flota`,
+      realizado_por: currentEmail,
+      datos_nuevos: { placa: placa.trim().toUpperCase(), modelo, anio, color, segmento },
+    })
+
     reset()
     onCreated()
     onClose()

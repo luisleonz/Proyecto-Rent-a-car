@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Plus, Phone, X, Check, ChevronRight } from 'lucide-react'
+import { Search, Plus, Phone, X, Check, ChevronRight, Pencil } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../state/auth'
+import { insertLog } from '../../lib/log'
 
 const db = supabase as any
 
@@ -45,6 +47,7 @@ function AgregarClientePanel({ open, onClose, onCreated }: {
   onClose: () => void
   onCreated: (c: Cliente) => void
 }) {
+  const { currentEmail } = useAuth()
   const [nombre,   setNombre]   = useState('')
   const [telefono, setTelefono] = useState('')
   const [saving,   setSaving]   = useState(false)
@@ -61,6 +64,14 @@ function AgregarClientePanel({ open, onClose, onCreated }: {
     }).select().single()
     setSaving(false)
     if (err) { setError(err.message); return }
+    await insertLog({
+      accion: 'crear_cliente',
+      entidad: 'clientes',
+      entidad_id: data?.id,
+      descripcion: `Cliente ${nombre.trim()} agregado`,
+      realizado_por: currentEmail,
+      datos_nuevos: { nombre: nombre.trim(), telefono: telefono.trim() || null },
+    })
     reset()
     onCreated(data as Cliente)
     onClose()
@@ -118,15 +129,25 @@ function AgregarClientePanel({ open, onClose, onCreated }: {
 }
 
 /* ─── Client detail ──────────────────────────────────────────── */
-function ClienteDetail({ cliente, onNewReserva, onCotizar }: {
+function ClienteDetail({ cliente, onNewReserva, onCotizar, onUpdated }: {
   cliente: Cliente
   onNewReserva: () => void
   onCotizar: () => void
+  onUpdated: (c: Cliente) => void
 }) {
+  const { currentEmail } = useAuth()
   const [reservas,  setReservas]  = useState<ReservaResumen[]>([])
   const [loading,   setLoading]   = useState(true)
 
+  // Edit state
+  const [editing,    setEditing]    = useState(false)
+  const [editNombre, setEditNombre] = useState('')
+  const [editTel,    setEditTel]    = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError,  setEditError]  = useState('')
+
   useEffect(() => {
+    setEditing(false)
     setLoading(true)
     db.from('reservas')
       .select('id, fecha_entrega, fecha_devolucion, status, total, vehiculos(modelo, placa)')
@@ -138,6 +159,35 @@ function ClienteDetail({ cliente, onNewReserva, onCotizar }: {
         setLoading(false)
       })
   }, [cliente.id])
+
+  function startEdit() {
+    setEditNombre(cliente.nombre)
+    setEditTel(cliente.telefono ?? '')
+    setEditError('')
+    setEditing(true)
+  }
+
+  async function handleSave() {
+    if (!editNombre.trim()) { setEditError('El nombre es obligatorio'); return }
+    setEditSaving(true); setEditError('')
+    const { data, error: err } = await db.from('clientes')
+      .update({ nombre: editNombre.trim(), telefono: editTel.trim() || null })
+      .eq('id', cliente.id)
+      .select().single()
+    setEditSaving(false)
+    if (err) { setEditError(err.message); return }
+    await insertLog({
+      accion: 'editar_cliente',
+      entidad: 'clientes',
+      entidad_id: cliente.id,
+      descripcion: `Cliente ${cliente.nombre} actualizado`,
+      realizado_por: currentEmail,
+      datos_anteriores: { nombre: cliente.nombre, telefono: cliente.telefono },
+      datos_nuevos: { nombre: editNombre.trim(), telefono: editTel.trim() || null },
+    })
+    setEditing(false)
+    onUpdated(data as Cliente)
+  }
 
   const activa  = reservas.find(r => r.status === 'confirmada' || r.status === 'entregada')
   const totalFacturado = reservas.reduce((s, r) => s + (r.total ?? 0), 0)
@@ -162,7 +212,44 @@ function ClienteDetail({ cliente, onNewReserva, onCotizar }: {
       <div className="cli-dactions">
         <button className="btn sm primary" onClick={onNewReserva}>Nueva reserva</button>
         <button className="btn sm" onClick={onCotizar}>Cotizar</button>
+        <button className="btn sm" onClick={startEdit} style={{ marginLeft: 'auto' }}>
+          <Pencil size={13} />Editar
+        </button>
       </div>
+
+      {/* Inline edit form */}
+      {editing && (
+        <div style={{
+          background: 'var(--paper-alt)', borderRadius: 10, padding: '14px 16px',
+          display: 'flex', flexDirection: 'column', gap: 10,
+          border: '1.5px solid var(--primary-line)',
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)' }}>Editar datos</div>
+          <div className="field">
+            <label className="field-l">Nombre *</label>
+            <input className="field-i" value={editNombre} onChange={e => setEditNombre(e.target.value)} autoFocus />
+          </div>
+          <div className="field">
+            <label className="field-l">Teléfono</label>
+            <input className="field-i" value={editTel} onChange={e => setEditTel(e.target.value)} inputMode="tel" placeholder="+52 631..." />
+          </div>
+          {editError && (
+            <div style={{ fontSize: 12.5, color: '#c0392b', padding: '6px 10px', borderRadius: 7, background: 'oklch(96% 0.03 20)' }}>
+              {editError}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setEditing(false)} disabled={editSaving}>
+              Cancelar
+            </button>
+            <button className="btn primary" style={{ flex: 2, justifyContent: 'center' }} onClick={handleSave} disabled={editSaving || !editNombre.trim()}>
+              {editSaving
+                ? <><div className="spinner" style={{ width: 14, height: 14, borderWidth: 2, borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.3)' }} />Guardando…</>
+                : <><Check size={14} />Guardar cambios</>}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="cli-dkpis">
@@ -276,6 +363,14 @@ export default function ClientesScreen() {
     setSelected(c)
   }
 
+  function handleUpdated(updated: Cliente) {
+    setClientes(prev =>
+      prev.map(c => c.id === updated.id ? updated : c)
+        .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+    )
+    setSelected(updated)
+  }
+
   const filtered = query.trim()
     ? clientes.filter(c =>
         c.nombre.toLowerCase().includes(query.toLowerCase()) ||
@@ -356,6 +451,7 @@ export default function ClientesScreen() {
             cliente={selected}
             onNewReserva={() => navigate(`/app/reservations?new=1`)}
             onCotizar={() => navigate('/app/cotizaciones')}
+            onUpdated={handleUpdated}
           />
         ) : (
           <div className="card cli-detail is-empty">

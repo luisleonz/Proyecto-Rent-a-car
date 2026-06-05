@@ -381,9 +381,10 @@ const inits = (n: string) => {
   return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '?'
 }
 
-function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente }: {
+function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefilledVehiculo }: {
   open: boolean; onClose: () => void; onCreated: () => void
   prefilledCliente?: { id: string; nombre: string; telefono: string | null } | null
+  prefilledVehiculo?: { id: string } | null
 }) {
   const { currentEmail } = useAuth()
   // Client search
@@ -450,6 +451,9 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente }: {
       const busy = new Set((rRes.data ?? []).map((r: any) => r.vehiculo_id))
       const avail: VehicleOption[] = (vRes.data ?? []).filter((v: any) => !busy.has(v.id))
       setVehicles(avail)
+      if (prefilledVehiculo && avail.find(v => v.id === prefilledVehiculo.id)) {
+        setVehiculoId(prefilledVehiculo.id)
+      }
       setLoadingVeh(false)
     })
   }, [fechaEntrega, fechaDev])
@@ -832,15 +836,20 @@ export default function ReservationsScreen() {
   const [panelOpen, setPanelOpen]       = useState(false)
   const [modalOpen, setModalOpen]       = useState(false)
   const [prefilledCliente, setPrefilledCliente] = useState<{ id: string; nombre: string; telefono: string | null } | null>(null)
+  const [prefilledVehiculo, setPrefilledVehiculo] = useState<{ id: string } | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
 
   useEffect(() => {
     if (searchParams.get('new') === '1') {
-      const clienteId = searchParams.get('clienteId')
-      const nombre    = searchParams.get('nombre')
-      const telefono  = searchParams.get('telefono')
+      const clienteId  = searchParams.get('clienteId')
+      const nombre     = searchParams.get('nombre')
+      const telefono   = searchParams.get('telefono')
+      const vehiculoId = searchParams.get('vehiculoId')
       if (clienteId && nombre) {
         setPrefilledCliente({ id: clienteId, nombre, telefono: telefono || null })
+      }
+      if (vehiculoId) {
+        setPrefilledVehiculo({ id: vehiculoId })
       }
       setModalOpen(true)
       setSearchParams({}, { replace: true })
@@ -940,9 +949,10 @@ export default function ReservationsScreen() {
 
       <NuevaReservaModal
         open={modalOpen}
-        onClose={() => { setModalOpen(false); setPrefilledCliente(null) }}
+        onClose={() => { setModalOpen(false); setPrefilledCliente(null); setPrefilledVehiculo(null) }}
         onCreated={fetchReservas}
         prefilledCliente={prefilledCliente}
+        prefilledVehiculo={prefilledVehiculo}
       />
     </div>
   )

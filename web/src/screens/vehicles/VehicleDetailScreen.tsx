@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, Key, Check, Wrench, FileText } from 'lucide-react'
+import { ChevronLeft, Key, Check, Wrench, X, AlertTriangle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../state/auth'
+import { insertLog } from '../../lib/log'
 import type { Vehiculo } from '../../lib/database.types'
 
-/* ── Tone → colors ── */
+const db = supabase as any
+
+/* ── Constants ── */
 const TONES: Record<string, [string, string]> = {
   blue:  ['oklch(0.62 0.10 245)', 'oklch(0.90 0.04 245)'],
   slate: ['oklch(0.55 0.02 240)', 'oklch(0.92 0.01 240)'],
@@ -24,13 +28,26 @@ const STATUS_DOT: Record<string, string> = {
   disponible: 'primary', rentado: 'primary', taller: 'warn', reservado: 'neutral',
 }
 
-const VEH_HISTORY = [
-  { t: 'Devolución',     who: 'Mariana Pérez',   note: 'Sin daños · tanque lleno',     d: '18 may 2026', dot: 'primary' },
-  { t: 'Entrega',        who: 'Mariana Pérez',   note: '3 días · contrato #4471',       d: '15 may 2026', dot: 'primary' },
-  { t: 'Mantenimiento',  who: 'Taller central',  note: 'Cambio de aceite · 45,000 km', d: '02 may 2026', dot: 'warn'    },
-  { t: 'Devolución',     who: 'Pedro Soto',      note: 'Rayón menor puerta trasera',   d: '21 abr 2026', dot: 'neutral' },
-]
+const RES_STATUS_LABEL: Record<string, string> = {
+  pendiente: 'Reserva pendiente', confirmada: 'Confirmada', entregada: 'Entregada',
+  devuelta: 'Devuelta', cancelada: 'Cancelada',
+}
+const RES_STATUS_DOT: Record<string, string> = {
+  pendiente: 'warn', confirmada: '', entregada: 'primary', devuelta: 'neutral', cancelada: 'neutral',
+}
+
 const GALLERY = ['Frente', '3/4', 'Interior', 'Tablero']
+const fmt     = (n: number) => n.toLocaleString('es-MX')
+const fmtDate = (s: string) => new Date(s + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
+
+type ReservaHist = {
+  id: string
+  fecha_entrega: string
+  fecha_devolucion: string
+  status: string
+  total: number | null
+  clientes: { nombre: string } | null
+}
 
 /* ── CarPhoto ── */
 function CarPhoto({ v, height = 200 }: { v: Vehiculo; height?: number }) {
@@ -70,24 +87,90 @@ function SpecTile({ icon, label, value }: { icon: React.ReactNode; label: string
 }
 
 export default function VehicleDetailScreen() {
-  const { plate } = useParams<{ plate: string }>()
-  const navigate  = useNavigate()
-  const [v, setV]             = useState<Vehiculo | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [gallery, setGallery] = useState(0)
+  const { plate }  = useParams<{ plate: string }>()
+  const navigate   = useNavigate()
+  const { currentEmail } = useAuth()
+
+  const [v,           setV]           = useState<Vehiculo | null>(null)
+  const [loading,     setLoading]     = useState(true)
+  const [gallery,     setGallery]     = useState(0)
+  const [history,     setHistory]     = useState<ReservaHist[]>([])
+  const [activeResId, setActiveResId] = useState<string | null>(null)
+  const [working,     setWorking]     = useState(false)
+  const [successMsg,  setSuccessMsg]  = useState('')
+
+  // Taller form
+  const [showTallerForm, setShowTallerForm] = useState(false)
+  const [tallerNota,     setTallerNota]     = useState('')
 
   useEffect(() => {
     if (!plate) return
-    supabase
-      .from('vehiculos')
-      .select('*')
-      .eq('placa', plate)
-      .single()
-      .then(({ data, error }) => {
-        if (!error && data) setV(data)
+    db.from('vehiculos').select('*').eq('placa', plate).single()
+      .then(async ({ data, error }: any) => {
+        if (error || !data) { setLoading(false); return }
+        setV(data)
         setLoading(false)
+
+        // Load reservation history
+        const { data: hist } = await db
+          .from('reservas')
+          .select('id, fecha_entrega, fecha_devolucion, status, total, clientes(nombre)')
+          .eq('vehiculo_id', data.id)
+          .order('fecha_entrega', { ascending: false })
+          .limit(10)
+        setHistory(hist ?? [])
+
+        // Find active reservation for action buttons
+        const { data: active } = await db
+          .from('reservas')
+          .select('id')
+          .eq('vehiculo_id', data.id)
+          .in('status', ['confirmada', 'entregada'])
+          .order('fecha_entrega', { ascending: true })
+          .limit(1)
+          .maybeSingle()
+        if (active) setActiveResId(active.id)
       })
   }, [plate])
+
+  async function handleMarkListo() {
+    if (!v) return
+    setWorking(true)
+    await db.from('vehiculos').update({ status: 'disponible', cliente_actual: null, info_cliente: null }).eq('id', v.id)
+    await insertLog({
+      accion: 'vehiculo_listo',
+      entidad: 'vehiculos',
+      entidad_id: v.id,
+      descripcion: `${v.modelo} (${v.placa}) marcado como disponible desde taller`,
+      realizado_por: currentEmail,
+      datos_anteriores: { status: 'taller' },
+      datos_nuevos: { status: 'disponible' },
+    })
+    setV(prev => prev ? { ...prev, status: 'disponible', cliente_actual: null, info_cliente: null } : prev)
+    setSuccessMsg('Vehículo marcado como disponible.')
+    setWorking(false)
+  }
+
+  async function handleEnviarTaller() {
+    if (!v) return
+    setWorking(true)
+    const nota = tallerNota.trim() || null
+    await db.from('vehiculos').update({ status: 'taller', info_cliente: nota }).eq('id', v.id)
+    await insertLog({
+      accion: 'vehiculo_taller',
+      entidad: 'vehiculos',
+      entidad_id: v.id,
+      descripcion: `${v.modelo} (${v.placa}) enviado a taller${nota ? ` — ${nota}` : ''}`,
+      realizado_por: currentEmail,
+      datos_anteriores: { status: v.status },
+      datos_nuevos: { status: 'taller', info_cliente: nota },
+    })
+    setV(prev => prev ? { ...prev, status: 'taller', info_cliente: nota } : prev)
+    setShowTallerForm(false)
+    setTallerNota('')
+    setSuccessMsg('Vehículo enviado a taller.')
+    setWorking(false)
+  }
 
   if (loading) return (
     <div className="screen detail" style={{ opacity: 0.5 }}>
@@ -146,9 +229,8 @@ export default function VehicleDetailScreen() {
                 <span className={'dot ' + (STATUS_DOT[v.status] || 'neutral')} />
                 {STATUS_LABEL[v.status] ?? v.status}
               </span>
-              <span className="chip">{v.color}</span>
+              {v.color && <span className="chip">{v.color}</span>}
               {v.transmision && <span className="chip">{v.transmision}</span>}
-              <span className="chip">5 asientos</span>
             </div>
           </div>
         </div>
@@ -160,8 +242,8 @@ export default function VehicleDetailScreen() {
               <div>
                 <div className="eyebrow">Estado actual</div>
                 {v.status === 'rentado'    && <div className="detail-status">Rentado a <strong>{v.cliente_actual}</strong>{v.info_cliente ? ` · ${v.info_cliente}` : ''}</div>}
-                {v.status === 'taller'     && <div className="detail-status">En taller — {v.info_cliente}</div>}
-                {v.status === 'reservado'  && <div className="detail-status">Reservado · {v.info_cliente}</div>}
+                {v.status === 'taller'     && <div className="detail-status">En taller{v.info_cliente ? ` — ${v.info_cliente}` : ''}</div>}
+                {v.status === 'reservado'  && <div className="detail-status">Reservado{v.info_cliente ? ` · ${v.info_cliente}` : ''}</div>}
                 {v.status === 'disponible' && <div className="detail-status">Disponible para rentar</div>}
               </div>
               {v.tarifa_diaria != null && (
@@ -171,13 +253,83 @@ export default function VehicleDetailScreen() {
                 </div>
               )}
             </div>
+
+            {/* Success banner */}
+            {successMsg && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px',
+                background: 'oklch(95% 0.06 155)', borderRadius: 9,
+                border: '1px solid oklch(82% 0.1 155)', fontSize: 13,
+                color: 'var(--primary)', fontWeight: 600,
+              }}>
+                <Check size={14} />
+                {successMsg}
+              </div>
+            )}
+
+            {/* Taller note form */}
+            {showTallerForm && (
+              <div style={{
+                background: 'var(--paper-alt)', borderRadius: 10, padding: '12px 14px',
+                border: '1.5px solid var(--warn-line)', display: 'flex', flexDirection: 'column', gap: 10,
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink2)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <AlertTriangle size={14} color="var(--warn-ink)" />Enviar a taller
+                  </span>
+                  <button onClick={() => { setShowTallerForm(false); setTallerNota('') }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink3)', padding: 2 }}>
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="field" style={{ margin: 0 }}>
+                  <label className="field-l">Motivo / nota</label>
+                  <input className="field-i" value={tallerNota} onChange={e => setTallerNota(e.target.value)}
+                    placeholder="Ej. Cambio de aceite, revisión general…" autoFocus />
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn" style={{ flex: 1, justifyContent: 'center' }}
+                    onClick={() => { setShowTallerForm(false); setTallerNota('') }}>Cancelar</button>
+                  <button className="btn warn" style={{ flex: 2, justifyContent: 'center', background: 'oklch(96% 0.05 65)', borderColor: 'var(--warn-line)', color: 'var(--warn-ink)' }}
+                    onClick={handleEnviarTaller} disabled={working}>
+                    <Wrench size={14} />Confirmar envío
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="detail-btns">
-              {v.status === 'disponible' && <button className="btn primary"><Key size={15} />Crear reserva</button>}
-              {v.status === 'rentado'    && <button className="btn primary" onClick={() => navigate('/app/devolucion/3/1')}><Check size={15} />Registrar devolución</button>}
-              {v.status === 'reservado'  && <button className="btn primary"><Key size={15} />Entregar ahora</button>}
-              {v.status === 'taller'     && <button className="btn primary"><Check size={15} />Marcar listo</button>}
-              <button className="btn"><Wrench size={15} />Enviar a taller</button>
-              <button className="btn ghost"><FileText size={15} />Historial</button>
+              {/* Primary action depends on status */}
+              {v.status === 'disponible' && (
+                <button className="btn primary"
+                  onClick={() => navigate(`/app/reservations?new=1&vehiculoId=${v.id}&vehiculo=${encodeURIComponent(v.modelo)}&placa=${v.placa}`)}>
+                  <Key size={15} />Crear reserva
+                </button>
+              )}
+              {v.status === 'reservado' && (
+                <button className="btn primary" disabled={!activeResId || working}
+                  onClick={() => activeResId && navigate(`/app/entrega/${activeResId}/1`)}>
+                  <Key size={15} />{activeResId ? 'Entregar ahora' : 'Buscando reserva…'}
+                </button>
+              )}
+              {v.status === 'rentado' ? (
+                <button className="btn primary" disabled={!activeResId || working}
+                  onClick={() => activeResId && navigate(`/app/devolucion/${activeResId}/1`)}>
+                  <Check size={15} />{activeResId ? 'Registrar devolución' : 'Buscando reserva…'}
+                </button>
+              ) : null}
+              {v.status === 'taller' && (
+                <button className="btn primary" onClick={handleMarkListo} disabled={working}>
+                  <Check size={15} />Marcar como listo
+                </button>
+              )}
+
+              {/* Secondary: send to taller (not shown if already in taller) */}
+              {v.status !== 'taller' && !showTallerForm && (
+                <button className="btn" onClick={() => setShowTallerForm(true)} disabled={working}>
+                  <Wrench size={15} />Enviar a taller
+                </button>
+              )}
             </div>
           </div>
 
@@ -199,21 +351,30 @@ export default function VehicleDetailScreen() {
           </div>
 
           <div className="card detail-history">
-            <div className="eyebrow" style={{ marginBottom: 6 }}>Actividad reciente</div>
-            <div className="timeline">
-              {VEH_HISTORY.map((h, i) => (
-                <div key={i} className="tl-item">
-                  <span className={'tl-dot dot ' + h.dot} />
-                  <div className="tl-body">
-                    <div className="tl-row1">
-                      <strong>{h.t}</strong>
-                      <span className="tl-date">{h.d}</span>
+            <div className="eyebrow" style={{ marginBottom: 6 }}>Historial de rentas</div>
+            {history.length === 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--ink3)', padding: '8px 0' }}>Sin rentas registradas.</p>
+            ) : (
+              <div className="timeline">
+                {history.map(r => (
+                  <div key={r.id} className="tl-item">
+                    <span className={`tl-dot dot ${RES_STATUS_DOT[r.status] ?? 'neutral'}`} />
+                    <div className="tl-body">
+                      <div className="tl-row1">
+                        <strong>{RES_STATUS_LABEL[r.status] ?? r.status}</strong>
+                        <span className="tl-date">{fmtDate(r.fecha_entrega)}</span>
+                      </div>
+                      <div className="tl-note">
+                        {r.clientes?.nombre ?? 'Cliente desconocido'}
+                        {' · '}
+                        {fmtDate(r.fecha_entrega)} → {fmtDate(r.fecha_devolucion)}
+                        {r.total != null ? ` · $${fmt(r.total)}` : ''}
+                      </div>
                     </div>
-                    <div className="tl-note">{h.who} · {h.note}</div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

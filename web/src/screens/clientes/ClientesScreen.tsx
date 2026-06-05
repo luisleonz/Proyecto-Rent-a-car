@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Plus, Phone, X, Check, ChevronRight, Pencil } from 'lucide-react'
+import { Search, Plus, Phone, Mail, CreditCard, MapPin, X, Check, ChevronRight, Pencil } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
 import { insertLog } from '../../lib/log'
@@ -12,6 +12,9 @@ type Cliente = {
   id: string
   nombre: string
   telefono: string | null
+  email: string | null
+  licencia: string | null
+  direccion: string | null
   created_at: string
 }
 
@@ -50,17 +53,25 @@ function AgregarClientePanel({ open, onClose, onCreated }: {
   const { currentEmail } = useAuth()
   const [nombre,   setNombre]   = useState('')
   const [telefono, setTelefono] = useState('')
+  const [email,    setEmail]    = useState('')
+  const [licencia, setLicencia] = useState('')
+  const [direccion,setDireccion]= useState('')
   const [saving,   setSaving]   = useState(false)
   const [error,    setError]    = useState('')
 
-  function reset() { setNombre(''); setTelefono(''); setError('') }
+  function reset() {
+    setNombre(''); setTelefono(''); setEmail(''); setLicencia(''); setDireccion(''); setError('')
+  }
 
   async function handleGuardar() {
     if (!nombre.trim()) { setError('El nombre es obligatorio'); return }
     setSaving(true); setError('')
     const { data, error: err } = await db.from('clientes').insert({
-      nombre: nombre.trim(),
+      nombre:   nombre.trim(),
       telefono: telefono.trim() || null,
+      email:    email.trim()    || null,
+      licencia: licencia.trim() || null,
+      direccion:direccion.trim()|| null,
     }).select().single()
     setSaving(false)
     if (err) { setError(err.message); return }
@@ -99,6 +110,11 @@ function AgregarClientePanel({ open, onClose, onCreated }: {
             <input className="field-i" value={nombre} onChange={e => setNombre(e.target.value)}
               placeholder="Nombre apellido" autoFocus />
           </div>
+
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: -4 }}>
+            Contacto
+          </div>
+
           <div className="field">
             <label className="field-l">
               Teléfono <span style={{ color: 'var(--ink4)', fontWeight: 400 }}>(requerido para reservas)</span>
@@ -106,9 +122,31 @@ function AgregarClientePanel({ open, onClose, onCreated }: {
             <input className="field-i" value={telefono} onChange={e => setTelefono(e.target.value)}
               placeholder="+52 631..." inputMode="tel" />
           </div>
-          <div style={{ fontSize: 12.5, color: 'var(--ink3)', lineHeight: 1.5, padding: '4px 0' }}>
-            Puedes completar los datos adicionales (INE, licencia, etc.) antes de la entrega del vehículo.
+          <div className="field">
+            <label className="field-l">Correo electrónico</label>
+            <input className="field-i" value={email} onChange={e => setEmail(e.target.value)}
+              placeholder="correo@ejemplo.com" type="email" inputMode="email" />
           </div>
+          <div className="field">
+            <label className="field-l">Dirección</label>
+            <input className="field-i" value={direccion} onChange={e => setDireccion(e.target.value)}
+              placeholder="Calle, número, colonia…" />
+          </div>
+
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: -4 }}>
+            Documentos
+          </div>
+
+          <div className="field">
+            <label className="field-l">Número de licencia</label>
+            <input className="field-i" value={licencia} onChange={e => setLicencia(e.target.value)}
+              placeholder="Número de licencia de manejo" />
+          </div>
+
+          <div style={{ fontSize: 12, color: 'var(--ink3)', lineHeight: 1.5, padding: '2px 0' }}>
+            Solo nombre es obligatorio. El resto puede completarse antes de la entrega del vehículo.
+          </div>
+
           {error && (
             <div style={{ fontSize: 13, color: '#c0392b', padding: '8px 12px', borderRadius: 8, background: 'oklch(96% 0.03 20)' }}>
               {error}
@@ -136,13 +174,16 @@ function ClienteDetail({ cliente, onNewReserva, onCotizar, onUpdated }: {
   onUpdated: (c: Cliente) => void
 }) {
   const { currentEmail } = useAuth()
-  const [reservas,  setReservas]  = useState<ReservaResumen[]>([])
-  const [loading,   setLoading]   = useState(true)
+  const [reservas, setReservas] = useState<ReservaResumen[]>([])
+  const [loading,  setLoading]  = useState(true)
 
   // Edit state
   const [editing,    setEditing]    = useState(false)
   const [editNombre, setEditNombre] = useState('')
   const [editTel,    setEditTel]    = useState('')
+  const [editEmail,  setEditEmail]  = useState('')
+  const [editLic,    setEditLic]    = useState('')
+  const [editDir,    setEditDir]    = useState('')
   const [editSaving, setEditSaving] = useState(false)
   const [editError,  setEditError]  = useState('')
 
@@ -163,6 +204,9 @@ function ClienteDetail({ cliente, onNewReserva, onCotizar, onUpdated }: {
   function startEdit() {
     setEditNombre(cliente.nombre)
     setEditTel(cliente.telefono ?? '')
+    setEditEmail(cliente.email ?? '')
+    setEditLic(cliente.licencia ?? '')
+    setEditDir(cliente.direccion ?? '')
     setEditError('')
     setEditing(true)
   }
@@ -171,7 +215,13 @@ function ClienteDetail({ cliente, onNewReserva, onCotizar, onUpdated }: {
     if (!editNombre.trim()) { setEditError('El nombre es obligatorio'); return }
     setEditSaving(true); setEditError('')
     const { data, error: err } = await db.from('clientes')
-      .update({ nombre: editNombre.trim(), telefono: editTel.trim() || null })
+      .update({
+        nombre:   editNombre.trim(),
+        telefono: editTel.trim()   || null,
+        email:    editEmail.trim() || null,
+        licencia: editLic.trim()   || null,
+        direccion:editDir.trim()   || null,
+      })
       .eq('id', cliente.id)
       .select().single()
     setEditSaving(false)
@@ -189,7 +239,7 @@ function ClienteDetail({ cliente, onNewReserva, onCotizar, onUpdated }: {
     onUpdated(data as Cliente)
   }
 
-  const activa  = reservas.find(r => r.status === 'confirmada' || r.status === 'entregada')
+  const activa = reservas.find(r => r.status === 'confirmada' || r.status === 'entregada')
   const totalFacturado = reservas.reduce((s, r) => s + (r.total ?? 0), 0)
 
   return (
@@ -233,6 +283,18 @@ function ClienteDetail({ cliente, onNewReserva, onCotizar, onUpdated }: {
             <label className="field-l">Teléfono</label>
             <input className="field-i" value={editTel} onChange={e => setEditTel(e.target.value)} inputMode="tel" placeholder="+52 631..." />
           </div>
+          <div className="field">
+            <label className="field-l">Correo electrónico</label>
+            <input className="field-i" value={editEmail} onChange={e => setEditEmail(e.target.value)} type="email" placeholder="correo@ejemplo.com" />
+          </div>
+          <div className="field">
+            <label className="field-l">Dirección</label>
+            <input className="field-i" value={editDir} onChange={e => setEditDir(e.target.value)} placeholder="Calle, número, colonia…" />
+          </div>
+          <div className="field">
+            <label className="field-l">Número de licencia</label>
+            <input className="field-i" value={editLic} onChange={e => setEditLic(e.target.value)} placeholder="Número de licencia" />
+          </div>
           {editError && (
             <div style={{ fontSize: 12.5, color: '#c0392b', padding: '6px 10px', borderRadius: 7, background: 'oklch(96% 0.03 20)' }}>
               {editError}
@@ -272,15 +334,18 @@ function ClienteDetail({ cliente, onNewReserva, onCotizar, onUpdated }: {
         <div className="eyebrow" style={{ marginBottom: 6 }}>Datos de contacto</div>
         <div className="cli-data">
           {cliente.telefono ? (
-            <div className="cli-data-row">
-              <Phone size={15} />
-              <span>{cliente.telefono}</span>
-            </div>
+            <div className="cli-data-row"><Phone size={15} /><span>{cliente.telefono}</span></div>
           ) : (
-            <div className="cli-data-row" style={{ color: 'var(--ink4)' }}>
-              <Phone size={15} />
-              <span>Sin teléfono registrado</span>
-            </div>
+            <div className="cli-data-row" style={{ color: 'var(--ink4)' }}><Phone size={15} /><span>Sin teléfono</span></div>
+          )}
+          {cliente.email && (
+            <div className="cli-data-row"><Mail size={15} /><span>{cliente.email}</span></div>
+          )}
+          {cliente.direccion && (
+            <div className="cli-data-row"><MapPin size={15} /><span>{cliente.direccion}</span></div>
+          )}
+          {cliente.licencia && (
+            <div className="cli-data-row"><CreditCard size={15} /><span>Licencia: {cliente.licencia}</span></div>
           )}
         </div>
       </div>
@@ -371,6 +436,24 @@ export default function ClientesScreen() {
     setSelected(updated)
   }
 
+  function goToReserva(c: Cliente) {
+    const params = new URLSearchParams({
+      new: '1',
+      clienteId: c.id,
+      nombre: c.nombre,
+      ...(c.telefono ? { telefono: c.telefono } : {}),
+    })
+    navigate(`/app/reservations?${params.toString()}`)
+  }
+
+  function goToCotizar(c: Cliente) {
+    const params = new URLSearchParams({
+      nombre: c.nombre,
+      ...(c.telefono ? { telefono: c.telefono } : {}),
+    })
+    navigate(`/app/cotizaciones?${params.toString()}`)
+  }
+
   const filtered = query.trim()
     ? clientes.filter(c =>
         c.nombre.toLowerCase().includes(query.toLowerCase()) ||
@@ -449,8 +532,8 @@ export default function ClientesScreen() {
         {selected ? (
           <ClienteDetail
             cliente={selected}
-            onNewReserva={() => navigate(`/app/reservations?new=1`)}
-            onCotizar={() => navigate('/app/cotizaciones')}
+            onNewReserva={() => goToReserva(selected)}
+            onCotizar={() => goToCotizar(selected)}
             onUpdated={handleUpdated}
           />
         ) : (

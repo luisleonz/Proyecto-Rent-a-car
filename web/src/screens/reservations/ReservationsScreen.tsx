@@ -346,7 +346,10 @@ const inits = (n: string) => {
   return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '?'
 }
 
-function NuevaReservaModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
+function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente }: {
+  open: boolean; onClose: () => void; onCreated: () => void
+  prefilledCliente?: { id: string; nombre: string; telefono: string | null } | null
+}) {
   const { currentEmail } = useAuth()
   // Client search
   const [clientSearch,     setClientSearch]     = useState('')
@@ -354,6 +357,15 @@ function NuevaReservaModal({ open, onClose, onCreated }: { open: boolean; onClos
   const [showClientDrop,   setShowClientDrop]    = useState(false)
   const [selectedCliente,  setSelectedCliente]   = useState<ClienteOption | null>(null)
   const [clienteTel,       setClienteTel]        = useState('')
+
+  // Pre-fill from client navigation
+  useEffect(() => {
+    if (open && prefilledCliente) {
+      setSelectedCliente(prefilledCliente)
+      setClientSearch(prefilledCliente.nombre)
+      setClienteTel(prefilledCliente.telefono ?? '')
+    }
+  }, [open, prefilledCliente?.id])
 
   // Dates
   const [fechaEntrega, setFechaEntrega] = useState('')
@@ -759,10 +771,17 @@ export default function ReservationsScreen() {
   const [panelRes, setPanelRes]         = useState<ReservaConDetalle | null>(null)
   const [panelOpen, setPanelOpen]       = useState(false)
   const [modalOpen, setModalOpen]       = useState(false)
+  const [prefilledCliente, setPrefilledCliente] = useState<{ id: string; nombre: string; telefono: string | null } | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
 
   useEffect(() => {
     if (searchParams.get('new') === '1') {
+      const clienteId = searchParams.get('clienteId')
+      const nombre    = searchParams.get('nombre')
+      const telefono  = searchParams.get('telefono')
+      if (clienteId && nombre) {
+        setPrefilledCliente({ id: clienteId, nombre, telefono: telefono || null })
+      }
       setModalOpen(true)
       setSearchParams({}, { replace: true })
     }
@@ -861,8 +880,9 @@ export default function ReservationsScreen() {
 
       <NuevaReservaModal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => { setModalOpen(false); setPrefilledCliente(null) }}
         onCreated={fetchReservas}
+        prefilledCliente={prefilledCliente}
       />
     </div>
   )

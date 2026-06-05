@@ -32,13 +32,17 @@ export interface Database {
       }
       clientes: {
         Row: {
-          id: string; nombre: string; telefono: string | null; created_at: string
+          id: string; nombre: string; telefono: string | null
+          email: string | null; licencia: string | null; direccion: string | null
+          created_at: string
         }
         Insert: {
           nombre: string; telefono?: string | null
+          email?: string | null; licencia?: string | null; direccion?: string | null
         }
         Update: {
           nombre?: string; telefono?: string | null
+          email?: string | null; licencia?: string | null; direccion?: string | null
         }
       }
       reservas: {

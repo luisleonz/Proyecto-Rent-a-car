@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Check, Download, MessageCircle, X, ArrowRight, RefreshCw } from 'lucide-react'
 import jsPDF from 'jspdf'
 import { supabase } from '../../lib/supabase'
@@ -515,8 +516,9 @@ function VehOption({ v, selected, onSelect }: { v: Vehiculo; selected: boolean; 
 /* ─── Main screen ───────────────────────────────────────────── */
 export default function CotizacionesScreen() {
   const { currentEmail } = useAuth()
-  const [clientName, setClientName]     = useState('')
-  const [clientPhone, setClientPhone]   = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [clientName, setClientName]     = useState(() => searchParams.get('nombre') ?? '')
+  const [clientPhone, setClientPhone]   = useState(() => searchParams.get('telefono') ?? '')
   const [days, setDays]                 = useState(3)
   const [discount, setDiscount]         = useState('')
   const [selectedId, setSelectedId]     = useState<string>('')
@@ -528,6 +530,12 @@ export default function CotizacionesScreen() {
   const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([])
   const [panelOpen, setPanelOpen]       = useState(false)
   const [panelCot, setPanelCot]         = useState<Cotizacion | null>(null)
+
+  useEffect(() => {
+    if (searchParams.get('nombre') || searchParams.get('telefono')) {
+      setSearchParams({}, { replace: true })
+    }
+  }, [])
 
   useEffect(() => {
     supabase

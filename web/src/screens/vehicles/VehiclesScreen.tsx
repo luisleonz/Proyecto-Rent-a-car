@@ -132,18 +132,78 @@ function SkeletonCard() {
   )
 }
 
+/* ─── Basic color list ───────────────────────────────────────── */
+const BASIC_COLORS = [
+  'Blanco', 'Negro', 'Plata', 'Gris', 'Rojo', 'Azul',
+  'Azul Marino', 'Beige', 'Verde', 'Naranja', 'Amarillo', 'Café', 'Morado',
+]
+const COLOR_DOT: Record<string, string> = {
+  'Blanco': '#F0F0F0', 'Negro': '#1C1C1C', 'Plata': '#C4C4D0', 'Gris': '#808090',
+  'Rojo': '#C82000', 'Azul': '#1A5ECC', 'Azul Marino': '#1A2868', 'Beige': '#CEB490',
+  'Verde': '#28742A', 'Naranja': '#D85800', 'Amarillo': '#CCA800', 'Café': '#6A4828',
+  'Morado': '#683DA0',
+}
+
+/* ─── Combobox ───────────────────────────────────────────────── */
+function Combobox({ label, value, onChange, suggestions, placeholder, required }: {
+  label: string; value: string; onChange: (v: string) => void
+  suggestions: string[]; placeholder: string; required?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const filtered = suggestions
+    .filter(s => s.toLowerCase() !== value.toLowerCase())
+    .filter(s => !value || s.toLowerCase().includes(value.toLowerCase()))
+    .slice(0, 7)
+
+  return (
+    <div className="field">
+      <label className="field-l">{label}{required ? ' *' : ''}</label>
+      <input
+        className="field-i"
+        value={value}
+        onChange={e => { onChange(e.target.value); setOpen(true) }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder={placeholder}
+      />
+      {open && filtered.length > 0 && (
+        <div style={{
+          background: 'var(--paper)', border: '1.5px solid var(--border)',
+          borderRadius: 10, overflow: 'hidden', marginTop: 4,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+        }}>
+          {filtered.map(s => (
+            <button key={s}
+              onMouseDown={() => { onChange(s); setOpen(false) }}
+              style={{
+                display: 'block', width: '100%', textAlign: 'left',
+                padding: '9px 14px', fontSize: 13.5, background: 'none',
+                border: 'none', borderBottom: '1px solid var(--line)',
+                cursor: 'pointer', color: 'var(--ink)',
+              }}>{s}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ─── Agregar vehículo panel ─────────────────────────────────── */
 interface AgregarPanelProps {
   open: boolean
   onClose: () => void
   onCreated: () => void
+  fleet: Vehiculo[]
 }
 
-function AgregarPanel({ open, onClose, onCreated }: AgregarPanelProps) {
+function AgregarPanel({ open, onClose, onCreated, fleet }: AgregarPanelProps) {
   const [placa,       setPlaca]       = useState('')
-  const [modelo,      setModelo]      = useState('')
+  const [marca,       setMarca]       = useState('')
+  const [modeloNom,   setModeloNom]   = useState('')
   const [anio,        setAnio]        = useState(String(new Date().getFullYear()))
-  const [color,       setColor]       = useState('')
+  const [colorPick,   setColorPick]   = useState('')
+  const [colorCustom, setColorCustom] = useState(false)
+  const [colorText,   setColorText]   = useState('')
   const [tono,        setTono]        = useState('slate')
   const [segmento,    setSegmento]    = useState('Sedán')
   const [transmision, setTransmision] = useState('Automático')
@@ -153,18 +213,34 @@ function AgregarPanel({ open, onClose, onCreated }: AgregarPanelProps) {
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
 
+  // Derived from fleet
+  const existingBrands = [...new Set(fleet.map(v => v.modelo.split(' ')[0]).filter(Boolean))].sort()
+  const existingModels = marca
+    ? [...new Set(
+        fleet
+          .filter(v => v.modelo.toLowerCase().startsWith(marca.toLowerCase() + ' '))
+          .map(v => v.modelo.trim().substring(marca.trim().length).trim())
+      )].filter(Boolean).sort()
+    : []
+
+  const color  = colorCustom ? colorText : colorPick
+  const modelo = `${marca.trim()} ${modeloNom.trim()}`.trim()
+
   function reset() {
-    setPlaca(''); setModelo(''); setAnio(String(new Date().getFullYear()))
-    setColor(''); setTono('slate'); setSegmento('Sedán'); setTransmision('Automático')
-    setTarifa(''); setKm('0'); setCombustible('100'); setError('')
+    setPlaca(''); setMarca(''); setModeloNom(''); setAnio(String(new Date().getFullYear()))
+    setColorPick(''); setColorCustom(false); setColorText(''); setTono('slate')
+    setSegmento('Sedán'); setTransmision('Automático'); setTarifa('')
+    setKm('0'); setCombustible('100'); setError('')
   }
 
   async function handleGuardar() {
-    if (!placa.trim() || !modelo.trim()) { setError('Placa y modelo son obligatorios'); return }
+    if (!placa.trim() || !marca.trim() || !modeloNom.trim()) {
+      setError('Placa, marca y modelo son obligatorios'); return
+    }
     setSaving(true); setError('')
     const { error: err } = await db.from('vehiculos').insert({
       placa:        placa.trim().toUpperCase(),
-      modelo:       modelo.trim(),
+      modelo:       modelo,
       anio:         parseInt(anio) || null,
       color:        color.trim() || null,
       tono:         tono,
@@ -202,7 +278,7 @@ function AgregarPanel({ open, onClose, onCreated }: AgregarPanelProps) {
         </div>
 
         <div className="qpanel-body" style={{ gap: 14 }}>
-          {/* Color preview */}
+          {/* Preview */}
           <div style={{
             height: 64, borderRadius: 10, background: previewTone[1],
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -211,37 +287,76 @@ function AgregarPanel({ open, onClose, onCreated }: AgregarPanelProps) {
             {modelo || 'Vista previa'} · {placa || 'PLACA'}
           </div>
 
-          {/* Placa + Modelo */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10 }}>
+          {/* Placa + Año */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div className="field">
               <label className="field-l">Placa *</label>
               <input className="field-i" placeholder="ABC-123" value={placa}
                 onChange={e => setPlaca(e.target.value)} style={{ textTransform: 'uppercase' }} />
             </div>
             <div className="field">
-              <label className="field-l">Modelo *</label>
-              <input className="field-i" placeholder="Nissan Versa" value={modelo}
-                onChange={e => setModelo(e.target.value)} />
-            </div>
-          </div>
-
-          {/* Año + Color */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div className="field">
               <label className="field-l">Año</label>
               <input className="field-i" placeholder="2024" value={anio} inputMode="numeric"
                 onChange={e => setAnio(e.target.value.replace(/\D/g, ''))} />
             </div>
-            <div className="field">
-              <label className="field-l">Color</label>
-              <input className="field-i" placeholder="Blanco" value={color}
-                onChange={e => setColor(e.target.value)} />
+          </div>
+
+          {/* Marca combobox */}
+          <Combobox
+            label="Marca" value={marca} onChange={v => { setMarca(v); setModeloNom('') }}
+            suggestions={existingBrands} placeholder="Nissan, Toyota, Kia…" required
+          />
+
+          {/* Modelo combobox */}
+          <Combobox
+            label="Modelo" value={modeloNom} onChange={setModeloNom}
+            suggestions={existingModels}
+            placeholder={marca ? `Modelo para ${marca}` : 'Selecciona primero la marca'}
+            required
+          />
+
+          {/* Color */}
+          <div className="field">
+            <label className="field-l">Color</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: colorCustom ? 8 : 0 }}>
+              {BASIC_COLORS.map(c => {
+                const active = !colorCustom && colorPick === c
+                return (
+                  <button key={c} onClick={() => { setColorPick(c); setColorCustom(false) }}
+                    style={{
+                      padding: '5px 10px', borderRadius: 20, fontSize: 12.5, fontWeight: 600,
+                      border: '1.5px solid', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                      borderColor: active ? 'var(--primary)' : 'var(--line)',
+                      background: active ? 'var(--primary-soft)' : 'transparent',
+                      color: active ? 'var(--primary)' : 'var(--ink2)',
+                    }}>
+                    <span style={{
+                      width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
+                      background: COLOR_DOT[c] ?? '#888',
+                      border: '1px solid rgba(0,0,0,0.15)', display: 'inline-block',
+                    }} />
+                    {c}
+                  </button>
+                )
+              })}
+              <button onClick={() => { setColorCustom(true); setColorPick('') }}
+                style={{
+                  padding: '5px 10px', borderRadius: 20, fontSize: 12.5, fontWeight: 600,
+                  border: '1.5px solid', cursor: 'pointer',
+                  borderColor: colorCustom ? 'var(--primary)' : 'var(--line)',
+                  background: colorCustom ? 'var(--primary-soft)' : 'transparent',
+                  color: colorCustom ? 'var(--primary)' : 'var(--ink2)',
+                }}>Otro</button>
             </div>
+            {colorCustom && (
+              <input className="field-i" value={colorText} onChange={e => setColorText(e.target.value)}
+                placeholder="Escribe el color…" autoFocus />
+            )}
           </div>
 
           {/* Tono SVG */}
           <div className="field">
-            <label className="field-l">Tono (color del ícono)</label>
+            <label className="field-l">Tono del ícono</label>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {Object.entries(TONE_LABELS).map(([key, label]) => (
                 <button key={key} onClick={() => setTono(key)}
@@ -361,7 +476,7 @@ export default function VehiclesScreen() {
 
   return (
     <div className="screen">
-      <AgregarPanel open={panelOpen} onClose={() => setPanelOpen(false)} onCreated={fetchFleet} />
+      <AgregarPanel open={panelOpen} onClose={() => setPanelOpen(false)} onCreated={fetchFleet} fleet={fleet} />
 
       {/* Page head */}
       <div className="pagehead">

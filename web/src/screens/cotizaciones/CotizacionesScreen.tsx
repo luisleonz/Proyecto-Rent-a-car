@@ -624,14 +624,30 @@ export default function CotizacionesScreen() {
   }
 
   async function handleConvert(cot: Cotizacion, fechaEntrega: string, fechaDevolucion: string, deposito: number, metodoDeposito: string | null): Promise<string | null> {
-    const { data: cliente, error: clienteErr } = await db.from('clientes').insert({
-      nombre: cot.cliente_nombre,
-      telefono: cot.cliente_telefono ?? null,
-    }).select().single()
-    if (clienteErr) return `Error al crear cliente: ${clienteErr.message}`
+    // Find-or-create client: search by phone first, then by name, else insert
+    let clienteId: string | null = null
+
+    if (cot.cliente_telefono?.trim()) {
+      const { data: found } = await db.from('clientes').select('id')
+        .eq('telefono', cot.cliente_telefono.trim()).maybeSingle()
+      if (found) clienteId = found.id
+    }
+    if (!clienteId) {
+      const { data: found } = await db.from('clientes').select('id')
+        .ilike('nombre', cot.cliente_nombre.trim()).maybeSingle()
+      if (found) clienteId = found.id
+    }
+    if (!clienteId) {
+      const { data: nuevo, error: clienteErr } = await db.from('clientes').insert({
+        nombre: cot.cliente_nombre,
+        telefono: cot.cliente_telefono ?? null,
+      }).select('id').single()
+      if (clienteErr) return `Error al crear cliente: ${clienteErr.message}`
+      clienteId = nuevo?.id ?? null
+    }
 
     const { data: reserva, error: reservaErr } = await db.from('reservas').insert({
-      cliente_id: cliente?.id ?? null,
+      cliente_id: clienteId,
       vehiculo_id: cot.vehiculo_id ?? null,
       fecha_entrega: fechaEntrega,
       fecha_devolucion: fechaDevolucion,

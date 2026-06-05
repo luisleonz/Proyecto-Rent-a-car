@@ -208,10 +208,45 @@ function ReservaPanel({ res, open, onClose, onSolicitudCreada }: PanelProps) {
                     <span className="val">{fmtDate(res.fecha_devolucion)}</span>
                   </div>
                   {res.total != null && (
-                    <div className="qpanel-total-row" style={{ marginTop: 8 }}>
-                      <span className="lbl">Total</span>
-                      <span className="val">${fmt(res.total)}</span>
-                    </div>
+                    <>
+                      <div className="qpanel-row" style={{ marginTop: 8 }}>
+                        <span className="lbl">Total de la renta</span>
+                        <span className="val">${fmt(res.total)}</span>
+                      </div>
+                      {res.deposito > 0 && (
+                        <div className="qpanel-row">
+                          <span className="lbl" style={{ color: 'var(--primary)' }}>Depósito pagado</span>
+                          <span className="val" style={{ color: 'var(--primary)' }}>-${fmt(res.deposito)}</span>
+                        </div>
+                      )}
+                      {res.deposito > 0 && (
+                        <div style={{
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          marginTop: 6, padding: '10px 12px', borderRadius: 9,
+                          background: res.deposito >= res.total
+                            ? 'oklch(95% 0.06 155)'
+                            : 'oklch(96% 0.06 60)',
+                          border: `1px solid ${res.deposito >= res.total
+                            ? 'oklch(82% 0.1 155)'
+                            : 'oklch(82% 0.12 60)'}`,
+                        }}>
+                          <span style={{
+                            fontSize: 13, fontWeight: 600,
+                            color: res.deposito >= res.total ? 'var(--primary)' : 'oklch(0.45 0.14 60)',
+                          }}>
+                            {res.deposito >= res.total ? 'Pagado en su totalidad' : 'Saldo pendiente'}
+                          </span>
+                          <span style={{
+                            fontSize: 16, fontWeight: 800,
+                            color: res.deposito >= res.total ? 'var(--primary)' : 'oklch(0.45 0.14 60)',
+                          }}>
+                            {res.deposito >= res.total
+                              ? '✓ $0'
+                              : `$${fmt(res.total - res.deposito)}`}
+                          </span>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               ) : (
@@ -661,30 +696,55 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente }: {
           )}
 
           {/* ── Calculation ── */}
-          {showCalc && (
-            <div style={{
-              background: 'var(--paper-alt)', borderRadius: 12, padding: '14px 16px',
-              display: 'flex', flexDirection: 'column', gap: 8,
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--ink3)' }}>
-                <span>{dias} {dias === 1 ? 'día' : 'días'} × ${fmt(tarifa)}/día</span>
-                <span>${fmt(subtotal)}</span>
-              </div>
-              {descNum > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--warn-ink)' }}>
-                  <span>Descuento</span>
-                  <span>-${fmt(descNum)}</span>
-                </div>
-              )}
+          {showCalc && (() => {
+            const depNum   = tieneDeposito ? (Number(deposito) || 0) : 0
+            const saldo    = Math.max(0, total - depNum)
+            return (
               <div style={{
-                display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 700, color: 'var(--ink)',
-                borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 2,
+                background: 'var(--paper-alt)', borderRadius: 12, padding: '14px 16px',
+                display: 'flex', flexDirection: 'column', gap: 8,
               }}>
-                <span>Total</span>
-                <span>${fmt(total)}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--ink3)' }}>
+                  <span>{dias} {dias === 1 ? 'día' : 'días'} × ${fmt(tarifa)}/día</span>
+                  <span>${fmt(subtotal)}</span>
+                </div>
+                {descNum > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--warn-ink)' }}>
+                    <span>Descuento</span>
+                    <span>-${fmt(descNum)}</span>
+                  </div>
+                )}
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, color: 'var(--ink)',
+                  borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 2,
+                }}>
+                  <span>Total</span>
+                  <span>${fmt(total)}</span>
+                </div>
+                {depNum > 0 && (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--primary)' }}>
+                      <span>Depósito de apartado</span>
+                      <span>-${fmt(depNum)}</span>
+                    </div>
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '9px 12px', borderRadius: 8,
+                      background: saldo === 0 ? 'oklch(95% 0.06 155)' : 'oklch(96% 0.06 60)',
+                      border: `1px solid ${saldo === 0 ? 'oklch(82% 0.1 155)' : 'oklch(82% 0.12 60)'}`,
+                    }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: saldo === 0 ? 'var(--primary)' : 'oklch(0.45 0.14 60)' }}>
+                        {saldo === 0 ? 'Liquidado' : 'Saldo pendiente al entregar'}
+                      </span>
+                      <span style={{ fontSize: 15, fontWeight: 800, color: saldo === 0 ? 'var(--primary)' : 'oklch(0.45 0.14 60)' }}>
+                        {saldo === 0 ? '✓ $0' : `$${fmt(saldo)}`}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
-            </div>
-          )}
+            )
+          })()}
 
           {/* ── Discount ── */}
           {showCalc && (

@@ -9,7 +9,7 @@ import type { Reserva, Cliente, Vehiculo } from '../../lib/database.types'
 const db = supabase as any // eslint-disable-line @typescript-eslint/no-explicit-any
 
 // Private bucket: only logged-in employees can read it (see supabase_seguridad.sql).
-const FIRMA_BUCKET = 'privado'
+const FIRMA_BUCKET = 'Firma'
 const FIRMA_PATH = 'firma-arrendador.png'
 
 export type ReservaContrato = Reserva & { clientes: Cliente | null; vehiculos: Vehiculo | null }

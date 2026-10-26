@@ -6,7 +6,7 @@
 -- Qué hace:
 --  1. Solo usuarios con sesión iniciada (empleados) pueden leer o escribir las tablas.
 --     Sin esto, la llave pública del sitio web permite leer todos los datos.
---  2. Crea el almacenamiento privado "privado" para la firma del arrendador.
+--  2. Deja el almacenamiento "Firma" (firma del arrendador) privado y legible solo por empleados.
 --
 -- Además, en el panel de Supabase: Authentication → Sign In / Providers →
 -- desactivar "Allow new users to sign up", para que nadie pueda crearse una cuenta
@@ -24,11 +24,12 @@ begin
 end $$;
 
 insert into storage.buckets (id, name, public)
-values ('privado', 'privado', false)
+values ('Firma', 'Firma', false)
 on conflict (id) do update set public = false;
 
 drop policy if exists empleados_leen_privado on storage.objects;
-create policy empleados_leen_privado on storage.objects
-  for select to authenticated using (bucket_id = 'privado');
+drop policy if exists empleados_leen_firma on storage.objects;
+create policy empleados_leen_firma on storage.objects
+  for select to authenticated using (bucket_id = 'Firma');
 
--- Después: Storage → privado → Upload file → subir "firma-arrendador.png" (con ese nombre exacto).
+-- Después: Storage → Firma → Upload file → subir "firma-arrendador.png" (con ese nombre exacto).

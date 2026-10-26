@@ -5,6 +5,7 @@ import jsPDF from 'jspdf'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
 import { insertLog } from '../../lib/log'
+import { isoLocal } from '../../lib/fechas'
 import type { Vehiculo, Cotizacion, CotizacionStatus } from '../../lib/database.types'
 
 const db = supabase as any
@@ -214,7 +215,7 @@ function cotizacionToQuoteData(cot: Cotizacion): QuoteData {
 }
 
 /* ─── Quote detail panel ────────────────────────────────────── */
-const toDateInput = (d: Date) => d.toISOString().split('T')[0]
+const toDateInput = isoLocal
 
 interface PanelProps {
   cot: Cotizacion | null

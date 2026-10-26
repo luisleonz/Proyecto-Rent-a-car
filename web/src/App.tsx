@@ -26,6 +26,7 @@ import EmpleadosScreen from './screens/empleados/EmpleadosScreen'
 import AutorizacionesScreen from './screens/autorizaciones/AutorizacionesScreen'
 import EditProfileScreen from './screens/more/EditProfileScreen'
 import ContratoPrint from './screens/print/ContratoPrint'
+import CalendarioScreen from './screens/calendario/CalendarioScreen'
 import { CajaTurnoScreen, CajaCierreScreen, CajaJustificacionScreen, CajaOkScreen } from './screens/caja/CajaFlow'
 import { EntregaStep1Screen, EntregaStep2Screen, EntregaStep3Screen, EntregaOkScreen } from './screens/flows/EntregaFlow'
 import { DevolucionStep1Screen, DevolucionStep2Screen, DevolucionStep3Screen, DevolucionOkScreen } from './screens/flows/DevolucionFlow'
@@ -57,6 +58,7 @@ function AppLayout() {
     '/app/home':         ['Inicio', '12 movimientos hoy'],
     '/app/reservations': ['Reservas', '14 movimientos'],
     '/app/cotizaciones': ['Cotizaciones', 'Cotizador rápido'],
+    '/app/calendario':   ['Calendario', 'Disponibilidad de la flota'],
     '/app/vehicles':     ['Vehículos', '12 unidades'],
     '/app/more':         ['Ajustes', ''],
     '/app/caja':         ['Caja', '22 may · turno T1'],
@@ -92,6 +94,7 @@ function AppLayout() {
             <Route path="home"              element={<HomeScreen />} />
             <Route path="reservations"      element={<ReservationsScreen />} />
             <Route path="cotizaciones"      element={<CotizacionesScreen />} />
+            <Route path="calendario"        element={<CalendarioScreen />} />
             <Route path="vehicles"          element={<VehiclesScreen />} />
             <Route path="vehicles/:plate"   element={<VehicleDetailScreen />} />
             <Route path="more"              element={<MoreScreen />} />

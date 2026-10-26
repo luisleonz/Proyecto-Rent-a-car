@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
 import { insertLog } from '../../lib/log'
 import { EMPRESA } from '../../lib/empresa'
+import { hoyISO, addDias } from '../../lib/fechas'
 import type { ReservaConDetalle, ReservaStatus, Cobertura } from '../../lib/database.types'
 
 /* ─── Constants ─────────────────────────────────────────────── */
@@ -420,10 +421,11 @@ const inits = (n: string) => {
   return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '?'
 }
 
-function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefilledVehiculo }: {
+function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefilledVehiculo, prefilledFecha }: {
   open: boolean; onClose: () => void; onCreated: () => void
   prefilledCliente?: { id: string; nombre: string; telefono: string | null } | null
   prefilledVehiculo?: { id: string } | null
+  prefilledFecha?: string | null
 }) {
   const { currentEmail } = useAuth()
   const navigate = useNavigate()
@@ -471,7 +473,7 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
   const [working, setWorking] = useState(false)
   const [error,   setError]   = useState('')
   const [created, setCreated] = useState<{ id: string; aviso: string } | null>(null)
-  const today = new Date().toISOString().split('T')[0]
+  const today = hoyISO()
 
   // Debounced client search
   useEffect(() => {
@@ -524,6 +526,13 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
     setCobertura('basica'); setCeroDiario(''); setFianza(''); setMetodoFianza('efectivo')
     setError(''); setCreated(null)
   }
+
+  useEffect(() => {
+    if (open && prefilledFecha) {
+      setFechaEntrega(prefilledFecha)
+      setFechaDev(addDias(prefilledFecha, 1))
+    }
+  }, [open, prefilledFecha])
 
   // Suggest the vehicle's usual security deposit when one is picked
   useEffect(() => {
@@ -1028,6 +1037,7 @@ export default function ReservationsScreen() {
   const [modalOpen, setModalOpen]       = useState(false)
   const [prefilledCliente, setPrefilledCliente] = useState<{ id: string; nombre: string; telefono: string | null } | null>(null)
   const [prefilledVehiculo, setPrefilledVehiculo] = useState<{ id: string } | null>(null)
+  const [prefilledFecha, setPrefilledFecha] = useState<string | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
 
   useEffect(() => {
@@ -1042,10 +1052,20 @@ export default function ReservationsScreen() {
       if (vehiculoId) {
         setPrefilledVehiculo({ id: vehiculoId })
       }
+      setPrefilledFecha(searchParams.get('fecha'))
       setModalOpen(true)
       setSearchParams({}, { replace: true })
     }
   }, [])
+
+  // Open a specific reservation (e.g. clicked from the fleet calendar)
+  useEffect(() => {
+    const id = searchParams.get('res')
+    if (!id || reservas.length === 0) return
+    const r = reservas.find(x => x.id === id)
+    if (r) openPanel(r)
+    setSearchParams({}, { replace: true })
+  }, [reservas])
 
   async function fetchReservas() {
     const { data, error } = await db
@@ -1140,10 +1160,11 @@ export default function ReservationsScreen() {
 
       <NuevaReservaModal
         open={modalOpen}
-        onClose={() => { setModalOpen(false); setPrefilledCliente(null); setPrefilledVehiculo(null) }}
+        onClose={() => { setModalOpen(false); setPrefilledCliente(null); setPrefilledVehiculo(null); setPrefilledFecha(null) }}
         onCreated={fetchReservas}
         prefilledCliente={prefilledCliente}
         prefilledVehiculo={prefilledVehiculo}
+        prefilledFecha={prefilledFecha}
       />
     </div>
   )

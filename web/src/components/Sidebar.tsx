@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { Home, Calendar, FileText, Car, Users, DollarSign, BarChart3, UserCheck, Settings, LogOut, ShieldCheck } from 'lucide-react'
+import { Home, Calendar, CalendarRange, FileText, Car, Users, DollarSign, BarChart3, UserCheck, Settings, LogOut, ShieldCheck } from 'lucide-react'
 import { useAuth } from '../state/auth'
 import { supabase } from '../lib/supabase'
 
@@ -9,6 +9,7 @@ const db = supabase as any
 const NAV = [
   { id: 'inicio',     label: 'Inicio',        icon: Home,       path: '/app/home',         group: 'operacion', adminOnly: false },
   { id: 'reservas',   label: 'Reservas',       icon: Calendar,   path: '/app/reservations', group: 'operacion', adminOnly: false },
+  { id: 'calendario', label: 'Calendario',     icon: CalendarRange, path: '/app/calendario', group: 'operacion', adminOnly: false },
   { id: 'cotizacion', label: 'Cotizaciones',   icon: FileText,   path: '/app/cotizaciones', group: 'operacion', adminOnly: false },
   { id: 'flota',      label: 'Flota',          icon: Car,        path: '/app/vehicles',     group: 'operacion', adminOnly: false },
   { id: 'clientes',   label: 'Clientes',       icon: Users,      path: '/app/clientes',     group: 'operacion', adminOnly: false },

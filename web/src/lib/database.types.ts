@@ -5,6 +5,7 @@ export type ReservaStatus    = 'pendiente' | 'confirmada' | 'entregada' | 'devue
 export type CotizacionStatus = 'enviada' | 'aceptada' | 'vencida' | 'convertida'
 
 export type SolicitudEstado = 'pendiente' | 'aprobada' | 'rechazada'
+export type Cobertura       = 'basica' | 'cero_deducible'
 
 export interface Database {
   public: {
@@ -16,6 +17,7 @@ export interface Database {
           transmision: string | null; km: number; combustible: number
           status: VehiculoStatus; tarifa_diaria: number | null
           cliente_actual: string | null; info_cliente: string | null; created_at: string
+          vin?: string | null; asientos?: number | null; fianza?: number | null
         }
         Insert: {
           placa: string; modelo: string; anio?: number | null; color?: string | null
@@ -34,6 +36,7 @@ export interface Database {
         Row: {
           id: string; nombre: string; telefono: string | null
           email: string | null; licencia: string | null; direccion: string | null
+          licencia_vence?: string | null; identificacion?: string | null
           created_at: string
         }
         Insert: {
@@ -51,6 +54,13 @@ export interface Database {
           fecha_entrega: string; fecha_devolucion: string
           status: ReservaStatus; total: number | null
           deposito: number; metodo_deposito: string | null; created_at: string
+          folio?: number | null
+          hora_entrega?: string | null; hora_devolucion?: string | null
+          lugar_entrega?: string | null; lugar_devolucion?: string | null
+          descuento?: number | null
+          cobertura?: Cobertura | null; cobertura_costo?: number | null
+          fianza?: number | null; metodo_fianza?: string | null
+          notas?: string | null
         }
         Insert: {
           cliente_id?: string | null; vehiculo_id?: string | null

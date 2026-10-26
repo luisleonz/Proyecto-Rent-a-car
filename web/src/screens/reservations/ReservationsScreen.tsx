@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { Plus, ChevronRight, X, Check, Clock } from 'lucide-react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
+import { Plus, ChevronRight, X, Check, Clock, Printer } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
 import { insertLog } from '../../lib/log'
-import type { ReservaConDetalle, ReservaStatus } from '../../lib/database.types'
+import { EMPRESA } from '../../lib/empresa'
+import type { ReservaConDetalle, ReservaStatus, Cobertura } from '../../lib/database.types'
 
 /* ─── Constants ─────────────────────────────────────────────── */
 const db = supabase as any // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -61,6 +62,7 @@ interface PanelProps {
 
 function ReservaPanel({ res, open, onClose, onSolicitudCreada }: PanelProps) {
   const { currentEmail } = useAuth()
+  const navigate = useNavigate()
   const [editing, setEditing]           = useState(false)
   const [working, setWorking]           = useState(false)
   const [successMsg, setSuccessMsg]     = useState('')
@@ -199,14 +201,32 @@ function ReservaPanel({ res, open, onClose, onSolicitudCreada }: PanelProps) {
               {!editing ? (
                 <div className="qpanel-section">
                   <div className="qpanel-section-title">Detalle</div>
+                  {res.folio != null && (
+                    <div className="qpanel-row">
+                      <span className="lbl">Contrato</span>
+                      <span className="val mono">#{res.folio}</span>
+                    </div>
+                  )}
                   <div className="qpanel-row">
                     <span className="lbl">Entrega</span>
-                    <span className="val">{fmtDate(res.fecha_entrega)}</span>
+                    <span className="val">{fmtDate(res.fecha_entrega)}{res.hora_entrega ? ` · ${res.hora_entrega.slice(0, 5)}` : ''}</span>
                   </div>
                   <div className="qpanel-row">
                     <span className="lbl">Devolución</span>
-                    <span className="val">{fmtDate(res.fecha_devolucion)}</span>
+                    <span className="val">{fmtDate(res.fecha_devolucion)}{res.hora_devolucion ? ` · ${res.hora_devolucion.slice(0, 5)}` : ''}</span>
                   </div>
+                  {res.cobertura && (
+                    <div className="qpanel-row">
+                      <span className="lbl">Cobertura</span>
+                      <span className="val">{res.cobertura === 'cero_deducible' ? 'Cero deducible' : 'Básica'}</span>
+                    </div>
+                  )}
+                  {(res.fianza ?? 0) > 0 && (
+                    <div className="qpanel-row">
+                      <span className="lbl">Depósito en garantía</span>
+                      <span className="val">${fmt(res.fianza ?? 0)}{res.metodo_fianza ? ` · ${res.metodo_fianza}` : ''}</span>
+                    </div>
+                  )}
                   {res.total != null && (
                     <>
                       <div className="qpanel-row" style={{ marginTop: 8 }}>
@@ -299,6 +319,11 @@ function ReservaPanel({ res, open, onClose, onSolicitudCreada }: PanelProps) {
             <div className="qpanel-foot">
               {!editing ? (
                 <>
+                  {res.status !== 'cancelada' && (
+                    <button className="btn dark" style={{ width: '100%' }} onClick={() => navigate(`/imprimir/contrato/${res.id}`)}>
+                      <Printer size={15} />Imprimir contrato y póliza
+                    </button>
+                  )}
                   {res.status !== 'cancelada' && res.status !== 'devuelta' && !successMsg && (
                     <>
                       <button className="btn primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setEditing(true)}>
@@ -373,8 +398,22 @@ function SkeletonRow() {
 }
 
 /* ─── New reservation modal ──────────────────────────────────── */
-type VehicleOption   = { id: string; modelo: string; placa: string; tarifa_diaria: number | null; returnsToday?: boolean }
+type VehicleOption   = { id: string; modelo: string; placa: string; tarifa_diaria: number | null; fianza?: number | null; returnsToday?: boolean }
 type ClienteOption   = { id: string; nombre: string; telefono: string | null }
+
+function Opt({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" onClick={onClick}
+      style={{
+        flex: 1, padding: '8px 6px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+        border: `1.5px solid ${active ? 'var(--primary)' : 'var(--card-line)'}`,
+        background: active ? 'var(--primary-soft)' : 'var(--paper)',
+        color: active ? 'var(--primary)' : 'var(--ink3)',
+      }}>
+      {children}
+    </button>
+  )
+}
 
 const inits = (n: string) => {
   const p = n.trim().split(' ')
@@ -387,6 +426,7 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
   prefilledVehiculo?: { id: string } | null
 }) {
   const { currentEmail } = useAuth()
+  const navigate = useNavigate()
   // Client search
   const [clientSearch,     setClientSearch]     = useState('')
   const [clientResults,    setClientResults]     = useState<ClienteOption[]>([])
@@ -418,8 +458,19 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
   const [deposito,       setDeposito]       = useState('')
   const [metodoDeposito, setMetodoDeposito] = useState<'efectivo' | 'transferencia'>('efectivo')
 
+  // Contract details
+  const [horaEntrega,  setHoraEntrega]  = useState('10:00')
+  const [horaDev,      setHoraDev]      = useState('10:00')
+  const [lugarEntrega, setLugarEntrega] = useState(EMPRESA.lugarEntregaPredeterminado)
+  const [lugarDev,     setLugarDev]     = useState(EMPRESA.lugarEntregaPredeterminado)
+  const [cobertura,    setCobertura]    = useState<Cobertura>('basica')
+  const [ceroDiario,   setCeroDiario]   = useState('')
+  const [fianza,       setFianza]       = useState('')
+  const [metodoFianza, setMetodoFianza] = useState<'efectivo' | 'tarjeta' | 'transferencia'>('efectivo')
+
   const [working, setWorking] = useState(false)
   const [error,   setError]   = useState('')
+  const [created, setCreated] = useState<{ id: string; aviso: string } | null>(null)
   const today = new Date().toISOString().split('T')[0]
 
   // Debounced client search
@@ -442,7 +493,7 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
     if (!fechaEntrega || !fechaDev || fechaDev <= fechaEntrega) return
     setLoadingVeh(true)
     Promise.all([
-      db.from('vehiculos').select('id, modelo, placa, tarifa_diaria').neq('status', 'taller').order('modelo'),
+      db.from('vehiculos').select('*').neq('status', 'taller').order('modelo'),
       db.from('reservas').select('vehiculo_id')
         .in('status', ['pendiente', 'confirmada', 'entregada'])
         .lt('fecha_entrega', fechaDev)
@@ -468,8 +519,17 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
     setClientSearch(''); setClientResults([]); setSelectedCliente(null); setClienteTel('')
     setFechaEntrega(''); setFechaDev(''); setVehicles([]); setVehiculoId('')
     setDescuento(''); setTieneDeposito(false); setDeposito(''); setMetodoDeposito('efectivo')
-    setError('')
+    setHoraEntrega('10:00'); setHoraDev('10:00')
+    setLugarEntrega(EMPRESA.lugarEntregaPredeterminado); setLugarDev(EMPRESA.lugarEntregaPredeterminado)
+    setCobertura('basica'); setCeroDiario(''); setFianza(''); setMetodoFianza('efectivo')
+    setError(''); setCreated(null)
   }
+
+  // Suggest the vehicle's usual security deposit when one is picked
+  useEffect(() => {
+    const f = vehicles.find(v => v.id === vehiculoId)?.fianza
+    if (f) setFianza(String(f))
+  }, [vehiculoId])
 
   function handleClose() { reset(); onClose() }
 
@@ -482,7 +542,8 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
   const tarifa   = selectedVehicle?.tarifa_diaria ?? 0
   const subtotal = tarifa * dias
   const descNum  = Math.min(Math.max(0, Number(descuento) || 0), subtotal)
-  const total    = subtotal - descNum
+  const ceroCosto = cobertura === 'cero_deducible' ? (Number(ceroDiario) || 0) * dias : 0
+  const total    = subtotal - descNum + ceroCosto
   const showCalc = dias > 0 && tarifa > 0
   const datesSet = !!(fechaEntrega && fechaDev && fechaDev > fechaEntrega)
 
@@ -502,7 +563,7 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
       clienteId = c?.id ?? null
     }
 
-    const { data: reservaData, error: rErr } = await db.from('reservas').insert({
+    const base = {
       cliente_id: clienteId,
       vehiculo_id: vehiculoId,
       fecha_entrega: fechaEntrega,
@@ -511,7 +572,26 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
       total: showCalc ? total : null,
       deposito: tieneDeposito ? (Number(deposito) || 0) : 0,
       metodo_deposito: tieneDeposito ? metodoDeposito : null,
-    }).select('id').single()
+    }
+    const fianzaNum = Number(fianza) || 0
+    const contrato = {
+      hora_entrega: horaEntrega || null,
+      hora_devolucion: horaDev || null,
+      lugar_entrega: lugarEntrega.trim() || null,
+      lugar_devolucion: lugarDev.trim() || null,
+      descuento: descNum,
+      cobertura,
+      cobertura_costo: ceroCosto,
+      fianza: fianzaNum,
+      metodo_fianza: fianzaNum > 0 ? metodoFianza : null,
+    }
+    let aviso = ''
+    let { data: reservaData, error: rErr } = await db.from('reservas').insert({ ...base, ...contrato }).select('id').single()
+    // PGRST204 = column missing: the contract migration hasn't been run yet, save the core reservation anyway
+    if (rErr?.code === 'PGRST204') {
+      ;({ data: reservaData, error: rErr } = await db.from('reservas').insert(base).select('id').single())
+      aviso = 'La reserva se guardó, pero sin hora, cobertura ni fianza: falta ejecutar la migración SQL de contratos en Supabase.'
+    }
     if (rErr) { setError(`Error al crear reserva: ${rErr.message}`); setWorking(false); return }
 
     await db.from('vehiculos')
@@ -530,16 +610,45 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
         fecha_entrega: fechaEntrega,
         fecha_devolucion: fechaDev,
         total: showCalc ? total : null,
+        cobertura,
       },
     })
 
     setWorking(false)
-    reset()
     onCreated()
-    onClose()
+    setCreated({ id: reservaData.id, aviso })
   }
 
   if (!open) return null
+
+  if (created) return (
+    <>
+      <div className="qpanel-overlay" onClick={handleClose} />
+      <div className="qpanel open">
+        <div className="qpanel-body" style={{ alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: 14 }}>
+          <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--primary-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Check size={28} color="var(--primary)" strokeWidth={2.6} />
+          </div>
+          <div style={{ fontSize: 22, fontFamily: 'var(--font-display)' }}>Reserva creada</div>
+          <div style={{ fontSize: 14, color: 'var(--ink2)', maxWidth: 320 }}>
+            {clienteNombre} · {selectedVehicle?.modelo}<br />
+            Imprime el contrato, el anexo y la póliza para que el cliente los firme.
+          </div>
+          {created.aviso && (
+            <div style={{ background: 'var(--warn-soft)', border: '1px solid var(--warn-line)', color: 'var(--warn-ink)', borderRadius: 10, padding: '10px 14px', fontSize: 13, textAlign: 'left' }}>
+              {created.aviso}
+            </div>
+          )}
+        </div>
+        <div className="qpanel-foot">
+          <button className="btn primary" style={{ width: '100%' }} onClick={() => navigate(`/imprimir/contrato/${created.id}`)}>
+            <Printer size={15} />Imprimir contrato
+          </button>
+          <button className="btn" style={{ width: '100%' }} onClick={handleClose}>Listo</button>
+        </div>
+      </div>
+    </>
+  )
 
   return (
     <>
@@ -654,6 +763,16 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
                 onChange={e => setFechaDev(e.target.value)} />
             </div>
           </div>
+          <div style={{ display: 'flex', gap: 10, marginTop: -8 }}>
+            <div className="field" style={{ flex: 1 }}>
+              <label className="field-l">Hora de entrega</label>
+              <input type="time" className="field-i" value={horaEntrega} onChange={e => setHoraEntrega(e.target.value)} />
+            </div>
+            <div className="field" style={{ flex: 1 }}>
+              <label className="field-l">Hora de devolución</label>
+              <input type="time" className="field-i" value={horaDev} onChange={e => setHoraDev(e.target.value)} />
+            </div>
+          </div>
 
           {/* ── Vehicles (appear after dates) ── */}
           {datesSet && (
@@ -731,6 +850,12 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--warn-ink)' }}>
                     <span>Descuento</span>
                     <span>-${fmt(descNum)}</span>
+                  </div>
+                )}
+                {ceroCosto > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--ink3)' }}>
+                    <span>Cero deducible · {dias} × ${fmt(Number(ceroDiario) || 0)}</span>
+                    <span>+${fmt(ceroCosto)}</span>
                   </div>
                 )}
                 <div style={{
@@ -818,6 +943,57 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
                 </div>
               </>
             )}
+          </div>
+
+          {/* ── Coverage ── */}
+          <div className="field">
+            <label className="field-l">Cobertura</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Opt active={cobertura === 'basica'} onClick={() => setCobertura('basica')}>Básica (con deducible)</Opt>
+              <Opt active={cobertura === 'cero_deducible'} onClick={() => setCobertura('cero_deducible')}>Cero deducible</Opt>
+            </div>
+            {cobertura === 'cero_deducible' && (
+              <div className="field-money" style={{ width: '100%', marginTop: 8 }}>
+                <span>$</span>
+                <input className="field-i" value={ceroDiario} inputMode="numeric" placeholder="Costo por día"
+                  onChange={e => setCeroDiario(e.target.value.replace(/[^0-9]/g, ''))} />
+                <span style={{ fontSize: 12, color: 'var(--ink3)', paddingRight: 10 }}>/día</span>
+              </div>
+            )}
+          </div>
+
+          {/* ── Security deposit (cláusula OCTAVA) ── */}
+          <div className="field">
+            <label className="field-l">
+              Depósito en garantía <span style={{ color: 'var(--ink4)', fontWeight: 400 }}>(se devuelve al regresar el auto)</span>
+            </label>
+            <div className="field-money" style={{ width: '100%', marginBottom: 8 }}>
+              <span>$</span>
+              <input className="field-i" value={fianza} inputMode="numeric" placeholder="0"
+                onChange={e => setFianza(e.target.value.replace(/[^0-9]/g, ''))} />
+            </div>
+            {Number(fianza) > 0 && (
+              <div style={{ display: 'flex', gap: 8 }}>
+                {(['efectivo', 'tarjeta', 'transferencia'] as const).map(m => (
+                  <Opt key={m} active={metodoFianza === m} onClick={() => setMetodoFianza(m)}>
+                    {m[0].toUpperCase() + m.slice(1)}
+                  </Opt>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ── Places ── */}
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div className="field" style={{ flex: 1 }}>
+              <label className="field-l">Lugar de entrega</label>
+              <input className="field-i" value={lugarEntrega}
+                onChange={e => { if (lugarDev === lugarEntrega) setLugarDev(e.target.value); setLugarEntrega(e.target.value) }} />
+            </div>
+            <div className="field" style={{ flex: 1 }}>
+              <label className="field-l">Lugar de devolución</label>
+              <input className="field-i" value={lugarDev} onChange={e => setLugarDev(e.target.value)} />
+            </div>
           </div>
 
           {/* Error */}

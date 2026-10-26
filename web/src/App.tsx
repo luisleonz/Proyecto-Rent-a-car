@@ -25,6 +25,7 @@ import ReportesScreen from './screens/reportes/ReportesScreen'
 import EmpleadosScreen from './screens/empleados/EmpleadosScreen'
 import AutorizacionesScreen from './screens/autorizaciones/AutorizacionesScreen'
 import EditProfileScreen from './screens/more/EditProfileScreen'
+import ContratoPrint from './screens/print/ContratoPrint'
 import { CajaTurnoScreen, CajaCierreScreen, CajaJustificacionScreen, CajaOkScreen } from './screens/caja/CajaFlow'
 import { EntregaStep1Screen, EntregaStep2Screen, EntregaStep3Screen, EntregaOkScreen } from './screens/flows/EntregaFlow'
 import { DevolucionStep1Screen, DevolucionStep2Screen, DevolucionStep3Screen, DevolucionOkScreen } from './screens/flows/DevolucionFlow'
@@ -137,6 +138,7 @@ export default function App() {
         <Route path="/onboarding/tour"      element={<OnboardingTourScreen />} />
         <Route path="/onboarding/done"      element={<OnboardingDoneScreen />} />
         <Route path="/app/*"                element={<RequireAuth><AppLayout /></RequireAuth>} />
+        <Route path="/imprimir/contrato/:resId" element={<RequireAuth><ContratoPrint /></RequireAuth>} />
         <Route path="*"                     element={<Navigate to="/" replace />} />
       </Routes>
     </AuthProvider>

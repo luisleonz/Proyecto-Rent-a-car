@@ -710,10 +710,19 @@ export default function CotizacionesScreen() {
     return null
   }
 
-  const activas    = cotizaciones.filter(c => c.status === 'enviada').length
-  const aceptadas  = cotizaciones.filter(c => c.status === 'aceptada').length
-  const total_cots = cotizaciones.length
-  const conversion = total_cots > 0 ? Math.round((aceptadas / total_cots) * 100) : 0
+  const etapa = (s: CotizacionStatus) => {
+    const cs = cotizaciones.filter(c => c.status === s)
+    return { n: cs.length, monto: cs.reduce((t, c) => t + (c.total ?? 0), 0) }
+  }
+  const pipeline = [
+    { tab: 'Enviadas',    label: 'Esperando respuesta', ...etapa('enviada'),    tone: 'var(--warn)' },
+    { tab: 'Aceptadas',   label: 'Aceptadas',           ...etapa('aceptada'),   tone: 'var(--primary)' },
+    { tab: 'Convertidas', label: 'Convertidas a reserva', ...etapa('convertida'), tone: 'oklch(0.50 0.12 250)' },
+    { tab: 'Vencidas',    label: 'Vencidas',            ...etapa('vencida'),    tone: 'var(--ink4)' },
+  ]
+  const decididas  = cotizaciones.filter(c => c.status !== 'enviada').length
+  const ganadas    = cotizaciones.filter(c => c.status === 'aceptada' || c.status === 'convertida').length
+  const conversion = decididas > 0 ? Math.round((ganadas / decididas) * 100) : null
 
   const filtered = cotizaciones.filter(c => filter === 'Todas' ? true : c.status === FILTER_MAP[filter])
 
@@ -878,19 +887,33 @@ export default function CotizacionesScreen() {
 
         {/* ── RIGHT: History ── */}
         <div className="qhistory">
-          <div className="card qstats">
-            <div className="qstat">
-              <div className="qstat-v">{activas}</div>
-              <div className="qstat-l">Activas</div>
+          <div className="card" style={{ padding: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+              <div className="eyebrow">Embudo de cotizaciones</div>
+              <div style={{ fontSize: 12.5, color: 'var(--ink3)' }}>
+                Conversión <b style={{ color: 'var(--ink)', fontSize: 15 }}>{conversion == null ? '—' : `${conversion}%`}</b>
+              </div>
             </div>
-            <div className="qstat">
-              <div className="qstat-v">{aceptadas}</div>
-              <div className="qstat-l">Aceptadas</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+              {pipeline.map(p => (
+                <button key={p.tab} onClick={() => setFilter(filter === p.tab ? 'Todas' : p.tab)}
+                  style={{
+                    textAlign: 'left', font: 'inherit', cursor: 'pointer', padding: '10px 12px', borderRadius: 10,
+                    background: filter === p.tab ? 'var(--paper-alt)' : 'var(--card)',
+                    border: `1px solid ${filter === p.tab ? 'var(--ink4)' : 'var(--card-line)'}`,
+                    borderLeft: `4px solid ${p.tone}`,
+                  }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.1 }}>{p.n}</div>
+                  <div style={{ fontSize: 12, color: 'var(--ink2)', fontWeight: 600 }}>{p.label}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--ink3)' }}>${fmt(p.monto)}</div>
+                </button>
+              ))}
             </div>
-            <div className="qstat">
-              <div className="qstat-v">{conversion}%</div>
-              <div className="qstat-l">Conversión</div>
-            </div>
+            {conversion == null && (
+              <div style={{ fontSize: 11.5, color: 'var(--ink3)', marginTop: 8 }}>
+                La conversión aparece cuando alguna cotización se acepta, se convierte o vence.
+              </div>
+            )}
           </div>
 
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>

@@ -8,6 +8,7 @@ import TopBar from './components/TopBar'
 
 import LoginScreen from './screens/auth/LoginScreen'
 import EnterPasswordScreen from './screens/auth/EnterPasswordScreen'
+import CrearContrasenaScreen from './screens/auth/CrearContrasenaScreen'
 import OnboardingWelcomeScreen from './screens/onboarding/OnboardingWelcomeScreen'
 import OnboardingPasswordScreen from './screens/onboarding/OnboardingPasswordScreen'
 import OnboardingPermissionsScreen from './screens/onboarding/OnboardingPermissionsScreen'
@@ -135,6 +136,7 @@ export default function App() {
       <Routes>
         <Route path="/"                     element={<LoginScreen />} />
         <Route path="/enter-password"       element={<EnterPasswordScreen />} />
+        <Route path="/crear-contrasena"     element={<CrearContrasenaScreen />} />
         <Route path="/onboarding"           element={<OnboardingWelcomeScreen />} />
         <Route path="/onboarding/password"  element={<OnboardingPasswordScreen />} />
         <Route path="/onboarding/permissions" element={<OnboardingPermissionsScreen />} />

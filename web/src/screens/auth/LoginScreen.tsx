@@ -2,14 +2,19 @@ import { useState } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { Mail, Car } from 'lucide-react'
 import { useAuth } from '../../state/auth'
+import { rutaTrasSesion, errorDeEnlace } from '../../lib/supabase'
 
 export default function LoginScreen() {
   const navigate  = useNavigate()
   const { session } = useAuth()
   const [email, setEmail] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(errorDeEnlace
+    ? errorDeEnlace === 'otp_expired'
+      ? 'El enlace del correo ya expiró o ya se usó. Pide una nueva invitación o usa “¿Olvidaste tu contraseña?”.'
+      : 'El enlace del correo no es válido. Pide uno nuevo.'
+    : null)
 
-  if (session) return <Navigate to="/app/home" replace />
+  if (session) return <Navigate to={rutaTrasSesion()} replace />
 
   function onContinue() {
     const trimmed = email.trim().toLowerCase()

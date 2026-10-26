@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams, Navigate } from 'react-router-dom'
 import { ArrowLeft, Lock, Eye, EyeOff, Car } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { supabase, rutaTrasSesion } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
 
 function mensajeDeError(e: { message: string; code?: string; status?: number; name?: string }) {
@@ -25,12 +25,20 @@ export default function EnterPasswordScreen() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError]             = useState<string | null>(null)
   const [loading, setLoading]         = useState(false)
+  const [aviso, setAviso]             = useState<string | null>(null)
 
   // Already authenticated — go to app
-  if (session) return <Navigate to="/app/home" replace />
+  if (session) return <Navigate to={rutaTrasSesion()} replace />
 
   // No email in URL — back to login
   if (!email) return <Navigate to="/" replace />
+
+  async function onOlvide() {
+    setError(null); setAviso(null)
+    const { error: e } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/` })
+    if (e) setError(e.status === 429 ? 'Ya se envió un correo hace poco. Espera unos minutos e inténtalo de nuevo.' : mensajeDeError(e))
+    else setAviso(`Te enviamos un correo a ${email} con un enlace para crear una nueva contraseña.`)
+  }
 
   async function onLogin() {
     if (!password) { setError('Ingresa tu contraseña'); return }
@@ -142,9 +150,13 @@ export default function EnterPasswordScreen() {
           {loading ? 'Iniciando sesión…' : 'Iniciar sesión'}
         </button>
 
-        <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--ink4)', marginTop: 18, lineHeight: 1.5 }}>
-          ¿Olvidaste tu contraseña?<br />Contacta al administrador del sistema.
-        </p>
+        {aviso && (
+          <p style={{ fontSize: 13, color: 'var(--primary-dark)', background: 'var(--primary-soft)', borderRadius: 10, padding: '10px 12px', marginTop: 16, lineHeight: 1.45 }}>{aviso}</p>
+        )}
+        <button onClick={onOlvide}
+          style={{ display: 'block', margin: '18px auto 0', background: 'none', border: 0, cursor: 'pointer', fontSize: 13, color: 'var(--primary)', fontWeight: 600, fontFamily: 'inherit' }}>
+          ¿Olvidaste tu contraseña?
+        </button>
       </div>
     </div>
   )

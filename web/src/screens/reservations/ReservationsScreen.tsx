@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { Plus, ChevronRight, X, Check, Clock, Printer } from 'lucide-react'
+import { Plus, ChevronRight, X, Check, Clock, Printer, Search, CalendarRange, AlertTriangle, CornerDownLeft, KeyRound } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
 import { insertLog } from '../../lib/log'
 import { EMPRESA } from '../../lib/empresa'
-import { hoyISO, addDias } from '../../lib/fechas'
+import { hoyISO, addDias, diffDias } from '../../lib/fechas'
 import type { ReservaConDetalle, ReservaStatus, Cobertura } from '../../lib/database.types'
 
 /* ─── Constants ─────────────────────────────────────────────── */
@@ -34,11 +34,7 @@ const STATUS_DOT: Record<ReservaStatus, string> = {
 }
 
 const ALL_STATUSES: ReservaStatus[] = ['pendiente', 'confirmada', 'entregada', 'devuelta', 'cancelada']
-const FILTER_TABS = ['Todas', 'Confirmadas', 'Pendientes', 'Entregadas', 'Devueltas']
-const FILTER_MAP: Record<string, ReservaStatus> = {
-  'Confirmadas': 'confirmada', 'Pendientes': 'pendiente',
-  'Entregadas':  'entregada',  'Devueltas': 'devuelta',
-}
+const FILTER_TABS = ['Todas', 'Requieren acción', 'Próximas', 'En curso', 'Por cobrar', 'Devueltas', 'Canceladas']
 
 const fmt      = (n: number) => new Intl.NumberFormat('es-MX').format(n)
 const fmtDate  = (s: string) => new Date(s + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -357,30 +353,78 @@ function ReservaPanel({ res, open, onClose, onSolicitudCreada }: PanelProps) {
   )
 }
 
+/* ─── Reservation timing & money helpers ─────────────────────── */
+const fmtDia = (s: string, h?: string | null) =>
+  new Date(s + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) + (h ? ` ${h.slice(0, 5)}` : '')
+
+type Alerta = 'vencida' | 'termina_hoy' | 'sale_hoy' | 'por_cobrar'
+
+function alertasDe(r: ReservaConDetalle, hoy: string): Alerta[] {
+  const a: Alerta[] = []
+  if (r.status === 'entregada' && r.fecha_devolucion < hoy) a.push('vencida')
+  if (r.status === 'entregada' && r.fecha_devolucion === hoy) a.push('termina_hoy')
+  if ((r.status === 'confirmada' || r.status === 'pendiente') && r.fecha_entrega <= hoy) a.push('sale_hoy')
+  if (porCobrar(r) > 0) a.push('por_cobrar')
+  return a
+}
+
+// Balance to collect at delivery. Payments after delivery aren't recorded yet, so only upcoming rentals count.
+function porCobrar(r: ReservaConDetalle) {
+  if (r.status !== 'confirmada' && r.status !== 'pendiente') return 0
+  return Math.max(0, (r.total ?? 0) - (r.deposito ?? 0))
+}
+
+function cuando(r: ReservaConDetalle, hoy: string): { txt: string; tone?: 'danger' | 'warn' } | null {
+  if (r.status === 'entregada') {
+    const d = diffDias(hoy, r.fecha_devolucion)
+    if (d < 0) return { txt: `vencida hace ${-d}d`, tone: 'danger' }
+    if (d === 0) return { txt: 'regresa hoy', tone: 'warn' }
+    return { txt: `regresa en ${d}d` }
+  }
+  if (r.status === 'confirmada' || r.status === 'pendiente') {
+    const d = diffDias(hoy, r.fecha_entrega)
+    if (d < 0) return { txt: `debió salir hace ${-d}d`, tone: 'danger' }
+    if (d === 0) return { txt: 'sale hoy', tone: 'warn' }
+    return { txt: `sale en ${d}d` }
+  }
+  return null
+}
+
 /* ─── Reservation row ────────────────────────────────────────── */
-function ResRow({ r, onClick }: { r: ReservaConDetalle; onClick: () => void }) {
-  const name = clientName(r)
-  const ini  = initials(r)
+function ResRow({ r, hoy, onClick }: { r: ReservaConDetalle; hoy: string; onClick: () => void }) {
+  const c = cuando(r, hoy)
+  const saldo = porCobrar(r)
   return (
-    <button className="resrow" onClick={onClick}>
-      <div className="avatar accent" style={{ width: 40, height: 40, fontSize: 14, flexShrink: 0 }}>{ini}</div>
-      <div className="resrow-main">
-        <div className="rr-who">{name}</div>
-        <div className="rr-car">
-          {r.vehiculos?.modelo ?? '—'} · <span className="mono">{r.vehiculos?.placa ?? ''}</span>
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--ink3)', marginTop: 2 }}>
-          {fmtDate(r.fecha_entrega)} → {fmtDate(r.fecha_devolucion)}
-        </div>
-      </div>
-      <div className="resrow-end">
-        {r.total != null && <div className="rr-total">${fmt(r.total)}</div>}
+    <button className={`rs-row${alertasDe(r, hoy).includes('vencida') ? ' late' : ''}`} onClick={onClick}>
+      <div className="rs-status">
         <span className={`chip sm ${STATUS_CHIP[r.status]}`}>
-          <span className={`dot ${STATUS_DOT[r.status]}`} />
-          {STATUS_LABEL[r.status]}
+          <span className={`dot ${STATUS_DOT[r.status]}`} />{STATUS_LABEL[r.status]}
         </span>
+        {c && <span className={`rs-when${c.tone ? ` ${c.tone}` : ''}`}><Clock size={11} />{c.txt}</span>}
       </div>
-      <ChevronRight size={16} />
+      <div className="rs-folio mono">{r.folio != null ? `#${r.folio}` : ''}</div>
+      <div className="rs-who">
+        <div className="avatar accent" style={{ width: 32, height: 32, fontSize: 12, flexShrink: 0 }}>{initials(r)}</div>
+        <div style={{ minWidth: 0 }}>
+          <div className="rs-name">{clientName(r)}</div>
+          {r.clientes?.telefono && <div className="rs-sub">{r.clientes.telefono}</div>}
+        </div>
+      </div>
+      <div className="rs-car">
+        <div className="rs-name">{r.vehiculos?.modelo ?? '—'}</div>
+        {r.vehiculos?.placa && <span className="rs-plate mono">{r.vehiculos.placa}</span>}
+      </div>
+      <div className="rs-dates">
+        <div className="rs-sub">{fmtDia(r.fecha_entrega, r.hora_entrega)}</div>
+        <div className="rs-name">→ {fmtDia(r.fecha_devolucion, r.hora_devolucion)}</div>
+      </div>
+      <div className="rs-money">
+        <div className="rs-name">{r.total != null ? `$${fmt(r.total)}` : '—'}</div>
+        {saldo > 0
+          ? <div className="rs-due">Por cobrar ${fmt(saldo)}</div>
+          : r.total != null && (r.deposito ?? 0) >= r.total ? <div className="rs-paid">Pagado</div> : null}
+      </div>
+      <ChevronRight size={16} className="rs-chev" />
     </button>
   )
 }
@@ -1038,7 +1082,9 @@ export default function ReservationsScreen() {
   const [prefilledCliente, setPrefilledCliente] = useState<{ id: string; nombre: string; telefono: string | null } | null>(null)
   const [prefilledVehiculo, setPrefilledVehiculo] = useState<{ id: string } | null>(null)
   const [prefilledFecha, setPrefilledFecha] = useState<string | null>(null)
+  const [q, setQ] = useState('')
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
 
   useEffect(() => {
     if (searchParams.get('new') === '1') {
@@ -1079,15 +1125,39 @@ export default function ReservationsScreen() {
 
   useEffect(() => { fetchReservas() }, [])
 
-  const filtered = reservas.filter(r =>
-    filter === 'Todas' ? true : r.status === FILTER_MAP[filter]
-  )
-
-  const totals = {
-    pendientes:  reservas.filter(r => r.status === 'pendiente').length,
-    confirmadas: reservas.filter(r => r.status === 'confirmada').length,
-    entregadas:  reservas.filter(r => r.status === 'entregada').length,
+  const hoy = hoyISO()
+  const mes = hoy.slice(0, 7)
+  const conAlerta = (a: Alerta) => reservas.filter(r => alertasDe(r, hoy).includes(a))
+  const alertas = {
+    vencida:     conAlerta('vencida'),
+    termina_hoy: conAlerta('termina_hoy'),
+    sale_hoy:    conAlerta('sale_hoy'),
+    por_cobrar:  conAlerta('por_cobrar'),
   }
+  const delMes = reservas.filter(r => r.status !== 'cancelada' && r.fecha_entrega.startsWith(mes))
+  const montoMes = delMes.reduce((s, r) => s + (r.total ?? 0), 0)
+  const montoPorCobrar = alertas.por_cobrar.reduce((s, r) => s + porCobrar(r), 0)
+
+  const matches = (tab: string, r: ReservaConDetalle) => {
+    switch (tab) {
+      case 'Requieren acción': return alertasDe(r, hoy).some(a => a !== 'por_cobrar')
+      case 'Próximas':   return r.status === 'confirmada' || r.status === 'pendiente'
+      case 'En curso':   return r.status === 'entregada'
+      case 'Por cobrar': return porCobrar(r) > 0
+      case 'Devueltas':  return r.status === 'devuelta'
+      case 'Canceladas': return r.status === 'cancelada'
+      default:           return true
+    }
+  }
+  const qn = q.trim().toLowerCase()
+  const filtered = reservas
+    .filter(r => matches(filter, r))
+    .filter(r => !qn || [r.clientes?.nombre, r.clientes?.telefono, r.vehiculos?.modelo, r.vehiculos?.placa, r.folio != null ? `#${r.folio}` : '', String(r.folio ?? '')]
+      .some(x => x?.toLowerCase().includes(qn)))
+    .sort((a, b) => {
+      const pasado = filter === 'Devueltas' || filter === 'Canceladas'
+      return pasado ? b.fecha_entrega.localeCompare(a.fecha_entrega) : a.fecha_entrega.localeCompare(b.fecha_entrega)
+    })
 
   function openPanel(r: ReservaConDetalle) { setPanelRes(r); setPanelOpen(true) }
   function closePanel() { setPanelOpen(false); setTimeout(() => setPanelRes(null), 280) }
@@ -1099,57 +1169,78 @@ export default function ReservationsScreen() {
           <div className="eyebrow">Agenda</div>
           <h1 className="h-display" style={{ fontSize: 'clamp(28px, 4cqw, 42px)', marginTop: 6 }}>Reservas</h1>
           <p style={{ fontSize: 13.5, color: 'var(--ink3)', marginTop: 4 }}>
-            {loading ? 'Cargando…' : `${reservas.length} reservas · ${totals.confirmadas} confirmadas`}
+            {loading ? 'Cargando…' : `$${fmt(montoMes)} reservado este mes · ${delMes.length} reservas`}
           </p>
         </div>
         <div className="pagehead-actions">
+          <button className="btn sm" onClick={() => navigate('/app/calendario')}>
+            <CalendarRange size={14} />Calendario
+          </button>
           <button className="btn sm primary" onClick={() => setModalOpen(true)}>
             <Plus size={14} />Nueva reserva
           </button>
         </div>
       </div>
 
-      {/* Stat strip */}
-      <div className="statgrid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-        {[
-          { label: 'Pendientes',  value: totals.pendientes,  sub: 'por confirmar' },
-          { label: 'Confirmadas', value: totals.confirmadas, sub: 'activas' },
-          { label: 'En curso',    value: totals.entregadas,  sub: 'vehículo entregado' },
-        ].map(s => (
-          <div key={s.label} className="card statcard">
-            <div className="eyebrow">{s.label}</div>
-            <div className="statval mono">{s.value}</div>
-            <div style={{ fontSize: 12.5, color: 'var(--ink3)' }}>{s.sub}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Filter bar */}
-      <div className="filterbar">
-        {FILTER_TABS.map(tab => {
-          const count = tab === 'Todas' ? reservas.length : reservas.filter(r => r.status === FILTER_MAP[tab]).length
-          return (
-            <button key={tab} className={`fbtn${filter === tab ? ' on' : ''}`} onClick={() => setFilter(tab)}>
-              {tab} <span className="fbtn-n">{count}</span>
+      {/* Alerts */}
+      {!loading && (
+        <div className="rs-alerts">
+          {alertas.vencida.length > 0 && (
+            <button className="rs-alert danger" onClick={() => setFilter('Requieren acción')}>
+              <AlertTriangle size={14} />{alertas.vencida.length} vencida{alertas.vencida.length > 1 ? 's' : ''} — llamar ahora
             </button>
-          )
-        })}
+          )}
+          {alertas.termina_hoy.length > 0 && (
+            <button className="rs-alert warn" onClick={() => setFilter('Requieren acción')}>
+              <CornerDownLeft size={14} />{alertas.termina_hoy.length} regresa{alertas.termina_hoy.length > 1 ? 'n' : ''} hoy
+            </button>
+          )}
+          {alertas.sale_hoy.length > 0 && (
+            <button className="rs-alert warn" onClick={() => setFilter('Requieren acción')}>
+              <KeyRound size={14} />{alertas.sale_hoy.length} por entregar hoy
+            </button>
+          )}
+          {alertas.por_cobrar.length > 0 && (
+            <button className="rs-alert" onClick={() => setFilter('Por cobrar')}>
+              {alertas.por_cobrar.length} con saldo por cobrar · ${fmt(montoPorCobrar)}
+            </button>
+          )}
+          {alertas.vencida.length + alertas.termina_hoy.length + alertas.sale_hoy.length === 0 && (
+            <span className="rs-alert ok"><Check size={14} />Nada urgente hoy</span>
+          )}
+        </div>
+      )}
+
+      {/* Search + filters */}
+      <div className="rs-tools">
+        <label className="rs-search">
+          <Search size={15} />
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar nombre, #contrato, placa o teléfono" />
+        </label>
+        <div className="filterbar" style={{ margin: 0 }}>
+          {FILTER_TABS.map(tab => (
+            <button key={tab} className={`fbtn${filter === tab ? ' on' : ''}`} onClick={() => setFilter(tab)}>
+              {tab} <span className="fbtn-n">{reservas.filter(r => matches(tab, r)).length}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* List */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div className="reslist" style={{ padding: '8px 0' }}>
+        <div className="rs-list">
           {loading ? (
             Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
           ) : filtered.length === 0 ? (
             <p style={{ textAlign: 'center', color: 'var(--ink4)', padding: '40px 0', fontSize: 14 }}>
-              {reservas.length === 0 ? 'Aún no hay reservas.' : 'Sin reservas en esta categoría.'}
+              {reservas.length === 0 ? 'Aún no hay reservas.' : 'Sin reservas que coincidan.'}
             </p>
           ) : filtered.map(r => (
-            <ResRow key={r.id} r={r} onClick={() => openPanel(r)} />
+            <ResRow key={r.id} r={r} hoy={hoy} onClick={() => openPanel(r)} />
           ))}
         </div>
       </div>
+      <style>{RS_CSS}</style>
 
       <ReservaPanel
         res={panelRes}
@@ -1169,3 +1260,42 @@ export default function ReservationsScreen() {
     </div>
   )
 }
+
+const RS_CSS = `
+.rs-alerts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.rs-alert { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; font: inherit; font-size: 12.5px; font-weight: 600;
+  border: 1px solid var(--card-line); background: var(--card); color: var(--ink2); cursor: pointer; }
+.rs-alert.danger { background: var(--danger-soft); border-color: var(--danger-line); color: var(--danger-ink); }
+.rs-alert.warn { background: var(--warn-soft); border-color: var(--warn-line); color: var(--warn-ink); }
+.rs-alert.ok { background: var(--primary-soft); border-color: var(--primary-line); color: var(--primary-dark); cursor: default; }
+.rs-tools { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.rs-search { display: flex; align-items: center; gap: 8px; background: var(--card); border: 1px solid var(--card-line); border-radius: 11px; padding: 0 12px; color: var(--ink3); }
+.rs-search input { flex: 1; border: 0; outline: none; background: none; font: inherit; font-size: 14px; padding: 10px 0; color: var(--ink); min-width: 0; }
+.rs-list { display: flex; flex-direction: column; }
+.rs-row { display: grid; grid-template-columns: 150px 52px minmax(0, 1.3fr) minmax(0, 1fr) 128px 118px 16px; align-items: center; gap: 12px;
+  width: 100%; text-align: left; padding: 12px 16px; border: 0; border-bottom: 1px solid var(--hairline); background: var(--card); font: inherit; color: inherit; cursor: pointer; }
+.rs-row:last-child { border-bottom: 0; }
+.rs-row:hover { background: var(--paper-alt); }
+.rs-row.late { box-shadow: inset 3px 0 0 var(--danger); }
+.rs-status { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.rs-when { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--ink3); }
+.rs-when.warn { color: var(--warn-ink); font-weight: 600; }
+.rs-when.danger { color: var(--danger-ink); font-weight: 700; }
+.rs-folio { font-size: 13px; font-weight: 700; color: var(--ink2); }
+.rs-who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rs-name { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rs-sub { font-size: 12px; color: var(--ink3); white-space: nowrap; }
+.rs-car { min-width: 0; }
+.rs-plate { display: inline-block; margin-top: 3px; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 5px; background: oklch(0.93 0.09 95); color: var(--ink); }
+.rs-money { text-align: right; }
+.rs-due { font-size: 11.5px; font-weight: 600; color: var(--warn-ink); }
+.rs-paid { font-size: 11.5px; font-weight: 600; color: var(--primary); }
+.rs-chev { color: var(--ink4); }
+@container app (max-width: 900px) {
+  .rs-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "who money" "car dates" "status folio"; row-gap: 6px; }
+  .rs-who { grid-area: who; } .rs-money { grid-area: money; } .rs-car { grid-area: car; display: flex; gap: 8px; align-items: center; }
+  .rs-car .rs-plate { margin-top: 0; } .rs-dates { grid-area: dates; text-align: right; }
+  .rs-status { grid-area: status; flex-direction: row; align-items: center; gap: 8px; } .rs-folio { grid-area: folio; text-align: right; }
+  .rs-chev { display: none; }
+}
+`

@@ -2,11 +2,15 @@ import { useEffect, useState, Fragment } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Printer } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { EMPRESA } from '../../lib/empresa'
+import { EMPRESA, ivaEtiqueta } from '../../lib/empresa'
 import { contrato, basica, ceroDeducible, type Para } from '../../lib/contratoTextos'
 import type { Reserva, Cliente, Vehiculo } from '../../lib/database.types'
 
 const db = supabase as any // eslint-disable-line @typescript-eslint/no-explicit-any
+
+// Private bucket: only logged-in employees can read it (see supabase_seguridad.sql).
+const FIRMA_BUCKET = 'privado'
+const FIRMA_PATH = 'firma-arrendador.png'
 
 export type ReservaContrato = Reserva & { clientes: Cliente | null; vehiculos: Vehiculo | null }
 type DocKey = 'contrato' | 'anexo' | 'basica' | 'cero'
@@ -61,10 +65,10 @@ function Segs({ p }: { p: Para }) {
   return <>{p.s.map(([b, t], i) => b ? <strong key={i}>{t}</strong> : <Fragment key={i}>{t}</Fragment>)}</>
 }
 
-function Firma({ rol, nombre, leyenda = 'Nombre y Firma de Conformidad' }: { rol?: string; nombre?: string; leyenda?: string }) {
+function Firma({ rol, nombre, img, leyenda = 'Nombre y Firma de Conformidad' }: { rol?: string; nombre?: string; img?: string | null; leyenda?: string }) {
   return (
     <div className="ct-firma">
-      <div className="ct-firma-nombre">{nombre ?? ''}</div>
+      <div className="ct-firma-nombre">{img ? <img src={img} alt="" className="ct-firma-img" /> : (nombre ?? '')}</div>
       <div className="ct-firma-linea" />
       {rol && <div className="ct-firma-rol">{rol}</div>}
       <div className="ct-firma-ley">{leyenda}</div>
@@ -91,7 +95,7 @@ function Folio({ r, label = 'CONTRATO NÚM' }: { r: ReservaContrato; label?: str
 }
 
 /* ─── Documents ──────────────────────────────────────────────── */
-function PaginaContrato({ r }: { r: ReservaContrato }) {
+function PaginaContrato({ r, firmaUrl }: { r: ReservaContrato; firmaUrl?: string | null }) {
   return (
     <section className="ct-page">
       <header className="ct-head">
@@ -101,21 +105,22 @@ function PaginaContrato({ r }: { r: ReservaContrato }) {
       </header>
       <div className="ct-cols"><Paras items={contrato} /></div>
       <div className="ct-firmas">
-        <Firma rol="ARRENDADOR" nombre={EMPRESA.representante.toUpperCase()} />
+        <Firma rol="ARRENDADOR" nombre={EMPRESA.representante.toUpperCase()} img={firmaUrl} />
         <Firma rol="ARRENDATARIO" nombre={r.clientes?.nombre?.toUpperCase()} />
       </div>
     </section>
   )
 }
 
-function PaginaAnexo({ r }: { r: ReservaContrato }) {
+function PaginaAnexo({ r, firmaUrl }: { r: ReservaContrato; firmaUrl?: string | null }) {
   const c = r.clientes, v = r.vehiculos
   const dias      = diasRenta(r)
   const tarifa    = v?.tarifa_diaria ?? null
   const subtotal  = tarifa != null ? tarifa * dias : null
   const descuento = r.descuento ?? 0
   const cobCosto  = r.cobertura_costo ?? 0
-  const total     = r.total ?? (subtotal != null ? subtotal - descuento + cobCosto : null)
+  const iva       = r.iva ?? 0
+  const total     = r.total ?? (subtotal != null ? subtotal - descuento + cobCosto + iva : null)
   const anticipo  = r.deposito ?? 0
   const saldo     = total != null ? Math.max(0, total - anticipo) : null
   const cero      = r.cobertura === 'cero_deducible'
@@ -173,6 +178,7 @@ function PaginaAnexo({ r }: { r: ReservaContrato }) {
           <tr><td>Renta: {dias} {dias === 1 ? 'día' : 'días'} × {money(tarifa)} por día</td><td>{money(subtotal)}</td></tr>
           {descuento > 0 && <tr><td>Descuento</td><td>−{money(descuento)}</td></tr>}
           <tr><td>Protección adicional cero deducible</td><td>{cero ? money(cobCosto) : 'No contratada'}</td></tr>
+          {iva > 0 && <tr><td>{ivaEtiqueta}</td><td>{money(iva)}</td></tr>}
           <tr className="tot"><td>TOTAL DEL ARRENDAMIENTO (moneda nacional)</td><td>{money(total)}</td></tr>
           <tr><td>Anticipo / apartado recibido{r.metodo_deposito ? ` (${metodo(r.metodo_deposito)})` : ''}</td><td>{money(anticipo)}</td></tr>
           <tr className="tot"><td>SALDO PENDIENTE AL ENTREGAR</td><td>{money(saldo)}</td></tr>
@@ -208,7 +214,7 @@ function PaginaAnexo({ r }: { r: ReservaContrato }) {
         {EMPRESA.ciudadFirma}, a {fechaLarga(r.fecha_entrega)}.
       </div>
       <div className="ct-firmas">
-        <Firma rol="ARRENDADOR" nombre={EMPRESA.representante.toUpperCase()} />
+        <Firma rol="ARRENDADOR" nombre={EMPRESA.representante.toUpperCase()} img={firmaUrl} />
         <Firma rol="ARRENDATARIO" nombre={c?.nombre?.toUpperCase()} />
       </div>
     </section>
@@ -231,11 +237,11 @@ function PaginaPoliza({ r, titulo, subtitulo, items }: { r: ReservaContrato; tit
   )
 }
 
-export function ContratoDocs({ r, docs }: { r: ReservaContrato; docs: DocKey[] }) {
+export function ContratoDocs({ r, docs, firmaUrl }: { r: ReservaContrato; docs: DocKey[]; firmaUrl?: string | null }) {
   return (
     <div className="ct-root">
-      {docs.includes('contrato') && <PaginaContrato r={r} />}
-      {docs.includes('anexo')    && <PaginaAnexo r={r} />}
+      {docs.includes('contrato') && <PaginaContrato r={r} firmaUrl={firmaUrl} />}
+      {docs.includes('anexo')    && <PaginaAnexo r={r} firmaUrl={firmaUrl} />}
       {docs.includes('basica')   && (
         <PaginaPoliza r={r} items={basica}
           titulo="PAQUETE DE COBERTURA AMPLIA CON PAGO DE DEDUCIBLE Y/O DAÑOS" subtitulo="(COBERTURA BÁSICA)" />
@@ -256,6 +262,12 @@ export default function ContratoPrint() {
   const [r, setR] = useState<ReservaContrato | null>(null)
   const [error, setError] = useState('')
   const [docs, setDocs] = useState<DocKey[]>([])
+  const [firmaUrl, setFirmaUrl] = useState<string | null | undefined>(undefined)
+
+  useEffect(() => {
+    supabase.storage.from(FIRMA_BUCKET).createSignedUrl(FIRMA_PATH, 3600)
+      .then(({ data }) => setFirmaUrl(data?.signedUrl ?? null))
+  }, [])
 
   useEffect(() => {
     db.from('reservas').select('*, clientes(*), vehiculos(*)').eq('id', resId).single()
@@ -283,13 +295,14 @@ export default function ContratoPrint() {
             <label key={k}><input type="checkbox" checked={docs.includes(k)} onChange={() => toggle(k)} />{DOC_LABEL[k]}</label>
           ))}
         </div>
+        {firmaUrl === null && <span className="ct-nofirma">Sin firma guardada: el arrendador firmará a mano</span>}
         <button className="btn sm primary" onClick={() => window.print()} disabled={!r || docs.length === 0}>
           <Printer size={15} />Imprimir
         </button>
       </div>
       {error && <div className="ct-msg">No se pudo cargar la reserva: {error}</div>}
       {!r && !error && <div className="ct-msg"><div className="spinner" /></div>}
-      {r && <ContratoDocs r={r} docs={(Object.keys(DOC_LABEL) as DocKey[]).filter(k => docs.includes(k))} />}
+      {r && <ContratoDocs r={r} firmaUrl={firmaUrl} docs={(Object.keys(DOC_LABEL) as DocKey[]).filter(k => docs.includes(k))} />}
     </div>
   )
 }
@@ -327,7 +340,10 @@ export const CONTRATO_CSS = `
 .ct-firmas.single { grid-template-columns: 1fr; padding: 0 1.8in; }
 .ct-firma { text-align: center; font-size: 7.5pt; font-weight: 700; }
 .ct-firma-nombre { min-height: 30px; display: flex; align-items: flex-end; justify-content: center; font-size: 8.5pt; padding-bottom: 2px; }
+.ct-firmas:not(.single) .ct-firma-nombre { height: 56px; }
+.ct-firma-img { height: 60px; max-width: 100%; object-fit: contain; margin-bottom: -6px; }
 .ct-firma-linea { border-top: 1px solid #000; margin-bottom: 3px; }
+.ct-nofirma { font-size: 12px; color: var(--warn-ink); background: var(--warn-soft); border: 1px solid var(--warn-line); border-radius: 8px; padding: 4px 9px; }
 .ct-firma-rol { font-size: 8pt; }
 .ct-firma-ley { font-weight: 600; }
 

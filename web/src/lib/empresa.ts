@@ -10,4 +10,9 @@ export const EMPRESA = {
   // Si se deja vacío, el anexo imprime una línea en blanco para llenarlo a mano.
   domicilio:       '',
   lugarEntregaPredeterminado: "Oficina Luciano's Tours",
+  // IVA de región fronteriza; las tarifas no lo incluyen y se suma al final.
+  ivaTasa: 0.08,
 }
+
+export const ivaDe = (base: number) => Math.round(Math.max(0, base) * EMPRESA.ivaTasa * 100) / 100
+export const ivaEtiqueta = `IVA ${Math.round(EMPRESA.ivaTasa * 100)}%`

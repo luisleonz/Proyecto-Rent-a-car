@@ -59,6 +59,7 @@ export interface Database {
           lugar_entrega?: string | null; lugar_devolucion?: string | null
           descuento?: number | null
           cobertura?: Cobertura | null; cobertura_costo?: number | null
+          iva?: number | null
           fianza?: number | null; metodo_fianza?: string | null
           notas?: string | null
         }
@@ -82,6 +83,7 @@ export interface Database {
           dias: number; tarifa_diaria: number | null; seguro_nombre: string | null
           seguro_costo: number; descuento: number; total: number
           status: CotizacionStatus; reserva_id: string | null; created_at: string
+          iva?: number | null
         }
         Insert: {
           id: string; cliente_nombre: string; cliente_telefono?: string | null

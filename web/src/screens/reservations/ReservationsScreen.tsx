@@ -4,7 +4,8 @@ import { Plus, ChevronRight, X, Check, Clock, Printer, Search, CalendarRange, Al
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
 import { insertLog } from '../../lib/log'
-import { EMPRESA } from '../../lib/empresa'
+import { EMPRESA, ivaDe, ivaEtiqueta } from '../../lib/empresa'
+import { insertarConExtras } from '../../lib/insertar'
 import { hoyISO, addDias, diffDias } from '../../lib/fechas'
 import { porCobrar } from '../../lib/reservas'
 import type { ReservaConDetalle, ReservaStatus, Cobertura } from '../../lib/database.types'
@@ -179,7 +180,7 @@ function ReservaPanel({ res, open, onClose, onSolicitudCreada }: PanelProps) {
                 }}>
                   <Check size={14} color="var(--primary)" strokeWidth={2.5} />
                   <span style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
-                    Depósito de apartado recibido
+                    Pagado a cuenta
                   </span>
                   <span style={{ fontSize: 13, color: 'var(--primary)', marginLeft: 'auto', fontWeight: 700 }}>
                     ${fmt(res.deposito)}
@@ -189,7 +190,7 @@ function ReservaPanel({ res, open, onClose, onSolicitudCreada }: PanelProps) {
                       fontSize: 11, padding: '2px 7px', borderRadius: 20, fontWeight: 600,
                       background: 'oklch(88% 0.12 155)', color: 'var(--primary)',
                     }}>
-                      {res.metodo_deposito === 'efectivo' ? 'Efectivo' : 'Transferencia'}
+                      {res.metodo_deposito[0].toUpperCase() + res.metodo_deposito.slice(1)}
                     </span>
                   )}
                 </div>
@@ -508,6 +509,7 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
   const [ceroDiario,   setCeroDiario]   = useState('')
   const [fianza,       setFianza]       = useState('')
   const [metodoFianza, setMetodoFianza] = useState<'efectivo' | 'tarjeta' | 'transferencia'>('efectivo')
+  const [conIva,       setConIva]       = useState(true)
 
   const [working, setWorking] = useState(false)
   const [error,   setError]   = useState('')
@@ -562,7 +564,7 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
     setDescuento(''); setTieneDeposito(false); setDeposito(''); setMetodoDeposito('efectivo')
     setHoraEntrega('10:00'); setHoraDev('10:00')
     setLugarEntrega(EMPRESA.lugarEntregaPredeterminado); setLugarDev(EMPRESA.lugarEntregaPredeterminado)
-    setCobertura('basica'); setCeroDiario(''); setFianza(''); setMetodoFianza('efectivo')
+    setCobertura('basica'); setCeroDiario(''); setFianza(''); setMetodoFianza('efectivo'); setConIva(true)
     setError(''); setCreated(null)
   }
 
@@ -591,7 +593,8 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
   const subtotal = tarifa * dias
   const descNum  = Math.min(Math.max(0, Number(descuento) || 0), subtotal)
   const ceroCosto = cobertura === 'cero_deducible' ? (Number(ceroDiario) || 0) * dias : 0
-  const total    = subtotal - descNum + ceroCosto
+  const ivaMonto = conIva ? ivaDe(subtotal - descNum + ceroCosto) : 0
+  const total    = subtotal - descNum + ceroCosto + ivaMonto
   const showCalc = dias > 0 && tarifa > 0
   const datesSet = !!(fechaEntrega && fechaDev && fechaDev > fechaEntrega)
 
@@ -630,16 +633,14 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
       descuento: descNum,
       cobertura,
       cobertura_costo: ceroCosto,
+      iva: ivaMonto,
       fianza: fianzaNum,
       metodo_fianza: fianzaNum > 0 ? metodoFianza : null,
     }
-    let aviso = ''
-    let { data: reservaData, error: rErr } = await db.from('reservas').insert({ ...base, ...contrato }).select('id').single()
-    // PGRST204 = column missing: the contract migration hasn't been run yet, save the core reservation anyway
-    if (rErr?.code === 'PGRST204') {
-      ;({ data: reservaData, error: rErr } = await db.from('reservas').insert(base).select('id').single())
-      aviso = 'La reserva se guardó, pero sin hora, cobertura ni fianza: falta ejecutar la migración SQL de contratos en Supabase.'
-    }
+    const { data: reservaData, error: rErr, sinExtras } = await insertarConExtras('reservas', base, contrato)
+    const aviso = sinExtras
+      ? 'La reserva se guardó, pero sin hora, cobertura, IVA ni fianza: falta ejecutar la migración SQL más reciente en Supabase.'
+      : ''
     if (rErr) { setError(`Error al crear reserva: ${rErr.message}`); setWorking(false); return }
 
     await db.from('vehiculos')
@@ -906,6 +907,12 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
                     <span>+${fmt(ceroCosto)}</span>
                   </div>
                 )}
+                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, color: 'var(--ink3)', cursor: 'pointer' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <input type="checkbox" checked={conIva} onChange={e => setConIva(e.target.checked)} />{ivaEtiqueta}
+                  </span>
+                  <span>{conIva ? `+$${fmt(ivaMonto)}` : 'sin IVA'}</span>
+                </label>
                 <div style={{
                   display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, color: 'var(--ink)',
                   borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 2,

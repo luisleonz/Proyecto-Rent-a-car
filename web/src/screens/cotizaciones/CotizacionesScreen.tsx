@@ -6,6 +6,8 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
 import { insertLog } from '../../lib/log'
 import { isoLocal } from '../../lib/fechas'
+import { ivaDe, ivaEtiqueta } from '../../lib/empresa'
+import { insertarConExtras } from '../../lib/insertar'
 import type { Vehiculo, Cotizacion, CotizacionStatus } from '../../lib/database.types'
 
 const db = supabase as any
@@ -55,6 +57,7 @@ interface QuoteData {
   dailyRate: number
   insurance: { label: string; cost: number }
   discount: number
+  iva: number
   total: number
   date: string
 }
@@ -120,6 +123,7 @@ function generatePDF(q: QuoteData): Blob {
   ]
   if (q.insurance.cost > 0) rows.push([`Seguro ${q.insurance.label}`, `$${fmt(q.insurance.cost)}`])
   if (q.discount > 0) rows.push([`Descuento aplicado`, `-$${fmt(q.discount)}`])
+  if (q.iva > 0) rows.push([ivaEtiqueta, `$${fmt(q.iva)}`])
 
   let y = 130
   rows.forEach(([label, amount]) => {
@@ -151,7 +155,7 @@ function generatePDF(q: QuoteData): Blob {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8.5)
   doc.setTextColor(...ink3)
-  doc.text('Lucianos Rent-a-Car  ·  Precios en MXN con IVA incluido  ·  Vigencia 7 días a partir de la fecha de emisión', W / 2, y + 8, { align: 'center' })
+  doc.text(`Lucianos Rent-a-Car  ·  Precios en MXN${q.iva > 0 ? ' · IVA desglosado' : ' · no incluye IVA'}  ·  Vigencia 7 días a partir de la fecha de emisión`, W / 2, y + 8, { align: 'center' })
   doc.text('Este documento es una cotización y no constituye un contrato de renta.', W / 2, y + 15, { align: 'center' })
 
   return doc.output('blob')
@@ -183,7 +187,7 @@ async function shareViaWhatsApp(q: QuoteData) {
     ``,
     `🚗 *${q.vehicle}* (${q.plate})`,
     `📅 ${q.days} día${q.days !== 1 ? 's' : ''} de renta`,
-    `💰 Total: *$${fmt(q.total)} MXN*`,
+    `💰 Total: *$${fmt(q.total)} MXN*${q.iva > 0 ? ' (IVA incluido)' : ''}`,
     ``,
     `Adjunto encontrará el PDF con todos los detalles.`,
     `Vigencia: 7 días · Para confirmar su reserva contáctenos.`,
@@ -209,6 +213,7 @@ function cotizacionToQuoteData(cot: Cotizacion): QuoteData {
     dailyRate:  cot.tarifa_diaria   ?? 0,
     insurance:  ins,
     discount:   cot.descuento,
+    iva:        cot.iva ?? 0,
     total:      cot.total,
     date:       new Date(cot.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }),
   }
@@ -317,6 +322,12 @@ function QuoteDetailPanel({ cot, open, onClose, onStatusChange, onConvert }: Pan
                   <div className="qpanel-row">
                     <span className="lbl">Descuento</span>
                     <span className="val mono" style={{ color: 'var(--primary)' }}>−${fmt(cot.descuento)}</span>
+                  </div>
+                )}
+                {(cot.iva ?? 0) > 0 && (
+                  <div className="qpanel-row">
+                    <span className="lbl">{ivaEtiqueta}</span>
+                    <span className="val mono">${fmt(cot.iva ?? 0)}</span>
                   </div>
                 )}
                 <div className="qpanel-total-row">
@@ -522,6 +533,7 @@ export default function CotizacionesScreen() {
   const [clientPhone, setClientPhone]   = useState(() => searchParams.get('telefono') ?? '')
   const [days, setDays]                 = useState(3)
   const [discount, setDiscount]         = useState('')
+  const [conIva, setConIva]             = useState(true)
   const [selectedId, setSelectedId]     = useState<string>('')
   const [insurance, setInsurance]       = useState(INSURANCE_OPTIONS[0])
   const [filter, setFilter]             = useState('Todas')
@@ -562,7 +574,9 @@ export default function CotizacionesScreen() {
   const discountAmount = parseInt(discount) || 0
   const vehicleRate    = selectedVehicle?.tarifa_diaria ?? 0
   const subtotal       = days * vehicleRate
-  const total          = Math.max(0, subtotal + insurance.cost - discountAmount)
+  const baseIva        = Math.max(0, subtotal + insurance.cost - discountAmount)
+  const ivaMonto       = conIva ? ivaDe(baseIva) : 0
+  const total          = baseIva + ivaMonto
 
   function buildQuoteData(): QuoteData {
     const now = new Date()
@@ -577,6 +591,7 @@ export default function CotizacionesScreen() {
       dailyRate: vehicleRate,
       insurance,
       discount: discountAmount,
+      iva: ivaMonto,
       total,
       date: dateStr,
     }
@@ -598,7 +613,7 @@ export default function CotizacionesScreen() {
       total: q.total,
       status: 'enviada' as CotizacionStatus,
     }
-    const { data } = await db.from('cotizaciones').insert(payload).select().single()
+    const { data } = await insertarConExtras('cotizaciones', payload, { iva: q.iva })
     return data ?? null
   }
 
@@ -668,7 +683,7 @@ export default function CotizacionesScreen() {
       clienteId = nuevo?.id ?? null
     }
 
-    const { data: reserva, error: reservaErr } = await db.from('reservas').insert({
+    const { data: reserva, error: reservaErr } = await insertarConExtras('reservas', {
       cliente_id: clienteId,
       vehiculo_id: cot.vehiculo_id ?? null,
       fecha_entrega: fechaEntrega,
@@ -677,7 +692,7 @@ export default function CotizacionesScreen() {
       total: cot.total,
       deposito,
       metodo_deposito: metodoDeposito,
-    }).select().single()
+    }, { iva: cot.iva ?? 0, descuento: cot.descuento ?? 0 })
     if (reservaErr) return `Error al crear reserva: ${reservaErr.message}`
     if (!reserva) return 'No se pudo crear la reserva'
 
@@ -858,11 +873,17 @@ export default function CotizacionesScreen() {
                 <span className="mono">−${fmt(discountAmount)}</span>
               </div>
             )}
+            <label className="qb-line" style={{ cursor: 'pointer' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <input type="checkbox" checked={conIva} onChange={e => setConIva(e.target.checked)} />{ivaEtiqueta}
+              </span>
+              <span className="mono">{conIva ? `$${fmt(ivaMonto)}` : 'sin IVA'}</span>
+            </label>
             <div className="qb-total">
               <span>Total</span>
               <span className="qb-total-v">${fmt(total)}</span>
             </div>
-            <p className="qb-note">Incluye IVA · vigencia 7 días</p>
+            <p className="qb-note">{conIva ? 'IVA incluido en el total' : 'No incluye IVA'} · vigencia 7 días</p>
           </div>
 
           <div className="qb-actions">

@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Plus, Phone, Mail, CreditCard, MapPin, X, Check, ChevronRight, Pencil } from 'lucide-react'
+import { Search, Plus, Phone, Mail, CreditCard, MapPin, X, Check, ChevronRight, Pencil, Fingerprint, Cake, LifeBuoy, StickyNote } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
 import { insertLog } from '../../lib/log'
+import { insertarConExtras } from '../../lib/insertar'
+import { hoyISO } from '../../lib/fechas'
 
 const db = supabase as any
 
@@ -15,6 +17,13 @@ type Cliente = {
   email: string | null
   licencia: string | null
   direccion: string | null
+  identificacion?: string | null
+  licencia_vence?: string | null
+  fecha_nacimiento?: string | null
+  nacionalidad?: string | null
+  contacto_emergencia?: string | null
+  contacto_emergencia_tel?: string | null
+  notas?: string | null
   created_at: string
 }
 
@@ -25,6 +34,19 @@ type ReservaResumen = {
   status: string
   total: number | null
   vehiculos: { modelo: string; placa: string } | null
+}
+
+const EXTRAS = ['identificacion', 'licencia_vence', 'fecha_nacimiento', 'nacionalidad', 'contacto_emergencia', 'contacto_emergencia_tel', 'notas'] as const
+type Extra = typeof EXTRAS[number]
+const EXTRA_VACIO = Object.fromEntries(EXTRAS.map(k => [k, ''])) as Record<Extra, string>
+const EXTRA_LABEL: Record<Extra, string> = {
+  identificacion: 'Identificación (INE / pasaporte)', licencia_vence: 'Vigencia de la licencia',
+  fecha_nacimiento: 'Fecha de nacimiento', nacionalidad: 'Nacionalidad',
+  contacto_emergencia: 'Contacto de emergencia', contacto_emergencia_tel: 'Teléfono de emergencia', notas: 'Notas',
+}
+const edad = (iso: string) => {
+  const n = new Date(iso + 'T12:00:00'), h = new Date()
+  return h.getFullYear() - n.getFullYear() - (h < new Date(h.getFullYear(), n.getMonth(), n.getDate()) ? 1 : 0)
 }
 
 /* ─── Utils ──────────────────────────────────────────────────── */
@@ -56,23 +78,28 @@ function AgregarClientePanel({ open, onClose, onCreated }: {
   const [email,    setEmail]    = useState('')
   const [licencia, setLicencia] = useState('')
   const [direccion,setDireccion]= useState('')
+  const [ident,    setIdent]    = useState('')
+  const [licVence, setLicVence] = useState('')
   const [saving,   setSaving]   = useState(false)
   const [error,    setError]    = useState('')
 
   function reset() {
-    setNombre(''); setTelefono(''); setEmail(''); setLicencia(''); setDireccion(''); setError('')
+    setNombre(''); setTelefono(''); setEmail(''); setLicencia(''); setDireccion(''); setIdent(''); setLicVence(''); setError('')
   }
 
   async function handleGuardar() {
     if (!nombre.trim()) { setError('El nombre es obligatorio'); return }
     setSaving(true); setError('')
-    const { data, error: err } = await db.from('clientes').insert({
+    const { data, error: err } = await insertarConExtras('clientes', {
       nombre:   nombre.trim(),
       telefono: telefono.trim() || null,
       email:    email.trim()    || null,
       licencia: licencia.trim() || null,
       direccion:direccion.trim()|| null,
-    }).select().single()
+    }, {
+      identificacion: ident.trim() || null,
+      licencia_vence: licVence || null,
+    })
     setSaving(false)
     if (err) { setError(err.message); return }
     await insertLog({
@@ -138,9 +165,19 @@ function AgregarClientePanel({ open, onClose, onCreated }: {
           </div>
 
           <div className="field">
-            <label className="field-l">Número de licencia</label>
-            <input className="field-i" value={licencia} onChange={e => setLicencia(e.target.value)}
-              placeholder="Número de licencia de manejo" />
+            <label className="field-l">Identificación (INE / pasaporte)</label>
+            <input className="field-i" value={ident} onChange={e => setIdent(e.target.value)} placeholder="IDMEX…" />
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div className="field" style={{ flex: 3 }}>
+              <label className="field-l">Número de licencia</label>
+              <input className="field-i" value={licencia} onChange={e => setLicencia(e.target.value)}
+                placeholder="Número de licencia de manejo" />
+            </div>
+            <div className="field" style={{ flex: 2 }}>
+              <label className="field-l">Vence</label>
+              <input className="field-i" type="date" value={licVence} onChange={e => setLicVence(e.target.value)} />
+            </div>
           </div>
 
           <div style={{ fontSize: 12, color: 'var(--ink3)', lineHeight: 1.5, padding: '2px 0' }}>
@@ -184,6 +221,7 @@ function ClienteDetail({ cliente, onNewReserva, onCotizar, onUpdated }: {
   const [editEmail,  setEditEmail]  = useState('')
   const [editLic,    setEditLic]    = useState('')
   const [editDir,    setEditDir]    = useState('')
+  const [editExtra,  setEditExtra]  = useState<Record<Extra, string>>(EXTRA_VACIO)
   const [editSaving, setEditSaving] = useState(false)
   const [editError,  setEditError]  = useState('')
 
@@ -194,7 +232,7 @@ function ClienteDetail({ cliente, onNewReserva, onCotizar, onUpdated }: {
       .select('id, fecha_entrega, fecha_devolucion, status, total, vehiculos(modelo, placa)')
       .eq('cliente_id', cliente.id)
       .order('fecha_entrega', { ascending: false })
-      .limit(10)
+      .limit(200)
       .then(({ data }: { data: ReservaResumen[] | null }) => {
         setReservas(data ?? [])
         setLoading(false)
@@ -207,6 +245,7 @@ function ClienteDetail({ cliente, onNewReserva, onCotizar, onUpdated }: {
     setEditEmail(cliente.email ?? '')
     setEditLic(cliente.licencia ?? '')
     setEditDir(cliente.direccion ?? '')
+    setEditExtra(Object.fromEntries(EXTRAS.map(k => [k, cliente[k] ?? ''])) as Record<Extra, string>)
     setEditError('')
     setEditing(true)
   }
@@ -214,16 +253,17 @@ function ClienteDetail({ cliente, onNewReserva, onCotizar, onUpdated }: {
   async function handleSave() {
     if (!editNombre.trim()) { setEditError('El nombre es obligatorio'); return }
     setEditSaving(true); setEditError('')
-    const { data, error: err } = await db.from('clientes')
-      .update({
-        nombre:   editNombre.trim(),
-        telefono: editTel.trim()   || null,
-        email:    editEmail.trim() || null,
-        licencia: editLic.trim()   || null,
-        direccion:editDir.trim()   || null,
-      })
-      .eq('id', cliente.id)
-      .select().single()
+    const base = {
+      nombre:   editNombre.trim(),
+      telefono: editTel.trim()   || null,
+      email:    editEmail.trim() || null,
+      licencia: editLic.trim()   || null,
+      direccion:editDir.trim()   || null,
+    }
+    const extras = Object.fromEntries(EXTRAS.map(k => [k, editExtra[k].trim() || null]))
+    let { data, error: err } = await db.from('clientes').update({ ...base, ...extras }).eq('id', cliente.id).select().single()
+    // PGRST204: newer columns not migrated yet
+    if (err?.code === 'PGRST204') ({ data, error: err } = await db.from('clientes').update(base).eq('id', cliente.id).select().single())
     setEditSaving(false)
     if (err) { setEditError(err.message); return }
     await insertLog({
@@ -240,7 +280,7 @@ function ClienteDetail({ cliente, onNewReserva, onCotizar, onUpdated }: {
   }
 
   const activa = reservas.find(r => r.status === 'confirmada' || r.status === 'entregada')
-  const totalFacturado = reservas.reduce((s, r) => s + (r.total ?? 0), 0)
+  const totalFacturado = reservas.filter(r => r.status !== 'cancelada').reduce((s, r) => s + (r.total ?? 0), 0)
 
   return (
     <div className="card cli-detail">
@@ -295,6 +335,15 @@ function ClienteDetail({ cliente, onNewReserva, onCotizar, onUpdated }: {
             <label className="field-l">Número de licencia</label>
             <input className="field-i" value={editLic} onChange={e => setEditLic(e.target.value)} placeholder="Número de licencia" />
           </div>
+          {EXTRAS.map(k => (
+            <div className="field" key={k}>
+              <label className="field-l">{EXTRA_LABEL[k]}</label>
+              {k === 'notas'
+                ? <textarea className="field-i" rows={3} value={editExtra[k]} onChange={e => setEditExtra(x => ({ ...x, [k]: e.target.value }))} />
+                : <input className="field-i" type={k === 'licencia_vence' || k === 'fecha_nacimiento' ? 'date' : 'text'}
+                    value={editExtra[k]} onChange={e => setEditExtra(x => ({ ...x, [k]: e.target.value }))} />}
+            </div>
+          ))}
           {editError && (
             <div style={{ fontSize: 12.5, color: '#c0392b', padding: '6px 10px', borderRadius: 7, background: 'oklch(96% 0.03 20)' }}>
               {editError}
@@ -344,8 +393,28 @@ function ClienteDetail({ cliente, onNewReserva, onCotizar, onUpdated }: {
           {cliente.direccion && (
             <div className="cli-data-row"><MapPin size={15} /><span>{cliente.direccion}</span></div>
           )}
+          {cliente.identificacion && (
+            <div className="cli-data-row"><Fingerprint size={15} /><span>INE / pasaporte: {cliente.identificacion}</span></div>
+          )}
           {cliente.licencia && (
-            <div className="cli-data-row"><CreditCard size={15} /><span>Licencia: {cliente.licencia}</span></div>
+            <div className="cli-data-row"><CreditCard size={15} />
+              <span>Licencia: {cliente.licencia}
+                {cliente.licencia_vence && (
+                  <span style={{ color: cliente.licencia_vence < hoyISO() ? 'var(--danger-ink)' : 'var(--ink3)', fontWeight: cliente.licencia_vence < hoyISO() ? 700 : 400 }}>
+                    {' '}· {cliente.licencia_vence < hoyISO() ? 'VENCIDA' : 'vence'} {fmtDate(cliente.licencia_vence)}
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
+          {cliente.fecha_nacimiento && (
+            <div className="cli-data-row"><Cake size={15} /><span>{fmtDate(cliente.fecha_nacimiento)} · {edad(cliente.fecha_nacimiento)} años{cliente.nacionalidad ? ` · ${cliente.nacionalidad}` : ''}</span></div>
+          )}
+          {cliente.contacto_emergencia && (
+            <div className="cli-data-row"><LifeBuoy size={15} /><span>Emergencia: {cliente.contacto_emergencia}{cliente.contacto_emergencia_tel ? ` · ${cliente.contacto_emergencia_tel}` : ''}</span></div>
+          )}
+          {cliente.notas && (
+            <div className="cli-data-row" style={{ alignItems: 'flex-start' }}><StickyNote size={15} /><span style={{ whiteSpace: 'pre-line' }}>{cliente.notas}</span></div>
           )}
         </div>
       </div>

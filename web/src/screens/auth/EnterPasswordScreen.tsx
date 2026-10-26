@@ -4,6 +4,17 @@ import { ArrowLeft, Lock, Eye, EyeOff, Car } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
 
+function mensajeDeError(e: { message: string; code?: string; status?: number; name?: string }) {
+  if (e.code === 'invalid_credentials') return 'Correo o contraseña incorrectos'
+  if (e.code === 'email_not_confirmed') return 'Este correo no ha sido confirmado. Confírmalo en Supabase → Authentication → Users.'
+  if (e.code === 'email_provider_disabled') return 'El inicio de sesión con correo está desactivado en Supabase (Authentication → Sign In / Providers → Email).'
+  if (e.code === 'user_banned') return 'Este usuario está bloqueado en Supabase.'
+  if (e.code === 'over_request_rate_limit' || e.status === 429) return 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.'
+  if (e.name === 'AuthRetryableFetchError' || !e.status || e.status >= 500)
+    return 'No se pudo conectar con el servidor. Revisa tu internet o que el proyecto de Supabase esté activo (no pausado).'
+  return `No se pudo iniciar sesión: ${e.message}`
+}
+
 export default function EnterPasswordScreen() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
@@ -27,9 +38,7 @@ export default function EnterPasswordScreen() {
     setError(null)
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
     setLoading(false)
-    if (authError) {
-      setError('Correo o contraseña incorrectos')
-    }
+    if (authError) setError(mensajeDeError(authError))
     // On success, onAuthStateChange fires → session updates → Navigate above redirects to /app/home
   }
 

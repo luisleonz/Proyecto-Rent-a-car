@@ -55,13 +55,13 @@ function AppLayout() {
 
   // Route → title/subtitle for mobile top bar
   const PAGE_INFO: Record<string, [string, string]> = {
-    '/app/home':         ['Inicio', '12 movimientos hoy'],
-    '/app/reservations': ['Reservas', '14 movimientos'],
+    '/app/home':         ['Inicio', ''],
+    '/app/reservations': ['Reservas', ''],
     '/app/cotizaciones': ['Cotizaciones', 'Cotizador rápido'],
     '/app/calendario':   ['Calendario', 'Disponibilidad de la flota'],
-    '/app/vehicles':     ['Vehículos', '12 unidades'],
+    '/app/vehicles':     ['Vehículos', ''],
     '/app/more':         ['Ajustes', ''],
-    '/app/caja':         ['Caja', '22 may · turno T1'],
+    '/app/caja':         ['Caja', ''],
   }
   const [title, sub] = PAGE_INFO[location.pathname] ?? ['', '']
 

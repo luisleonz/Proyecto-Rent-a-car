@@ -6,6 +6,7 @@ import { useAuth } from '../../state/auth'
 import { insertLog } from '../../lib/log'
 import { EMPRESA } from '../../lib/empresa'
 import { hoyISO, addDias, diffDias } from '../../lib/fechas'
+import { porCobrar } from '../../lib/reservas'
 import type { ReservaConDetalle, ReservaStatus, Cobertura } from '../../lib/database.types'
 
 /* ─── Constants ─────────────────────────────────────────────── */
@@ -366,12 +367,6 @@ function alertasDe(r: ReservaConDetalle, hoy: string): Alerta[] {
   if ((r.status === 'confirmada' || r.status === 'pendiente') && r.fecha_entrega <= hoy) a.push('sale_hoy')
   if (porCobrar(r) > 0) a.push('por_cobrar')
   return a
-}
-
-// Balance to collect at delivery. Payments after delivery aren't recorded yet, so only upcoming rentals count.
-function porCobrar(r: ReservaConDetalle) {
-  if (r.status !== 'confirmada' && r.status !== 'pendiente') return 0
-  return Math.max(0, (r.total ?? 0) - (r.deposito ?? 0))
 }
 
 function cuando(r: ReservaConDetalle, hoy: string): { txt: string; tone?: 'danger' | 'warn' } | null {

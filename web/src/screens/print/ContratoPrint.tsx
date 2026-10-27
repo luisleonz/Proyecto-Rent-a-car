@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { EMPRESA, ivaEtiqueta } from '../../lib/empresa'
 import { contrato, basica, ceroDeducible, type Para } from '../../lib/contratoTextos'
 import type { Reserva, Cliente, Vehiculo } from '../../lib/database.types'
+import { urlsFirmadas } from '../../lib/fotos'
 
 const db = supabase as any // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -86,6 +87,16 @@ function Campo({ label, value, span = 1 }: { label: string; value?: string | num
   )
 }
 
+function Gas({ nivel }: { nivel?: number | null }) {
+  const marcado = nivel == null ? null : [0, 25, 50, 75, 100].reduce((a, b) => (Math.abs(b - nivel) < Math.abs(a - nivel) ? b : a))
+  return (
+    <div className="ct-gas">Combustible: {([[0, 'E'], [25, '¼'], [50, '½'], [75, '¾'], [100, 'F']] as const).map(([n, g]) => (
+      <span key={g} className="ct-box" style={marcado === n ? { background: '#000', color: '#fff' } : undefined}>{g}</span>
+    ))}</div>
+  )
+}
+const kmFmt = (n?: number | null) => (n == null ? '' : new Intl.NumberFormat('es-MX').format(n))
+
 function Check({ on, children }: { on: boolean; children: React.ReactNode }) {
   return <span className="ct-check"><span className={`ct-box${on ? ' on' : ''}`}>{on ? '✕' : ''}</span>{children}</span>
 }
@@ -95,7 +106,7 @@ function Folio({ r, label = 'CONTRATO NÚM' }: { r: ReservaContrato; label?: str
 }
 
 /* ─── Documents ──────────────────────────────────────────────── */
-function PaginaContrato({ r, firmaUrl }: { r: ReservaContrato; firmaUrl?: string | null }) {
+function PaginaContrato({ r, firmaUrl, firmaCliente }: { r: ReservaContrato; firmaUrl?: string | null; firmaCliente?: string | null }) {
   return (
     <section className="ct-page">
       <header className="ct-head">
@@ -106,13 +117,13 @@ function PaginaContrato({ r, firmaUrl }: { r: ReservaContrato; firmaUrl?: string
       <div className="ct-cols"><Paras items={contrato} /></div>
       <div className="ct-firmas">
         <Firma rol="ARRENDADOR" nombre={EMPRESA.representante.toUpperCase()} img={firmaUrl} />
-        <Firma rol="ARRENDATARIO" nombre={r.clientes?.nombre?.toUpperCase()} />
+        <Firma rol="ARRENDATARIO" nombre={r.clientes?.nombre?.toUpperCase()} img={firmaCliente} />
       </div>
     </section>
   )
 }
 
-function PaginaAnexo({ r, firmaUrl }: { r: ReservaContrato; firmaUrl?: string | null }) {
+function PaginaAnexo({ r, firmaUrl, firmaCliente }: { r: ReservaContrato; firmaUrl?: string | null; firmaCliente?: string | null }) {
   const c = r.clientes, v = r.vehiculos
   const dias      = diasRenta(r)
   const tarifa    = v?.tarifa_diaria ?? null
@@ -196,16 +207,16 @@ function PaginaAnexo({ r, firmaUrl }: { r: ReservaContrato; firmaUrl?: string | 
       <div className="ct-insp">
         <div>
           <div className="ct-insp-t">Salida</div>
-          <div className="ct-gas">Combustible: {['E', '¼', '½', '¾', 'F'].map(g => <span key={g} className="ct-box">{g}</span>)}</div>
-          <div className="ct-linea">Km: {v?.km != null ? new Intl.NumberFormat('es-MX').format(v.km) : ''}</div>
-          <div className="ct-linea">Observaciones:</div>
+          <Gas nivel={r.combustible_salida} />
+          <div className="ct-linea">Km: {kmFmt(r.km_salida ?? v?.km)}</div>
+          <div className="ct-linea">Observaciones: {r.danos_entrega ?? ''}</div>
           <div className="ct-linea" />
         </div>
         <div>
           <div className="ct-insp-t">Devolución</div>
-          <div className="ct-gas">Combustible: {['E', '¼', '½', '¾', 'F'].map(g => <span key={g} className="ct-box">{g}</span>)}</div>
-          <div className="ct-linea">Km:</div>
-          <div className="ct-linea">Observaciones:</div>
+          <Gas nivel={r.combustible_regreso} />
+          <div className="ct-linea">Km: {kmFmt(r.km_regreso)}</div>
+          <div className="ct-linea">Observaciones: {r.danos_devolucion ?? ''}</div>
           <div className="ct-linea" />
         </div>
       </div>
@@ -215,13 +226,13 @@ function PaginaAnexo({ r, firmaUrl }: { r: ReservaContrato; firmaUrl?: string | 
       </div>
       <div className="ct-firmas">
         <Firma rol="ARRENDADOR" nombre={EMPRESA.representante.toUpperCase()} img={firmaUrl} />
-        <Firma rol="ARRENDATARIO" nombre={c?.nombre?.toUpperCase()} />
+        <Firma rol="ARRENDATARIO" nombre={c?.nombre?.toUpperCase()} img={firmaCliente} />
       </div>
     </section>
   )
 }
 
-function PaginaPoliza({ r, titulo, subtitulo, items }: { r: ReservaContrato; titulo: string; subtitulo: string; items: Para[] }) {
+function PaginaPoliza({ r, titulo, subtitulo, items, firmaCliente }: { r: ReservaContrato; titulo: string; subtitulo: string; items: Para[]; firmaCliente?: string | null }) {
   return (
     <section className="ct-page ct-poliza">
       <header className="ct-head">
@@ -231,23 +242,23 @@ function PaginaPoliza({ r, titulo, subtitulo, items }: { r: ReservaContrato; tit
       </header>
       <div className="ct-body"><Paras items={items} /></div>
       <div className="ct-firmas single">
-        <Firma nombre={r.clientes?.nombre?.toUpperCase()} leyenda="Nombre y firma de conformidad." />
+        <Firma nombre={r.clientes?.nombre?.toUpperCase()} img={firmaCliente} leyenda="Nombre y firma de conformidad." />
       </div>
     </section>
   )
 }
 
-export function ContratoDocs({ r, docs, firmaUrl }: { r: ReservaContrato; docs: DocKey[]; firmaUrl?: string | null }) {
+export function ContratoDocs({ r, docs, firmaUrl, firmaCliente }: { r: ReservaContrato; docs: DocKey[]; firmaUrl?: string | null; firmaCliente?: string | null }) {
   return (
     <div className="ct-root">
-      {docs.includes('contrato') && <PaginaContrato r={r} firmaUrl={firmaUrl} />}
-      {docs.includes('anexo')    && <PaginaAnexo r={r} firmaUrl={firmaUrl} />}
+      {docs.includes('contrato') && <PaginaContrato r={r} firmaUrl={firmaUrl} firmaCliente={firmaCliente} />}
+      {docs.includes('anexo')    && <PaginaAnexo r={r} firmaUrl={firmaUrl} firmaCliente={firmaCliente} />}
       {docs.includes('basica')   && (
-        <PaginaPoliza r={r} items={basica}
+        <PaginaPoliza r={r} items={basica} firmaCliente={firmaCliente}
           titulo="PAQUETE DE COBERTURA AMPLIA CON PAGO DE DEDUCIBLE Y/O DAÑOS" subtitulo="(COBERTURA BÁSICA)" />
       )}
       {docs.includes('cero') && (
-        <PaginaPoliza r={r} items={ceroDeducible}
+        <PaginaPoliza r={r} items={ceroDeducible} firmaCliente={firmaCliente}
           titulo="PAQUETE DE COBERTURA AMPLIA CON CERO DE DEDUCIBLE" subtitulo="(COBERTURA PREMIUM)" />
       )}
     </div>
@@ -263,6 +274,7 @@ export default function ContratoPrint() {
   const [error, setError] = useState('')
   const [docs, setDocs] = useState<DocKey[]>([])
   const [firmaUrl, setFirmaUrl] = useState<string | null | undefined>(undefined)
+  const [firmaCliente, setFirmaCliente] = useState<string | null>(null)
 
   useEffect(() => {
     supabase.storage.from(FIRMA_BUCKET).createSignedUrl(FIRMA_PATH, 3600)
@@ -274,6 +286,7 @@ export default function ContratoPrint() {
       .then(({ data, error: err }: { data: ReservaContrato | null; error: { message: string } | null }) => {
         if (err || !data) { setError(err?.message ?? 'Reserva no encontrada'); return }
         setR(data)
+        if (data.firma_cliente) urlsFirmadas([data.firma_cliente]).then(m => setFirmaCliente(m[data.firma_cliente!] ?? null))
         setDocs(['contrato', 'anexo', 'basica', ...(data.cobertura === 'cero_deducible' ? ['cero' as const] : [])])
         document.title = `Contrato ${data.folio ?? ''} · ${data.clientes?.nombre ?? ''}`.trim()
       })
@@ -302,7 +315,7 @@ export default function ContratoPrint() {
       </div>
       {error && <div className="ct-msg">No se pudo cargar la reserva: {error}</div>}
       {!r && !error && <div className="ct-msg"><div className="spinner" /></div>}
-      {r && <ContratoDocs r={r} firmaUrl={firmaUrl} docs={(Object.keys(DOC_LABEL) as DocKey[]).filter(k => docs.includes(k))} />}
+      {r && <ContratoDocs r={r} firmaUrl={firmaUrl} firmaCliente={firmaCliente} docs={(Object.keys(DOC_LABEL) as DocKey[]).filter(k => docs.includes(k))} />}
     </div>
   )
 }

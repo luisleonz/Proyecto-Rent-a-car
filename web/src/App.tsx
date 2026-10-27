@@ -29,8 +29,8 @@ import EditProfileScreen from './screens/more/EditProfileScreen'
 import ContratoPrint from './screens/print/ContratoPrint'
 import CalendarioScreen from './screens/calendario/CalendarioScreen'
 import { CajaTurnoScreen, CajaCierreScreen, CajaJustificacionScreen, CajaOkScreen } from './screens/caja/CajaFlow'
-import { EntregaStep1Screen, EntregaStep2Screen, EntregaStep3Screen, EntregaOkScreen } from './screens/flows/EntregaFlow'
-import { DevolucionStep1Screen, DevolucionStep2Screen, DevolucionStep3Screen, DevolucionOkScreen } from './screens/flows/DevolucionFlow'
+import EntregaScreen from './screens/flows/EntregaScreen'
+import DevolucionScreen from './screens/flows/DevolucionScreen'
 
 const FLOW_PREFIXES = ['/app/caja/turno', '/app/caja/cierre', '/app/caja/justificacion', '/app/caja/ok']
 
@@ -111,16 +111,8 @@ function AppLayout() {
             <Route path="caja/cierre"       element={<CajaCierreScreen />} />
             <Route path="caja/justificacion" element={<CajaJustificacionScreen />} />
             <Route path="caja/ok"           element={<CajaOkScreen />} />
-            {/* Entrega flow */}
-            <Route path="entrega/:resId/1"  element={<EntregaStep1Screen />} />
-            <Route path="entrega/:resId/2"  element={<EntregaStep2Screen />} />
-            <Route path="entrega/:resId/3"  element={<EntregaStep3Screen />} />
-            <Route path="entrega/:resId/ok" element={<EntregaOkScreen />} />
-            {/* Devolución flow */}
-            <Route path="devolucion/:resId/1"  element={<DevolucionStep1Screen />} />
-            <Route path="devolucion/:resId/2"  element={<DevolucionStep2Screen />} />
-            <Route path="devolucion/:resId/3"  element={<DevolucionStep3Screen />} />
-            <Route path="devolucion/:resId/ok" element={<DevolucionOkScreen />} />
+            <Route path="entrega/:resId/*"    element={<EntregaScreen />} />
+            <Route path="devolucion/:resId/*" element={<DevolucionScreen />} />
             <Route path="*" element={<Navigate to="home" replace />} />
           </Routes>
         </div>

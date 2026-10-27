@@ -140,6 +140,12 @@ export default function ReservaPanel({ res, open, onClose, onChanged }: {
     if (ed.notas !== (res!.notas ?? '')) nuevos.notas = ed.notas || null
     if (!Object.keys(nuevos).length) { setEditing(false); return }
     if (ed.fecha_devolucion < ed.fecha_entrega) { setAviso({ ok: false, t: 'La devolución no puede ser antes de la entrega.' }); return }
+    if ((nuevos.fecha_entrega || nuevos.fecha_devolucion) && res!.vehiculo_id) {
+      const { data: choques } = await db.from('reservas').select('folio')
+        .eq('vehiculo_id', res!.vehiculo_id).neq('id', res!.id).in('status', ['pendiente', 'confirmada', 'entregada'])
+        .lt('fecha_entrega', ed.fecha_devolucion).gt('fecha_devolucion', ed.fecha_entrega)
+      if (choques?.length) { setAviso({ ok: false, t: `En esas fechas el vehículo ya tiene la reserva #${choques[0].folio ?? '?'}.` }); return }
+    }
     if (isAdmin) {
       if (await cambiarDirecto(nuevos, 'editar_reserva', `Reserva #${res!.folio ?? ''} editada`)) { setEditing(false); setAviso({ ok: true, t: 'Cambios guardados.' }) }
     } else {

@@ -664,18 +664,26 @@ export default function CotizacionesScreen() {
   }
 
   async function handleConvert(cot: Cotizacion, fechaEntrega: string, fechaDevolucion: string, deposito: number, metodoDeposito: string | null): Promise<string | null> {
+    // The vehicle must be free for those dates
+    if (cot.vehiculo_id) {
+      const { data: choques } = await db.from('reservas').select('folio')
+        .eq('vehiculo_id', cot.vehiculo_id).in('status', ['pendiente', 'confirmada', 'entregada'])
+        .lt('fecha_entrega', fechaDevolucion).gt('fecha_devolucion', fechaEntrega)
+      if (choques?.length) return `El vehículo ya está reservado en esas fechas (reserva #${choques[0].folio ?? '?'}). Elige otras fechas.`
+    }
+
     // Find-or-create client: search by phone first, then by name, else insert
     let clienteId: string | null = null
 
     if (cot.cliente_telefono?.trim()) {
       const { data: found } = await db.from('clientes').select('id')
-        .eq('telefono', cot.cliente_telefono.trim()).maybeSingle()
-      if (found) clienteId = found.id
+        .eq('telefono', cot.cliente_telefono.trim()).limit(1)
+      if (found?.[0]) clienteId = found[0].id
     }
     if (!clienteId) {
       const { data: found } = await db.from('clientes').select('id')
-        .ilike('nombre', cot.cliente_nombre.trim()).maybeSingle()
-      if (found) clienteId = found.id
+        .ilike('nombre', cot.cliente_nombre.trim()).limit(1)
+      if (found?.[0]) clienteId = found[0].id
     }
     if (!clienteId) {
       const { data: nuevo, error: clienteErr } = await db.from('clientes').insert({
@@ -699,12 +707,13 @@ export default function CotizacionesScreen() {
     if (reservaErr) return `Error al crear reserva: ${reservaErr.message}`
     if (!reserva) return 'No se pudo crear la reserva'
 
+    if (deposito > 0) {
+      await db.from('pagos').insert({ reserva_id: reserva.id, monto: deposito, metodo: metodoDeposito, concepto: 'renta',
+        notas: 'Anticipo al reservar', registrado_por: currentEmail }).then(() => null, () => null)
+    }
     if (cot.vehiculo_id) {
-      await db.from('vehiculos').update({
-        status: 'reservado',
-        cliente_actual: cot.cliente_nombre,
-        info_cliente: `reserva ${reserva.id.slice(0, 8)}`,
-      }).eq('id', cot.vehiculo_id)
+      const { error: syncErr } = await db.rpc('sincronizar_vehiculo', { vid: cot.vehiculo_id })
+      if (syncErr) await db.from('vehiculos').update({ status: 'reservado', cliente_actual: cot.cliente_nombre }).eq('id', cot.vehiculo_id)
     }
 
     const { data: updated } = await db

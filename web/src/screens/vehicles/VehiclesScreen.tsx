@@ -554,7 +554,7 @@ export default function VehiclesScreen() {
           background: 'var(--warn-soft)', border: '1px solid var(--warn-line)', borderRadius: 'var(--radius-sm)', fontSize: 13.5, color: 'var(--warn-ink)' }}>
           <ImageDown size={18} />
           <span style={{ flex: 1, minWidth: 220 }}>
-            {fotosExternas.length} {fotosExternas.length === 1 ? 'foto sigue' : 'fotos siguen'} guardadas en la plataforma anterior y se perderán al cancelarla.
+            {fotosExternas.length === 1 ? '1 foto sigue guardada' : `${fotosExternas.length} fotos siguen guardadas`} en la plataforma anterior y se perderán al cancelarla.
           </span>
           <button className="btn sm" onClick={copiarFotos} disabled={!!copiando}>{copiando ?? 'Copiar a esta app'}</button>
         </div>

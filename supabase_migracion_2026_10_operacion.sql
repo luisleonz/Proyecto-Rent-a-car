@@ -38,7 +38,7 @@ alter table vehiculos
   add column if not exists notas               text;
 
 -- ── 3. Estado del vehículo según sus reservas ─────────
--- rentado: tiene una renta entregada · reservado: sale hoy o mañana (o debió salir) ·
+-- rentado: tiene una renta entregada · reservado: sale hoy o mañana (o debió salir y sus fechas siguen vigentes) ·
 -- taller: lo decide el usuario y no se toca · disponible: lo demás
 create or replace function public.sincronizar_vehiculo(vid uuid) returns void
 language plpgsql security definer set search_path = public as $$
@@ -63,6 +63,7 @@ begin
   select res.fecha_entrega, c.nombre into r
   from reservas res left join clientes c on c.id = res.cliente_id
   where res.vehiculo_id = vid and res.status in ('confirmada', 'pendiente') and res.fecha_entrega <= hoy + 1
+    and res.fecha_devolucion >= hoy   -- a pickup that never happened and whose dates passed doesn't block the car
   order by res.fecha_entrega limit 1;
   if found then
     update vehiculos set status = 'reservado', cliente_actual = r.nombre,

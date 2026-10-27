@@ -13,13 +13,14 @@ interface AuthContextType {
   currentRole: string
   currentBranch: string
   isAdmin: boolean
+  tieneAcceso: boolean
 }
 
 const AuthContext = createContext<AuthContextType>({
   session: null, user: null, loading: true,
   signOut: async () => {},
   currentEmail: '', currentFirstName: '', currentInitials: '',
-  currentRole: '', currentBranch: '', isAdmin: false,
+  currentRole: '', currentBranch: '', isAdmin: false, tieneAcceso: false,
 })
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -53,9 +54,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const firstName     = meta.first_name ?? meta.nombre ?? email.split('@')[0] ?? ''
   const initials      = meta.initials  ?? firstName.slice(0, 2).toUpperCase()
   // Role lives in app_metadata, which users cannot edit themselves (user_metadata they can)
-  const role          = (user?.app_metadata?.role as string | undefined) ?? 'Empleado'
+  const role          = (user?.app_metadata?.role as string | undefined) ?? 'Sin acceso'
   const branch   = meta.branch ?? meta.sucursal ?? 'Polanco'
   const isAdmin  = role === 'Administrador'
+  const tieneAcceso = role === 'Administrador' || role === 'Empleado'
 
   return (
     <AuthContext.Provider value={{
@@ -66,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       currentRole: role,
       currentBranch: branch,
       isAdmin,
+      tieneAcceso,
     }}>
       {children}
     </AuthContext.Provider>

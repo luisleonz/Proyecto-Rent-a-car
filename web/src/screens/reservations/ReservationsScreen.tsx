@@ -928,7 +928,7 @@ export default function ReservationsScreen() {
           )}
           {alertas.sale_hoy.length > 0 && (
             <button className="rs-alert warn" onClick={() => setFilter('Requieren acción')}>
-              <KeyRound size={14} />{alertas.sale_hoy.length} por entregar hoy
+              <KeyRound size={14} />{alertas.sale_hoy.length} por entregar
             </button>
           )}
           {alertas.por_cobrar.length > 0 && (

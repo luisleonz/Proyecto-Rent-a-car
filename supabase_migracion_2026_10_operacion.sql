@@ -6,7 +6,8 @@
 --  2. Vehículos: varias fotos, vencimientos (seguro, tarjeta, verificación) y servicio.
 --  3. Estado de cada vehículo calculado solo a partir de sus reservas.
 --  4. Roles seguros: el rol vive donde el usuario no lo puede cambiar.
---  5. Permisos: solo administradores borran datos o aprueban solicitudes.
+--  5. Permisos: solo cuentas activadas (Empleado/Administrador) ven datos;
+--     solo administradores borran datos o aprueban solicitudes.
 --  6. Almacenamiento de fotos de vehículos (público) y de documentos (privado).
 --  7. Funciones para la pantalla de Empleados y la página pública de autos.
 -- ══════════════════════════════════════════════════════
@@ -102,11 +103,20 @@ do $$ begin
     update auth.users
     set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || jsonb_build_object('role', raw_user_meta_data->>'role')
     where raw_user_meta_data->>'role' is not null and (raw_app_meta_data->>'role') is null;
+    -- Everyone who already had an account keeps access as Empleado
+    update auth.users
+    set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"role":"Empleado"}'::jsonb
+    where (raw_app_meta_data->>'role') is null;
   end if;
 end $$;
 
 create or replace function public.es_admin() returns boolean language sql stable as $$
   select coalesce((auth.jwt() -> 'app_metadata' ->> 'role') = 'Administrador', false)
+$$;
+
+-- New accounts (e.g. someone signing up on their own) have no role and see nothing until an admin enables them
+create or replace function public.es_empleado() returns boolean language sql stable as $$
+  select coalesce((auth.jwt() -> 'app_metadata' ->> 'role') in ('Empleado', 'Administrador'), false)
 $$;
 
 -- ── 5. Permisos por rol en todas las tablas ───────────
@@ -120,13 +130,13 @@ begin
     execute format('drop policy if exists empleados_crean on public.%I', t.tablename);
     execute format('drop policy if exists empleados_editan on public.%I', t.tablename);
     execute format('drop policy if exists admin_borra on public.%I', t.tablename);
-    execute format('create policy empleados_leen on public.%I for select to authenticated using (true)', t.tablename);
-    execute format('create policy empleados_crean on public.%I for insert to authenticated with check (true)', t.tablename);
+    execute format('create policy empleados_leen on public.%I for select to authenticated using (public.es_empleado())', t.tablename);
+    execute format('create policy empleados_crean on public.%I for insert to authenticated with check (public.es_empleado())', t.tablename);
     execute format('create policy admin_borra on public.%I for delete to authenticated using (public.es_admin())', t.tablename);
     if t.tablename = 'solicitudes' then
       execute format('create policy empleados_editan on public.%I for update to authenticated using (public.es_admin()) with check (public.es_admin())', t.tablename);
     else
-      execute format('create policy empleados_editan on public.%I for update to authenticated using (true) with check (true)', t.tablename);
+      execute format('create policy empleados_editan on public.%I for update to authenticated using (public.es_empleado()) with check (public.es_empleado())', t.tablename);
     end if;
   end loop;
 end $$;
@@ -145,11 +155,13 @@ do $$ begin
     drop policy if exists empleados_leen_documentos on storage.objects;
     drop policy if exists empleados_suben_documentos on storage.objects;
     drop policy if exists admin_borra_documentos on storage.objects;
-    create policy empleados_suben_vehiculos on storage.objects for insert to authenticated with check (bucket_id = 'vehiculos');
-    create policy empleados_cambian_vehiculos on storage.objects for update to authenticated using (bucket_id = 'vehiculos');
-    create policy empleados_borran_vehiculos on storage.objects for delete to authenticated using (bucket_id = 'vehiculos');
-    create policy empleados_leen_documentos on storage.objects for select to authenticated using (bucket_id = 'documentos');
-    create policy empleados_suben_documentos on storage.objects for insert to authenticated with check (bucket_id = 'documentos');
+    create policy empleados_suben_vehiculos on storage.objects for insert to authenticated with check (bucket_id = 'vehiculos' and public.es_empleado());
+    create policy empleados_cambian_vehiculos on storage.objects for update to authenticated using (bucket_id = 'vehiculos' and public.es_empleado());
+    create policy empleados_borran_vehiculos on storage.objects for delete to authenticated using (bucket_id = 'vehiculos' and public.es_empleado());
+    create policy empleados_leen_documentos on storage.objects for select to authenticated using (bucket_id = 'documentos' and public.es_empleado());
+    create policy empleados_suben_documentos on storage.objects for insert to authenticated with check (bucket_id = 'documentos' and public.es_empleado());
+    drop policy if exists empleados_leen_firma on storage.objects;
+    create policy empleados_leen_firma on storage.objects for select to authenticated using (bucket_id = 'Firma' and public.es_empleado());
     create policy admin_borra_documentos on storage.objects for delete to authenticated using (bucket_id = 'documentos' and public.es_admin());
   end if;
 end $$;
@@ -162,7 +174,7 @@ begin
   if not public.es_admin() then raise exception 'Solo administradores'; end if;
   return query
     select u.id, u.email::text, coalesce(u.raw_user_meta_data->>'first_name', u.raw_user_meta_data->>'nombre'),
-           coalesce(u.raw_app_meta_data->>'role', 'Empleado'), u.created_at, u.last_sign_in_at, u.email_confirmed_at is not null
+           coalesce(u.raw_app_meta_data->>'role', 'Sin acceso'), u.created_at, u.last_sign_in_at, u.email_confirmed_at is not null
     from auth.users u where u.deleted_at is null order by u.created_at;
 end $$;
 
@@ -170,9 +182,13 @@ create or replace function public.asignar_rol(uid uuid, rol text) returns void
 language plpgsql security definer set search_path = public, auth as $$
 begin
   if not public.es_admin() then raise exception 'Solo administradores'; end if;
-  if rol not in ('Administrador', 'Empleado') then raise exception 'Rol no válido'; end if;
+  if rol not in ('Administrador', 'Empleado', 'Sin acceso') then raise exception 'Rol no válido'; end if;
   if uid = auth.uid() and rol <> 'Administrador' then raise exception 'No puedes quitarte tu propio rol de administrador'; end if;
-  update auth.users set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || jsonb_build_object('role', rol) where id = uid;
+  if rol = 'Sin acceso' then
+    update auth.users set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) - 'role' where id = uid;
+  else
+    update auth.users set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || jsonb_build_object('role', rol) where id = uid;
+  end if;
 end $$;
 
 -- ── Página pública: solo datos de exhibición de los autos ──

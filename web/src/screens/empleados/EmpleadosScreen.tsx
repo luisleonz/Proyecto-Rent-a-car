@@ -48,11 +48,11 @@ export default function EmpleadosScreen() {
   }
   useEffect(() => { cargar() }, [])
 
-  async function cambiarRol(e: Empleado) {
-    const nuevo = e.rol === 'Administrador' ? 'Empleado' : 'Administrador'
-    if (!confirm(nuevo === 'Administrador'
-      ? `¿Dar permisos de administrador a ${e.nombre ?? e.email}? Podrá editar precios, vehículos, aprobar cambios y ver reportes.`
-      : `¿Quitar permisos de administrador a ${e.nombre ?? e.email}?`)) return
+  async function cambiarRol(e: Empleado, nuevo: 'Administrador' | 'Empleado' | 'Sin acceso') {
+    const quien = e.nombre ?? e.email
+    if (!confirm(nuevo === 'Administrador' ? `¿Dar permisos de administrador a ${quien}? Podrá editar precios y vehículos, aprobar cambios y ver reportes.`
+      : nuevo === 'Sin acceso' ? `¿Quitar el acceso a ${quien}? Ya no podrá ver ni modificar datos.`
+      : e.rol === 'Administrador' ? `¿Quitar permisos de administrador a ${quien}?` : `¿Dar acceso a ${quien} como empleado?`)) return
     setCambiando(e.id)
     const { error: err } = await db.rpc('asignar_rol', { uid: e.id, rol: nuevo })
     setCambiando(null)
@@ -75,7 +75,7 @@ export default function EmpleadosScreen() {
       </div>
 
       <div className="card" style={{ padding: '12px 16px', marginBottom: 'var(--gap)', fontSize: 13, color: 'var(--ink2)', lineHeight: 1.5 }}>
-        Para dar de alta a alguien: <strong>Invitar empleado</strong> abre Supabase → <em>Invite user</em> → escribe su correo. Le llegará un enlace para crear su contraseña y entrar. Aquí aparecerá como <strong>Empleado</strong>; si debe ser administrador, cámbialo con el botón.
+        Para dar de alta a alguien: <strong>Invitar empleado</strong> abre Supabase → <em>Invite user</em> → escribe su correo. Le llegará un enlace para crear su contraseña. Después aparecerá aquí <strong>Sin acceso</strong>: toca <strong>Dar acceso</strong> para que pueda trabajar. Los cambios de permisos se aplican la próxima vez que entre a la app.
       </div>
 
       {error && <div style={{ padding: '12px 16px', background: 'var(--danger-soft)', color: 'var(--danger-ink)', borderRadius: 'var(--radius-sm)', marginBottom: 'var(--gap)' }}>{error}</div>}
@@ -90,16 +90,19 @@ export default function EmpleadosScreen() {
               <div className="tile-main" style={{ minWidth: 200 }}>
                 <div className="tile-l" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                   {e.nombre ?? e.email.split('@')[0]}{yo && <span className="chip sm">tú</span>}
-                  <span className={`chip sm ${e.rol === 'Administrador' ? 'primary' : ''}`}>{e.rol}</span>
+                  <span className={`chip sm ${e.rol === 'Administrador' ? 'primary' : e.rol === 'Sin acceso' ? 'danger' : ''}`}>{e.rol}</span>
                   {!e.confirmado && <span className="chip sm warn">Invitación pendiente</span>}
                 </div>
                 <div className="tile-s">{e.email} · último acceso {hace(e.ultimo_acceso)}</div>
                 {a && <div className="tile-s">Últimos 30 días: {a.reservas} reservas · {a.entregas} entregas · {a.devoluciones} devoluciones · {a.cobros} cobros</div>}
               </div>
               {!yo && (
-                <button className="btn sm" onClick={() => cambiarRol(e)} disabled={cambiando === e.id}>
-                  {e.rol === 'Administrador' ? <><Shield size={13} />Quitar admin</> : <><ShieldCheck size={13} />Hacer admin</>}
-                </button>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {e.rol === 'Sin acceso' && <button className="btn sm primary" onClick={() => cambiarRol(e, 'Empleado')} disabled={cambiando === e.id}><ShieldCheck size={13} />Dar acceso</button>}
+                  {e.rol === 'Empleado' && <button className="btn sm" onClick={() => cambiarRol(e, 'Administrador')} disabled={cambiando === e.id}><ShieldCheck size={13} />Hacer admin</button>}
+                  {e.rol === 'Administrador' && <button className="btn sm" onClick={() => cambiarRol(e, 'Empleado')} disabled={cambiando === e.id}><Shield size={13} />Quitar admin</button>}
+                  {e.rol !== 'Sin acceso' && <button className="btn sm" onClick={() => cambiarRol(e, 'Sin acceso')} disabled={cambiando === e.id}>Quitar acceso</button>}
+                </div>
               )}
             </div>
           )

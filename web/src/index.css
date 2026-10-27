@@ -218,6 +218,7 @@ body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; color
 .dot.warn { background: var(--warn); }
 .dot.danger { background: var(--danger); }
 .dot.neutral { background: var(--ink3); }
+a.btn { text-decoration: none; }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 11px 17px; border-radius: 11px; cursor: pointer; font-family: inherit; font-size: 14px; font-weight: 600; letter-spacing: -0.1px; border: 1px solid var(--card-line); background: var(--card); color: var(--ink); transition: filter 120ms, background 120ms; white-space: nowrap; }
 .btn:hover { border-color: var(--ink4); }
 .btn.sm { padding: 8px 13px; font-size: 13px; border-radius: 9px; }

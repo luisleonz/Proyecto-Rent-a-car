@@ -2,6 +2,7 @@ import { useState, useEffect, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Menu } from 'lucide-react'
 import { AuthProvider, useAuth } from './state/auth'
+import { supabase } from './lib/supabase'
 import BottomNav from './components/BottomNav'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
@@ -35,14 +36,35 @@ const Cargando = () => (
 )
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { session, loading } = useAuth()
+  const { session, loading, tieneAcceso } = useAuth()
   if (loading) return (
     <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--paper)' }}>
       <div className="spinner" />
     </div>
   )
   if (!session) return <Navigate to="/" replace />
+  if (!tieneAcceso) return <SinAcceso />
   return <>{children}</>
+}
+
+function SinAcceso() {
+  const { currentEmail, signOut } = useAuth()
+  const [revisando, setRevisando] = useState(false)
+  return (
+    <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--paper)', padding: 16 }}>
+      <div className="card" style={{ maxWidth: 420, padding: 32, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <h1 className="h-display" style={{ fontSize: 26 }}>Tu cuenta aún no tiene acceso</h1>
+        <p style={{ color: 'var(--ink2)', margin: 0, lineHeight: 1.5 }}>
+          Iniciaste sesión como <strong>{currentEmail}</strong>. Pide al administrador que active tu cuenta en la pantalla de Empleados y luego toca “Ya me dieron acceso”.
+        </p>
+        <button className="btn primary" disabled={revisando}
+          onClick={async () => { setRevisando(true); await supabase.auth.refreshSession(); setRevisando(false) }}>
+          {revisando ? 'Revisando…' : 'Ya me dieron acceso'}
+        </button>
+        <button className="btn" onClick={signOut}>Cerrar sesión</button>
+      </div>
+    </div>
+  )
 }
 
 function SoloAdmin({ children }: { children: React.ReactNode }) {

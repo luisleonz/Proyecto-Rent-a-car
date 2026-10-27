@@ -563,7 +563,10 @@ export default function CotizacionesScreen() {
         setLoadingVeh(false)
       })
 
-    db.from('cotizaciones').select('*').order('created_at', { ascending: false })
+    // Quotes are valid for 7 days; unanswered older ones expire on their own
+    const limite = new Date(Date.now() - 7 * 864e5).toISOString()
+    db.from('cotizaciones').update({ status: 'vencida' }).eq('status', 'enviada').lt('created_at', limite)
+      .then(() => db.from('cotizaciones').select('*').order('created_at', { ascending: false }))
       .then(({ data }: { data: Cotizacion[] | null }) => {
         setCotizaciones(data ?? [])
       })

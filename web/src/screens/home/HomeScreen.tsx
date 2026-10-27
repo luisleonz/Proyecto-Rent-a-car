@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
 import { hoyISO, addDias, diffDias, parseISO } from '../../lib/fechas'
 import { porCobrar } from '../../lib/reservas'
+import { sincronizarFlota } from '../../lib/operacion'
 import type { Vehiculo, ReservaConDetalle } from '../../lib/database.types'
 
 const db = supabase as any // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -41,7 +42,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     const desde6m = addDias(hoy, -190)
-    Promise.all([
+    sincronizarFlota().then(() => Promise.all([
       db.from('vehiculos').select('*').order('modelo'),
       db.from('reservas').select('*, clientes(nombre, telefono), vehiculos(modelo, placa, anio, tarifa_diaria)')
         .neq('status', 'cancelada').gte('fecha_devolucion', desde6m),
@@ -51,7 +52,7 @@ export default function HomeScreen() {
       setReservas(r.data ?? [])
       setCotPendientes(c.count ?? 0)
       setLoading(false)
-    })
+    }))
   }, [])
 
   const d = useMemo(() => {
@@ -59,6 +60,19 @@ export default function HomeScreen() {
     const delMes = reservas.filter(r => r.fecha_entrega.startsWith(mes))
     const vencidas = reservas.filter(r => r.status === 'entregada' && r.fecha_devolucion < hoy)
     const noSalieron = reservas.filter(r => (r.status === 'confirmada' || r.status === 'pendiente') && r.fecha_entrega < hoy)
+    // Expiring documents (≤30 days) and services due (≤500 km)
+    const mantenimiento: { v: Vehiculo; texto: string; urgente: boolean }[] = []
+    const en30 = addDias(hoy, 30)
+    for (const v of vehiculos) {
+      for (const [campo, nombre] of [['seguro_vence', 'Seguro'], ['tarjeta_vence', 'Tarjeta de circulación'], ['verificacion_vence', 'Verificación']] as const) {
+        const f = v[campo]
+        if (f && f <= en30) mantenimiento.push({ v, urgente: f < hoy, texto: `${nombre} ${f < hoy ? 'vencido' : `vence el ${parseISO(f).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}`}` })
+      }
+      if (v.servicio_cada_km) {
+        const falta = (v.ultimo_servicio_km ?? 0) + v.servicio_cada_km - (v.km ?? 0)
+        if (falta <= 500) mantenimiento.push({ v, urgente: falta <= 0, texto: falta <= 0 ? `Servicio vencido por ${fmt(-falta)} km` : `Servicio en ${fmt(falta)} km` })
+      }
+    }
     const porCobrarTotal = reservas.reduce((s, r) => s + porCobrar(r), 0)
     const counts = vehiculos.reduce<Record<string, number>>((a, v) => { a[v.status] = (a[v.status] ?? 0) + 1; return a }, {})
 
@@ -79,7 +93,7 @@ export default function HomeScreen() {
       montoMes: delMes.reduce((s, r) => s + (r.total ?? 0), 0),
       anticiposMes: delMes.reduce((s, r) => s + (r.deposito ?? 0), 0),
       reservasMes: delMes.length,
-      vencidas, noSalieron, porCobrarTotal, counts, meses, movs,
+      vencidas, noSalieron, porCobrarTotal, counts, meses, movs, mantenimiento,
       salenHoy: movs.filter(m => m.tipo === 'Entrega' && m.fecha === hoy).length,
       regresanHoy: movs.filter(m => m.tipo === 'Devolución' && m.fecha === hoy).length,
     }
@@ -271,6 +285,16 @@ export default function HomeScreen() {
                 <span className="link" style={{ fontSize: 12.5, color: 'var(--primary)', fontWeight: 600, cursor: 'pointer' }} onClick={() => navigate('/app/vehicles')}>Flota</span>
               </div>
             )}
+            {d.mantenimiento.map((m, i) => (
+              <div key={`m${i}`} className="tilerow">
+                <div className={`tile-ic ${m.urgente ? 'danger' : 'warn'}`}><Wrench size={18} /></div>
+                <div className="tile-main">
+                  <div className="tile-l">{m.texto}</div>
+                  <div className="tile-s">{m.v.modelo} · {m.v.placa}</div>
+                </div>
+                <span className="link" style={{ fontSize: 12.5, color: 'var(--primary)', fontWeight: 600, cursor: 'pointer' }} onClick={() => navigate(`/app/vehicles/${m.v.placa}`)}>Ver</span>
+              </div>
+            ))}
             {cotPendientes > 0 && (
               <div className="tilerow">
                 <div className="tile-ic"><FileText size={18} /></div>
@@ -281,7 +305,7 @@ export default function HomeScreen() {
                 <span className="link" style={{ fontSize: 12.5, color: 'var(--primary)', fontWeight: 600, cursor: 'pointer' }} onClick={() => navigate('/app/cotizaciones')}>Ver</span>
               </div>
             )}
-            {!loading && d.vencidas.length + d.noSalieron.length + (d.counts.taller ?? 0) + cotPendientes === 0 && (
+            {!loading && d.vencidas.length + d.noSalieron.length + (d.counts.taller ?? 0) + cotPendientes + d.mantenimiento.length === 0 && (
               <div style={{ padding: '28px 16px', textAlign: 'center', color: 'var(--ink3)', fontSize: 13.5 }}>Todo en orden.</div>
             )}
           </div>

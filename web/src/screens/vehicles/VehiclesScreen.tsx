@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, SlidersHorizontal, Gauge, Fuel, Settings2, User, X, Check, ImageDown } from 'lucide-react'
+import { Plus, SlidersHorizontal, Gauge, Fuel, Settings2, User, X, Check, ImageDown, Globe } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
 import { insertLog } from '../../lib/log'
@@ -531,6 +531,9 @@ export default function VehiclesScreen() {
           >
             <SlidersHorizontal size={14} />Filtros{segFilter !== 'todos' ? ' ·' + segFilter : ''}
           </button>
+          <a className="btn sm" href="#/disponibles" target="_blank" rel="noreferrer" title="Página para clientes con los autos y precios">
+            <Globe size={14} />Página pública
+          </a>
           {isAdmin && (
             <button className="btn sm primary" onClick={() => setPanelOpen(true)}>
               <Plus size={14} />Agregar

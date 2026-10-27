@@ -1,22 +1,18 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, SlidersHorizontal, Gauge, Fuel, Settings2, User, X, Check } from 'lucide-react'
+import { Plus, SlidersHorizontal, Gauge, Fuel, Settings2, User, X, Check, ImageDown } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
 import { insertLog } from '../../lib/log'
 import type { Vehiculo, VehiculoStatus } from '../../lib/database.types'
+import VehiculoFoto, { TONES } from '../../components/VehiculoFoto'
+import { insertarConExtras } from '../../lib/insertar'
+import { sincronizarFlota } from '../../lib/operacion'
+import { subirFotoVehiculo } from '../../lib/fotos'
 
 const db = supabase as any
 
 /* ─── Constants ─────────────────────────────────────────────── */
-const TONES: Record<string, [string, string]> = {
-  blue:  ['oklch(0.62 0.10 245)', 'oklch(0.90 0.04 245)'],
-  slate: ['oklch(0.55 0.02 240)', 'oklch(0.92 0.01 240)'],
-  rose:  ['oklch(0.62 0.13 20)',  'oklch(0.92 0.04 20)'],
-  ink:   ['oklch(0.40 0.01 240)', 'oklch(0.88 0.01 240)'],
-  sand:  ['oklch(0.70 0.06 75)',  'oklch(0.93 0.03 80)'],
-  white: ['oklch(0.72 0.01 240)', 'oklch(0.95 0.005 240)'],
-}
 
 const TONE_LABELS: Record<string, string> = {
   blue: 'Azul', slate: 'Gris', rose: 'Rojo/Rosa', ink: 'Negro', sand: 'Arena/Café', white: 'Blanco/Plata',
@@ -44,30 +40,15 @@ const FILTER_TABS = [
 
 const fmt = (n: number) => n.toLocaleString('es-MX')
 
-/* ─── Car Photo SVG ──────────────────────────────────────────── */
+/* ─── Card photo ─────────────────────────────────────────────── */
 function CarPhoto({ v }: { v: Vehiculo }) {
-  const [bodyColor, bgColor] = TONES[v.tono ?? 'slate'] ?? TONES.slate
-  const glassColor = 'rgba(255,255,255,0.42)'
   return (
-    <div className="fc-photo photo" style={{ backgroundColor: bgColor, minHeight: 130 }}>
-      <span className={`chip sm ${STATUS_CHIP[v.status] ?? ''}`} style={{ position: 'absolute', top: 12, left: 12 }}>
+    <VehiculoFoto url={v.foto_url} tono={v.tono} height={150} className="fc-photo">
+      <span className={`chip sm ${STATUS_CHIP[v.status] ?? ''}`} style={{ position: 'absolute', top: 12, left: 12, zIndex: 1 }}>
         <span className={`dot ${STATUS_DOT[v.status] ?? ''}`} />
         {STATUS_LABEL[v.status] ?? v.status}
       </span>
-      <svg viewBox="0 0 200 72" fill="none" style={{ width: '100%', maxWidth: 180 }}>
-        <path d="M12 50 C12 44 15 42 20 42 L48 42 C54 27 70 17 100 15 C130 13 152 23 162 42 L182 42 C187 42 190 44 190 50 L190 58 C190 62 187 64 182 64 L18 64 C14 64 12 62 12 58 Z" fill={bodyColor} />
-        <path d="M52 42 C56 26 70 17 100 15 C130 13 148 24 156 42 Z" fill={bodyColor} opacity="0.85" />
-        <path d="M112 16 L154 42 L132 42 Z" fill={glassColor} />
-        <path d="M58 42 L82 42 L74 22 Z" fill={glassColor} />
-        <circle cx="54"  cy="64" r="14" fill="oklch(0.18 0.005 240)" />
-        <circle cx="54"  cy="64" r="7"  fill="oklch(0.40 0.008 240)" />
-        <circle cx="54"  cy="64" r="3"  fill="oklch(0.62 0.008 240)" />
-        <circle cx="154" cy="64" r="14" fill="oklch(0.18 0.005 240)" />
-        <circle cx="154" cy="64" r="7"  fill="oklch(0.40 0.008 240)" />
-        <circle cx="154" cy="64" r="3"  fill="oklch(0.62 0.008 240)" />
-      </svg>
-      <span className="lbl mono">{v.placa}</span>
-    </div>
+    </VehiculoFoto>
   )
 }
 
@@ -193,7 +174,7 @@ function Combobox({ label, value, onChange, suggestions, placeholder, required }
 interface AgregarPanelProps {
   open: boolean
   onClose: () => void
-  onCreated: () => void
+  onCreated: (placa: string) => void
   fleet: Vehiculo[]
 }
 
@@ -212,6 +193,8 @@ function AgregarPanel({ open, onClose, onCreated, fleet }: AgregarPanelProps) {
   const [tarifa,      setTarifa]      = useState('')
   const [km,          setKm]          = useState('0')
   const [combustible, setCombustible] = useState('100')
+  const [asientos,    setAsientos]    = useState('5')
+  const [fianza,      setFianza]      = useState('2000')
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
 
@@ -232,7 +215,7 @@ function AgregarPanel({ open, onClose, onCreated, fleet }: AgregarPanelProps) {
     setPlaca(''); setMarca(''); setModeloNom(''); setAnio(String(new Date().getFullYear()))
     setColorPick(''); setColorCustom(false); setColorText(''); setTono('slate')
     setSegmento('Sedán'); setTransmision('Automático'); setTarifa('')
-    setKm('0'); setCombustible('100'); setError('')
+    setKm('0'); setCombustible('100'); setAsientos('5'); setFianza('2000'); setError('')
   }
 
   async function handleGuardar() {
@@ -240,7 +223,7 @@ function AgregarPanel({ open, onClose, onCreated, fleet }: AgregarPanelProps) {
       setError('Placa, marca y modelo son obligatorios'); return
     }
     setSaving(true); setError('')
-    const { error: err } = await db.from('vehiculos').insert({
+    const { error: err } = await insertarConExtras('vehiculos', {
       placa:        placa.trim().toUpperCase(),
       modelo:       modelo,
       anio:         parseInt(anio) || null,
@@ -252,7 +235,7 @@ function AgregarPanel({ open, onClose, onCreated, fleet }: AgregarPanelProps) {
       km:           parseInt(km) || 0,
       combustible:  parseInt(combustible) || 100,
       status:       'disponible' as VehiculoStatus,
-    })
+    }, { asientos: parseInt(asientos) || null, fianza: Number(fianza) || 0 })
     setSaving(false)
     if (err) { setError(err.message); return }
 
@@ -264,8 +247,9 @@ function AgregarPanel({ open, onClose, onCreated, fleet }: AgregarPanelProps) {
       datos_nuevos: { placa: placa.trim().toUpperCase(), modelo, anio, color, segmento },
     })
 
+    const nuevaPlaca = placa.trim().toUpperCase()
     reset()
-    onCreated()
+    onCreated(nuevaPlaca)
     onClose()
   }
 
@@ -428,6 +412,22 @@ function AgregarPanel({ open, onClose, onCreated, fleet }: AgregarPanelProps) {
             </div>
           </div>
 
+          {/* Asientos + Fianza */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div className="field">
+              <label className="field-l">Asientos</label>
+              <input className="field-i" value={asientos} inputMode="numeric" onChange={e => setAsientos(e.target.value.replace(/\D/g, ''))} />
+            </div>
+            <div className="field">
+              <label className="field-l">Depósito en garantía</label>
+              <div className="field-money">
+                <span>$</span>
+                <input className="field-i" value={fianza} inputMode="numeric" onChange={e => setFianza(e.target.value.replace(/\D/g, ''))} />
+              </div>
+            </div>
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--ink3)' }}>Después de agregarlo podrás subir sus fotos y completar sus datos.</div>
+
           {error && (
             <div style={{ fontSize: 13, color: '#c0392b', padding: '8px 12px', borderRadius: 8, background: 'oklch(96% 0.03 20)' }}>
               {error}
@@ -460,8 +460,11 @@ export default function VehiclesScreen() {
   const [error,        setError]        = useState<string | null>(null)
   const [panelOpen,    setPanelOpen]    = useState(false)
 
+  const [copiando,     setCopiando]     = useState<string | null>(null)
+
   async function fetchFleet() {
     setLoading(true)
+    await sincronizarFlota()
     const { data, error } = await supabase.from('vehiculos').select('*').order('modelo')
     if (error) setError('No se pudo cargar la flota')
     else setFleet(data ?? [])
@@ -480,6 +483,28 @@ export default function VehiclesScreen() {
   const workshop  = count('taller')
   const total     = fleet.length
 
+  const propio = (import.meta.env.VITE_SUPABASE_URL as string ?? '').replace(/\/$/, '')
+  const fotosExternas = fleet.filter(v => v.foto_url && !v.foto_url.startsWith(propio))
+
+  async function copiarFotos() {
+    let ok = 0, mal = 0
+    for (const [i, v] of fotosExternas.entries()) {
+      setCopiando(`Copiando ${i + 1} de ${fotosExternas.length}…`)
+      try {
+        const resp = await fetch(v.foto_url!)
+        if (!resp.ok) throw new Error(String(resp.status))
+        const url = await subirFotoVehiculo(v.id, await resp.blob())
+        const fotos = [url, ...((v.fotos ?? []).filter(f => f !== v.foto_url))]
+        const { error } = await db.from('vehiculos').update({ foto_url: url, fotos }).eq('id', v.id)
+        if (error) throw error
+        ok++
+      } catch { mal++ }
+    }
+    setCopiando(null)
+    setError(mal ? `Se copiaron ${ok} fotos; ${mal} no se pudieron copiar (puede que ya no existan o falte la actualización de la base de datos).` : null)
+    fetchFleet()
+  }
+
   const filtered = fleet.filter(v =>
     (filter === 'todos' || v.status === filter) &&
     (segFilter === 'todos' || v.segmento === segFilter)
@@ -487,7 +512,8 @@ export default function VehiclesScreen() {
 
   return (
     <div className="screen">
-      <AgregarPanel open={panelOpen} onClose={() => setPanelOpen(false)} onCreated={fetchFleet} fleet={fleet} />
+      <AgregarPanel open={panelOpen} onClose={() => setPanelOpen(false)} fleet={fleet}
+        onCreated={p => { fetchFleet(); navigate(`/app/vehicles/${p}`) }} />
 
       {/* Page head */}
       <div className="pagehead">
@@ -516,6 +542,18 @@ export default function VehiclesScreen() {
       {error && (
         <div style={{ padding: '14px 18px', background: 'var(--danger-soft)', border: '1px solid var(--danger-line)', borderRadius: 'var(--radius-sm)', color: 'var(--danger-ink)', fontSize: 14, marginBottom: 'var(--gap)' }}>
           {error}
+        </div>
+      )}
+
+      {/* Photos still hosted by the previous platform: copy before that account closes */}
+      {isAdmin && fotosExternas.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '12px 16px', marginBottom: 'var(--gap)',
+          background: 'var(--warn-soft)', border: '1px solid var(--warn-line)', borderRadius: 'var(--radius-sm)', fontSize: 13.5, color: 'var(--warn-ink)' }}>
+          <ImageDown size={18} />
+          <span style={{ flex: 1, minWidth: 220 }}>
+            {fotosExternas.length} {fotosExternas.length === 1 ? 'foto sigue' : 'fotos siguen'} guardadas en la plataforma anterior y se perderán al cancelarla.
+          </span>
+          <button className="btn sm" onClick={copiarFotos} disabled={!!copiando}>{copiando ?? 'Copiar a esta app'}</button>
         </div>
       )}
 

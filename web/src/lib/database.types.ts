@@ -18,6 +18,9 @@ export interface Database {
           status: VehiculoStatus; tarifa_diaria: number | null
           cliente_actual: string | null; info_cliente: string | null; created_at: string
           vin?: string | null; asientos?: number | null; fianza?: number | null
+          foto_url?: string | null; fotos?: string[] | null; notas?: string | null
+          seguro_vence?: string | null; tarjeta_vence?: string | null; verificacion_vence?: string | null
+          servicio_cada_km?: number | null; ultimo_servicio_km?: number | null; legacy_id?: string | null
         }
         Insert: {
           placa: string; modelo: string; anio?: number | null; color?: string | null
@@ -37,6 +40,8 @@ export interface Database {
           id: string; nombre: string; telefono: string | null
           email: string | null; licencia: string | null; direccion: string | null
           licencia_vence?: string | null; identificacion?: string | null
+          fecha_nacimiento?: string | null; nacionalidad?: string | null; notas?: string | null
+          contacto_emergencia?: string | null; contacto_emergencia_tel?: string | null
           created_at: string
         }
         Insert: {
@@ -62,6 +67,16 @@ export interface Database {
           iva?: number | null
           fianza?: number | null; metodo_fianza?: string | null
           notas?: string | null
+          km_salida?: number | null; km_regreso?: number | null
+          combustible_salida?: number | null; combustible_regreso?: number | null
+          entregado_at?: string | null; devuelto_at?: string | null
+          entregado_por?: string | null; recibido_por?: string | null
+          fotos_entrega?: string[] | null; fotos_devolucion?: string[] | null
+          danos_entrega?: string | null; danos_devolucion?: string | null
+          firma_cliente?: string | null
+          cargos_extra?: number | null; cargos_detalle?: { concepto: string; monto: number }[] | null
+          fianza_devuelta?: number | null; fianza_devuelta_at?: string | null
+          legacy_id?: string | null
         }
         Insert: {
           cliente_id?: string | null; vehiculo_id?: string | null

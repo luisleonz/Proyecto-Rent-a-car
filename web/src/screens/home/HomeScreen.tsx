@@ -139,7 +139,7 @@ export default function HomeScreen() {
                   <div className="dash-mini-v">{fmtK(d.anticiposMes)}</div>
                 </div>
                 <div className="dash-mini">
-                  <div className="dash-mini-l">Por cobrar al entregar</div>
+                  <div className="dash-mini-l">Saldos por cobrar</div>
                   <div className="dash-mini-v">{fmtK(d.porCobrarTotal)}</div>
                 </div>
               </>

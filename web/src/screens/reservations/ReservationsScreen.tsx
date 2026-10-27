@@ -8,6 +8,7 @@ import { EMPRESA, ivaDe, ivaEtiqueta } from '../../lib/empresa'
 import { insertarConExtras } from '../../lib/insertar'
 import { hoyISO, addDias, diffDias } from '../../lib/fechas'
 import { porCobrar } from '../../lib/reservas'
+import ReservaPanel from './ReservaPanel'
 import type { ReservaConDetalle, ReservaStatus, Cobertura } from '../../lib/database.types'
 
 /* ─── Constants ─────────────────────────────────────────────── */
@@ -49,310 +50,6 @@ function initials(r: ReservaConDetalle) {
   const n = r.clientes?.nombre ?? ''
   const parts = n.trim().split(' ')
   return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '?'
-}
-
-/* ─── Detail / edit panel ────────────────────────────────────── */
-interface PanelProps {
-  res: ReservaConDetalle | null
-  open: boolean
-  onClose: () => void
-  onSolicitudCreada: () => void
-}
-
-function ReservaPanel({ res, open, onClose, onSolicitudCreada }: PanelProps) {
-  const { currentEmail } = useAuth()
-  const navigate = useNavigate()
-  const [editing, setEditing]           = useState(false)
-  const [working, setWorking]           = useState(false)
-  const [successMsg, setSuccessMsg]     = useState('')
-  const [fechaEntrega, setFechaEntrega] = useState('')
-  const [fechaDev, setFechaDev]         = useState('')
-  const [status, setStatus]             = useState<ReservaStatus>('confirmada')
-  const [total, setTotal]               = useState('')
-  const [nota, setNota]                 = useState('')
-
-  useEffect(() => {
-    if (res) {
-      setFechaEntrega(res.fecha_entrega)
-      setFechaDev(res.fecha_devolucion)
-      setStatus(res.status)
-      setTotal(String(res.total ?? ''))
-      setEditing(false)
-      setSuccessMsg('')
-    }
-  }, [res?.id])
-
-  if (!open && editing) setEditing(false)
-
-  async function handleSolicitud() {
-    if (!res) return
-    setWorking(true)
-    const datos_nuevos: Record<string, unknown> = {}
-    if (fechaEntrega !== res.fecha_entrega) datos_nuevos.fecha_entrega = fechaEntrega
-    if (fechaDev !== res.fecha_devolucion)  datos_nuevos.fecha_devolucion = fechaDev
-    if (status !== res.status)              datos_nuevos.status = status
-    if (total !== String(res.total ?? ''))  datos_nuevos.total = Number(total) || null
-
-    if (Object.keys(datos_nuevos).length === 0) { setWorking(false); setEditing(false); return }
-
-    await db.from('solicitudes').insert({
-      tipo: 'editar_reserva',
-      tabla: 'reservas',
-      registro_id: res.id,
-      datos_actuales: {
-        fecha_entrega: res.fecha_entrega,
-        fecha_devolucion: res.fecha_devolucion,
-        status: res.status,
-        total: res.total,
-      },
-      datos_nuevos,
-      solicitado_por: currentEmail,
-    })
-
-    setWorking(false)
-    setEditing(false)
-    setSuccessMsg('Solicitud enviada — esperando aprobación del administrador.')
-    onSolicitudCreada()
-  }
-
-  async function handleCancelar() {
-    if (!res) return
-    setWorking(true)
-    await db.from('solicitudes').insert({
-      tipo: 'cancelar_reserva',
-      tabla: 'reservas',
-      registro_id: res.id,
-      datos_actuales: { status: res.status },
-      datos_nuevos: { status: 'cancelada' },
-      solicitado_por: currentEmail,
-    })
-    setWorking(false)
-    setSuccessMsg('Solicitud de cancelación enviada — esperando aprobación.')
-    onSolicitudCreada()
-  }
-
-  return (
-    <>
-      {open && <div className="qpanel-overlay" onClick={onClose} />}
-      <div className={`qpanel${open ? ' open' : ''}`}>
-        {res && (
-          <>
-            <div className="qpanel-head">
-              <div>
-                <div className="eyebrow" style={{ marginBottom: 4 }}>Reserva</div>
-                <div style={{ fontSize: 20, fontFamily: 'var(--font-display)', color: 'var(--ink)' }}>
-                  {clientName(res)}
-                </div>
-                {res.clientes?.telefono && (
-                  <div style={{ fontSize: 13, color: 'var(--ink3)', marginTop: 3 }}>{res.clientes.telefono}</div>
-                )}
-                <div style={{ marginTop: 8 }}>
-                  <span className={`chip sm ${STATUS_CHIP[res.status]}`}>
-                    <span className={`dot ${STATUS_DOT[res.status]}`} />
-                    {STATUS_LABEL[res.status]}
-                  </span>
-                </div>
-              </div>
-              <button onClick={onClose}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: 'var(--ink3)', flexShrink: 0 }}>
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="qpanel-body">
-              {/* Vehicle */}
-              <div className="qpanel-section">
-                <div className="qpanel-section-title">Vehículo</div>
-                <div style={{ background: 'var(--paper-alt)', borderRadius: 10, padding: '12px 14px' }}>
-                  <div style={{ fontWeight: 600, fontSize: 15 }}>{res.vehiculos?.modelo ?? '—'}</div>
-                  <div style={{ fontSize: 13, color: 'var(--ink3)', marginTop: 2 }}>
-                    {res.vehiculos?.placa}{res.vehiculos?.anio ? ` · ${res.vehiculos.anio}` : ''}
-                  </div>
-                </div>
-              </div>
-
-              {/* Deposit badge */}
-              {(res.deposito > 0) && (
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px',
-                  background: 'oklch(95% 0.06 155)', borderRadius: 9,
-                  border: '1px solid oklch(82% 0.1 155)',
-                }}>
-                  <Check size={14} color="var(--primary)" strokeWidth={2.5} />
-                  <span style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
-                    Pagado a cuenta
-                  </span>
-                  <span style={{ fontSize: 13, color: 'var(--primary)', marginLeft: 'auto', fontWeight: 700 }}>
-                    ${fmt(res.deposito)}
-                  </span>
-                  {res.metodo_deposito && (
-                    <span style={{
-                      fontSize: 11, padding: '2px 7px', borderRadius: 20, fontWeight: 600,
-                      background: 'oklch(88% 0.12 155)', color: 'var(--primary)',
-                    }}>
-                      {res.metodo_deposito[0].toUpperCase() + res.metodo_deposito.slice(1)}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {/* Dates & total */}
-              {!editing ? (
-                <div className="qpanel-section">
-                  <div className="qpanel-section-title">Detalle</div>
-                  {res.folio != null && (
-                    <div className="qpanel-row">
-                      <span className="lbl">Contrato</span>
-                      <span className="val mono">#{res.folio}</span>
-                    </div>
-                  )}
-                  <div className="qpanel-row">
-                    <span className="lbl">Entrega</span>
-                    <span className="val">{fmtDate(res.fecha_entrega)}{res.hora_entrega ? ` · ${res.hora_entrega.slice(0, 5)}` : ''}</span>
-                  </div>
-                  <div className="qpanel-row">
-                    <span className="lbl">Devolución</span>
-                    <span className="val">{fmtDate(res.fecha_devolucion)}{res.hora_devolucion ? ` · ${res.hora_devolucion.slice(0, 5)}` : ''}</span>
-                  </div>
-                  {res.cobertura && (
-                    <div className="qpanel-row">
-                      <span className="lbl">Cobertura</span>
-                      <span className="val">{res.cobertura === 'cero_deducible' ? 'Cero deducible' : 'Básica'}</span>
-                    </div>
-                  )}
-                  {(res.fianza ?? 0) > 0 && (
-                    <div className="qpanel-row">
-                      <span className="lbl">Depósito en garantía</span>
-                      <span className="val">${fmt(res.fianza ?? 0)}{res.metodo_fianza ? ` · ${res.metodo_fianza}` : ''}</span>
-                    </div>
-                  )}
-                  {res.total != null && (
-                    <>
-                      <div className="qpanel-row" style={{ marginTop: 8 }}>
-                        <span className="lbl">Total de la renta</span>
-                        <span className="val">${fmt(res.total)}</span>
-                      </div>
-                      {res.deposito > 0 && (
-                        <div className="qpanel-row">
-                          <span className="lbl" style={{ color: 'var(--primary)' }}>Depósito pagado</span>
-                          <span className="val" style={{ color: 'var(--primary)' }}>-${fmt(res.deposito)}</span>
-                        </div>
-                      )}
-                      {res.deposito > 0 && (
-                        <div style={{
-                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                          marginTop: 6, padding: '10px 12px', borderRadius: 9,
-                          background: res.deposito >= res.total
-                            ? 'oklch(95% 0.06 155)'
-                            : 'oklch(96% 0.06 60)',
-                          border: `1px solid ${res.deposito >= res.total
-                            ? 'oklch(82% 0.1 155)'
-                            : 'oklch(82% 0.12 60)'}`,
-                        }}>
-                          <span style={{
-                            fontSize: 13, fontWeight: 600,
-                            color: res.deposito >= res.total ? 'var(--primary)' : 'oklch(0.45 0.14 60)',
-                          }}>
-                            {res.deposito >= res.total ? 'Pagado en su totalidad' : 'Saldo pendiente'}
-                          </span>
-                          <span style={{
-                            fontSize: 16, fontWeight: 800,
-                            color: res.deposito >= res.total ? 'var(--primary)' : 'oklch(0.45 0.14 60)',
-                          }}>
-                            {res.deposito >= res.total
-                              ? '✓ $0'
-                              : `$${fmt(res.total - res.deposito)}`}
-                          </span>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              ) : (
-                <div className="qpanel-section">
-                  <div className="qpanel-section-title">Editar datos</div>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 11.5, color: 'var(--ink3)', marginBottom: 4 }}>Entrega</div>
-                      <input type="date" className="field-i" value={toInput(fechaEntrega)} onChange={e => setFechaEntrega(e.target.value)} style={{ width: '100%', fontSize: 13 }} />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 11.5, color: 'var(--ink3)', marginBottom: 4 }}>Devolución</div>
-                      <input type="date" className="field-i" value={toInput(fechaDev)} onChange={e => setFechaDev(e.target.value)} style={{ width: '100%', fontSize: 13 }} />
-                    </div>
-                  </div>
-                  <div style={{ marginTop: 10 }}>
-                    <div style={{ fontSize: 11.5, color: 'var(--ink3)', marginBottom: 4 }}>Estado</div>
-                    <div className="status-btns">
-                      {ALL_STATUSES.filter(s => s !== 'cancelada').map(s => (
-                        <button key={s} className={`status-btn${status === s ? ` active-${s === 'confirmada' || s === 'entregada' ? 'aceptada' : s}` : ''}`}
-                          onClick={() => setStatus(s)}>
-                          {STATUS_LABEL[s]}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div style={{ marginTop: 10 }}>
-                    <div style={{ fontSize: 11.5, color: 'var(--ink3)', marginBottom: 4 }}>Total</div>
-                    <div className="field-money" style={{ width: '100%' }}>
-                      <span>$</span>
-                      <input className="field-i" value={total} onChange={e => setTotal(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" placeholder="0" />
-                    </div>
-                  </div>
-                  <div style={{ marginTop: 10 }}>
-                    <div style={{ fontSize: 11.5, color: 'var(--ink3)', marginBottom: 4 }}>Nota (opcional)</div>
-                    <input className="field-i" value={nota} onChange={e => setNota(e.target.value)} placeholder="Motivo del cambio" style={{ width: '100%', fontSize: 13 }} />
-                  </div>
-                </div>
-              )}
-
-              {/* Success message */}
-              {successMsg && (
-                <div style={{ background: 'var(--primary-soft)', border: '1px solid var(--primary-line)', borderRadius: 10, padding: '12px 14px', fontSize: 13, color: 'var(--primary-dark)', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                  <Clock size={16} style={{ flexShrink: 0, marginTop: 1 }} />
-                  {successMsg}
-                </div>
-              )}
-            </div>
-
-            <div className="qpanel-foot">
-              {!editing ? (
-                <>
-                  {res.status !== 'cancelada' && (
-                    <button className="btn dark" style={{ width: '100%' }} onClick={() => navigate(`/imprimir/contrato/${res.id}`)}>
-                      <Printer size={15} />Imprimir contrato y póliza
-                    </button>
-                  )}
-                  {res.status !== 'cancelada' && res.status !== 'devuelta' && !successMsg && (
-                    <>
-                      <button className="btn primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setEditing(true)}>
-                        Solicitar cambio
-                      </button>
-                      <button className="btn" style={{ width: '100%', justifyContent: 'center', color: 'var(--danger)', borderColor: 'var(--danger-line)' }}
-                        onClick={handleCancelar} disabled={working}>
-                        Solicitar cancelación
-                      </button>
-                    </>
-                  )}
-                </>
-              ) : (
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setEditing(false)} disabled={working}>
-                    Cancelar
-                  </button>
-                  <button className="btn primary" style={{ flex: 2, justifyContent: 'center' }} onClick={handleSolicitud} disabled={working}>
-                    {working
-                      ? <><div className="spinner" style={{ width: 15, height: 15, borderWidth: 2, borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.3)' }} />Enviando…</>
-                      : <><Check size={15} />Enviar solicitud</>}
-                  </button>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-    </>
-  )
 }
 
 /* ─── Reservation timing & money helpers ─────────────────────── */
@@ -514,6 +211,25 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
   const [working, setWorking] = useState(false)
   const [error,   setError]   = useState('')
   const [created, setCreated] = useState<{ id: string; aviso: string } | null>(null)
+  const [alertasCliente, setAlertasCliente] = useState<string[]>([])
+
+  // Warn about an expired license or money owed from earlier rentals
+  useEffect(() => {
+    setAlertasCliente([])
+    if (!selectedCliente) return
+    Promise.all([
+      db.from('clientes').select('*').eq('id', selectedCliente.id).single(),
+      db.from('reservas').select('total, deposito, status, folio').eq('cliente_id', selectedCliente.id).neq('status', 'cancelada'),
+    ]).then(([c, r]: [{ data: { licencia_vence?: string | null; licencia?: string | null } | null }, { data: { total: number | null; deposito: number; status: string; folio: number | null }[] | null }]) => {
+      const a: string[] = []
+      const lic = c.data?.licencia_vence
+      if (lic && lic < (fechaDev || today)) a.push(`Su licencia ${lic < today ? 'está vencida' : 'vence antes de la devolución'} (${new Date(lic + 'T12:00:00').toLocaleDateString('es-MX')}).`)
+      if (c.data && !c.data.licencia) a.push('No tiene número de licencia registrado.')
+      const deudas = (r.data ?? []).filter(x => x.status === 'devuelta' && (x.total ?? 0) > (x.deposito ?? 0))
+      if (deudas.length) a.push(`Debe $${fmt(deudas.reduce((t, x) => t + (x.total ?? 0) - (x.deposito ?? 0), 0))} de rentas anteriores (${deudas.map(x => `#${x.folio ?? '?'}`).join(', ')}).`)
+      setAlertasCliente(a)
+    })
+  }, [selectedCliente?.id, fechaDev])
   const today = hoyISO()
 
   // Debounced client search
@@ -643,9 +359,14 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
       : ''
     if (rErr) { setError(`Error al crear reserva: ${rErr.message}`); setWorking(false); return }
 
-    await db.from('vehiculos')
-      .update({ status: 'reservado', cliente_actual: clienteNombre })
-      .eq('id', vehiculoId)
+    // Booking advance goes into the payments history too
+    if (base.deposito > 0) {
+      await db.from('pagos').insert({ reserva_id: reservaData.id, monto: base.deposito, metodo: base.metodo_deposito,
+        concepto: 'renta', notas: 'Anticipo al reservar', registrado_por: currentEmail }).then(() => null, () => null)
+    }
+    // Vehicle status is recalculated by the database from its reservations
+    const { error: syncErr } = await db.rpc('sincronizar_vehiculo', { vid: vehiculoId })
+    if (syncErr) await db.from('vehiculos').update({ status: 'reservado', cliente_actual: clienteNombre }).eq('id', vehiculoId)
 
     await insertLog({
       accion: 'crear_reserva',
@@ -781,6 +502,12 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
               </>
             )}
           </div>
+
+          {alertasCliente.length > 0 && (
+            <div style={{ background: 'var(--warn-soft)', border: '1px solid var(--warn-line)', color: 'var(--warn-ink)', borderRadius: 10, padding: '10px 12px', fontSize: 12.5, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {alertasCliente.map(t => <span key={t}>⚠ {t}</span>)}
+            </div>
+          )}
 
           {/* Phone (only for new clients) */}
           {!selectedCliente && (
@@ -1121,7 +848,9 @@ export default function ReservationsScreen() {
       .select('*, clientes(nombre, telefono), vehiculos(modelo, placa, anio, tarifa_diaria)')
       .order('fecha_entrega', { ascending: true })
     if (error) console.error('fetchReservas:', error)
-    setReservas((data as ReservaConDetalle[]) ?? [])
+    const lista = (data as ReservaConDetalle[]) ?? []
+    setReservas(lista)
+    setPanelRes(p => (p ? lista.find(r => r.id === p.id) ?? p : p))
     setLoading(false)
   }
 
@@ -1244,12 +973,7 @@ export default function ReservationsScreen() {
       </div>
       <style>{RS_CSS}</style>
 
-      <ReservaPanel
-        res={panelRes}
-        open={panelOpen}
-        onClose={closePanel}
-        onSolicitudCreada={() => {}}
-      />
+      <ReservaPanel res={panelRes} open={panelOpen} onClose={closePanel} onChanged={fetchReservas} />
 
       <NuevaReservaModal
         open={modalOpen}

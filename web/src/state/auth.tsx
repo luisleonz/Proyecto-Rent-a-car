@@ -26,6 +26,8 @@ const AuthContext = createContext<AuthContextType>({
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  // 'previo' = the roles migration hasn't been run yet, so access works as before it
+  const [acceso, setAcceso] = useState<'cargando' | 'previo' | 'si' | 'no'>('cargando')
 
   useEffect(() => {
     // Restore existing session on mount
@@ -42,6 +44,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
+  // The server decides access from the session token (refreshed after an admin grants it)
+  useEffect(() => {
+    if (!session) { setAcceso('cargando'); return }
+    ;(supabase as any).rpc('es_empleado').then(({ data, error }: { data: boolean | null; error: { code?: string } | null }) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+      if (error) setAcceso(error.code === 'PGRST202' || error.code === '42883' ? 'previo' : 'si')
+      else setAcceso(data ? 'si' : 'no')
+    })
+  }, [session?.access_token])
+
   async function signOut() {
     await supabase.auth.signOut()
   }
@@ -54,14 +65,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const firstName     = meta.first_name ?? meta.nombre ?? email.split('@')[0] ?? ''
   const initials      = meta.initials  ?? firstName.slice(0, 2).toUpperCase()
   // Role lives in app_metadata, which users cannot edit themselves (user_metadata they can)
-  const role          = (user?.app_metadata?.role as string | undefined) ?? 'Sin acceso'
+  const role          = acceso === 'previo'
+    ? (meta.role ?? 'Empleado')
+    : (user?.app_metadata?.role as string | undefined) ?? 'Sin acceso'
   const branch   = meta.branch ?? meta.sucursal ?? 'Polanco'
   const isAdmin  = role === 'Administrador'
-  const tieneAcceso = role === 'Administrador' || role === 'Empleado'
+  const tieneAcceso = acceso === 'previo' || acceso === 'si'
 
   return (
     <AuthContext.Provider value={{
-      session, user, loading, signOut,
+      session, user, loading: loading || (!!session && acceso === 'cargando'), signOut,
       currentEmail: email,
       currentFirstName: firstName,
       currentInitials: initials,

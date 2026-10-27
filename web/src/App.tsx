@@ -28,11 +28,10 @@ import AutorizacionesScreen from './screens/autorizaciones/AutorizacionesScreen'
 import EditProfileScreen from './screens/more/EditProfileScreen'
 import ContratoPrint from './screens/print/ContratoPrint'
 import CalendarioScreen from './screens/calendario/CalendarioScreen'
-import { CajaTurnoScreen, CajaCierreScreen, CajaJustificacionScreen, CajaOkScreen } from './screens/caja/CajaFlow'
 import EntregaScreen from './screens/flows/EntregaScreen'
 import DevolucionScreen from './screens/flows/DevolucionScreen'
 
-const FLOW_PREFIXES = ['/app/caja/turno', '/app/caja/cierre', '/app/caja/justificacion', '/app/caja/ok']
+const FLOW_PREFIXES: string[] = []
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth()
@@ -107,10 +106,6 @@ function AppLayout() {
             <Route path="edit-profile"      element={<EditProfileScreen />} />
             {/* Caja / Turno */}
             <Route path="caja"              element={<CajaScreen />} />
-            <Route path="caja/turno"        element={<CajaTurnoScreen />} />
-            <Route path="caja/cierre"       element={<CajaCierreScreen />} />
-            <Route path="caja/justificacion" element={<CajaJustificacionScreen />} />
-            <Route path="caja/ok"           element={<CajaOkScreen />} />
             <Route path="entrega/:resId/*"    element={<EntregaScreen />} />
             <Route path="devolucion/:resId/*" element={<DevolucionScreen />} />
             <Route path="*" element={<Navigate to="home" replace />} />

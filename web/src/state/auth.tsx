@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const initials      = meta.initials  ?? firstName.slice(0, 2).toUpperCase()
   // Role lives in app_metadata, which users cannot edit themselves (user_metadata they can)
   const role          = acceso === 'previo'
-    ? (meta.role ?? 'Empleado')
+    ? ((user?.app_metadata?.role as string | undefined) ?? meta.role ?? 'Empleado')
     : (user?.app_metadata?.role as string | undefined) ?? 'Sin acceso'
   const branch   = meta.branch ?? meta.sucursal ?? 'Polanco'
   const isAdmin  = role === 'Administrador'

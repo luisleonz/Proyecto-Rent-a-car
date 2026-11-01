@@ -473,6 +473,10 @@ async function otraSesion(ctx, b) {
       ok(!(await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), `${r} cabe en el celular`)
     }
   }, { movil: true })
+  await escenario('Compatibilidad', 'Antes de la actualización: rol de administrador guardado por SQL se reconoce', async ({ p, ok }) => {
+    await entrar(p)
+    ok((await texto(p)).includes('Empleados'), 'Ve el menú de administrador')
+  }, { preparar: b => { b.sinMigracion = true; b.luis.user_metadata = { first_name: 'Luis' }; b.luis.app_metadata = { role: 'Administrador' } } })
   await escenario('Compatibilidad', 'Antes de ejecutar la actualización: la app sigue funcionando', async ({ p, b, ok }) => {
     await entrar(p)
     ok((await texto(p)).includes('Hola, Luis'), 'El administrador entra normalmente')

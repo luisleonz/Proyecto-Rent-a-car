@@ -98,6 +98,15 @@ def main(ruta, limpio=False):
                     c.get('emergency_contact_name'), c.get('emergency_contact_phone'), notas, c.get('created_date')])
 
     fianza_metodo = {x['contract_id']: METODO.get(x.get('payment_method')) for x in d['deposits'] if not x.get('is_deleted')}
+
+    # Bookings not yet activated keep their advance and deposit in "pending_*" fields, not in payments
+    def declarado(c, campo):
+        x = c.get(campo)
+        return x if isinstance(x, dict) and x.get('declared') and x.get('amount') else None
+
+    def anticipo(c):
+        return None if c.get('initial_payment_recorded') else declarado(c, 'pending_initial_payment')
+
     res = []
     for c in contratos:
         ini, fin = local(c['start_date']), local(c['end_date'])
@@ -111,11 +120,12 @@ def main(ruta, limpio=False):
             desc = 0
         notas = '\n'.join(x for x in [c.get('internal_notes'), c.get('notes'),
                                       f"Cancelación: {c.get('cancelled_reason') or c.get('cancellation_reason')}" if c.get('status') == 'cancelled' and (c.get('cancelled_reason') or c.get('cancellation_reason')) else None] if x)
+        ant, gar = anticipo(c), declarado(c, 'pending_deposit_collected')
         res.append([c['id'], int(c['contract_number']), c['customer_id'], c['vehicle_id'],
                     ini.date().isoformat(), ini.strftime('%H:%M'), fin.date().isoformat(), fin.strftime('%H:%M'),
-                    STATUS_RES.get(c['status'], 'confirmada'), total, c.get('amount_paid') or 0,
-                    METODO.get(c.get('initial_payment_method')), round(desc, 2), iva,
-                    c.get('deposit_amount') or 0, fianza_metodo.get(c['id']),
+                    STATUS_RES.get(c['status'], 'confirmada'), total, (c.get('amount_paid') or 0) + (ant['amount'] if ant else 0),
+                    METODO.get((ant or {}).get('method') or c.get('initial_payment_method')), round(desc, 2), iva,
+                    (gar or {}).get('amount') or c.get('deposit_amount') or 0, fianza_metodo.get(c['id']) or METODO.get((gar or {}).get('method')),
                     c.get('pickup_location'), c.get('return_location'), notas or None,
                     c.get('mileage_on_pickup') or c.get('odometer_out'), c.get('mileage_on_return') or c.get('odometer_in'),
                     combustible(c.get('fuel_level_out') or c.get('fuel_level_on_pickup')),
@@ -123,9 +133,24 @@ def main(ruta, limpio=False):
                     c.get('actual_return_date'), c.get('created_date')])
 
     pagos = [[p['id'], p['contract_id'], p['amount'], METODO.get(p.get('payment_method')), p.get('payment_date'),
-              p.get('notes'), p.get('recorded_by')]
+              p.get('notes'), p.get('recorded_by'), 'renta']
              for p in d['contract_payments']
              if p.get('payment_status') == 'succeeded' and not p.get('is_deleted') and p['contract_id'] in ids_contrato]
+    con_garantia = set()
+    for x in d['deposits']:
+        if x.get('is_deleted') or x['contract_id'] not in ids_contrato or not x.get('amount'):
+            continue
+        con_garantia.add(x['contract_id'])
+        pagos.append([x['id'], x['contract_id'], x['amount'], METODO.get(x.get('payment_method')), x.get('created_date'), x.get('notes'), x.get('processed_by'), 'fianza'])
+        if x.get('refund_amount'):
+            pagos.append([x['id'] + ':devolucion', x['contract_id'], x['refund_amount'], METODO.get(x.get('payment_method')),
+                          x.get('processed_date') or x.get('updated_date'), None, x.get('processed_by'), 'devolucion_fianza'])
+    for c in contratos:
+        ant, gar = anticipo(c), declarado(c, 'pending_deposit_collected')
+        if ant:
+            pagos.append([c['id'] + ':anticipo', c['id'], ant['amount'], METODO.get(ant.get('method')), ant.get('date'), 'Anticipo al reservar', None, 'renta'])
+        if gar and c['id'] not in con_garantia:
+            pagos.append([c['id'] + ':garantia', c['id'], gar['amount'], METODO.get(gar.get('method')), gar.get('date'), 'Garantía recibida al reservar', None, 'fianza'])
 
     titulo = 'CAMBIO LIMPIO: borra los datos actuales y carga solo rentas activas y próximas' if limpio else 'Importación del respaldo del sistema anterior'
     out = [f'-- {titulo} · generado {datetime.now():%Y-%m-%d %H:%M} (hoy en Sonora: {hoy})',
@@ -174,7 +199,7 @@ create temp table _r (legacy_id text, folio bigint, cliente_legacy text, vehicul
   iva numeric, fianza numeric, metodo_fianza text, lugar_entrega text, lugar_devolucion text, notas text, km_salida int, km_regreso int,
   combustible_salida int, combustible_regreso int, devuelto_at timestamptz, created_at timestamptz) on commit drop;
 create temp table _p (legacy_id text, reserva_legacy text, monto numeric, metodo text, fecha timestamptz, notas text,
-  registrado_por text) on commit drop;
+  registrado_por text, concepto text) on commit drop;
 
 create or replace function pg_temp.nnom(t text) returns text language sql immutable as
   $f$ select upper(trim(regexp_replace(translate(coalesce(t, ''), 'áéíóúÁÉÍÓÚñÑüÜ', 'aeiouAEIOUNNUU'), '\\s+', ' ', 'g'))) $f$;
@@ -278,7 +303,7 @@ select setval(pg_get_serial_sequence('public.reservas', 'folio'), (select max(fo
 
 -- ── Pagos ──
 insert into pagos (reserva_id, monto, metodo, concepto, fecha, notas, registrado_por, legacy_id)
-select r.id, p.monto, p.metodo, 'renta', coalesce(p.fecha, now()), p.notas, p.registrado_por, p.legacy_id
+select r.id, p.monto, p.metodo, coalesce(p.concepto, 'renta'), coalesce(p.fecha, now()), p.notas, p.registrado_por, p.legacy_id
 from _p p join reservas r on r.legacy_id = p.reserva_legacy
 where not exists (select 1 from pagos x where x.legacy_id = p.legacy_id);
 

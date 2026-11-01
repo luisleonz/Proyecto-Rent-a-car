@@ -2,8 +2,14 @@
 """Genera un script SQL que importa el respaldo JSON del sistema anterior a Supabase.
 
 Uso:  python3 scripts/importar_respaldo.py respaldo.json > importar.sql
-Luego se ejecuta importar.sql en Supabase → SQL Editor. El script es idempotente:
-volver a ejecutarlo (o generarlo con un respaldo más nuevo) actualiza en lugar de duplicar.
+      python3 scripts/importar_respaldo.py respaldo.json --limpio > cambio_limpio.sql
+Luego se ejecuta el .sql en Supabase → SQL Editor (Run as: postgres).
+
+Modo normal: fusiona todo el historial; volver a ejecutarlo actualiza en lugar de duplicar.
+Modo --limpio (para el día del cambio de sistema): BORRA los datos de la app (reservas, pagos,
+clientes, vehículos, cotizaciones, solicitudes y actividad) y carga solo vehículos, clientes y las
+rentas activas y próximas, con sus pagos. Los números de contrato siguen después del último del
+sistema anterior. Los usuarios y archivos (fotos, firma) no se tocan.
 El archivo generado contiene datos personales de clientes: no lo suba al repositorio.
 """
 import json
@@ -13,7 +19,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
-MIGRACIONES = ['supabase_migracion_2026_10_contratos.sql', 'supabase_migracion_2026_10_importacion.sql']
+MIGRACIONES = ['supabase_migracion_2026_10_contratos.sql', 'supabase_migracion_2026_10_importacion.sql',
+               'supabase_migracion_2026_10_operacion.sql']
 TZ = timedelta(hours=-7)  # America/Hermosillo, sin horario de verano
 
 METODO = {'cash': 'efectivo', 'bank_transfer': 'transferencia', 'card': 'tarjeta', 'pos': 'tarjeta'}
@@ -52,9 +59,17 @@ def values(filas):
     return ',\n'.join('(' + ', '.join(q(x) for x in f) + ')' for f in filas)
 
 
-def main(ruta):
+def vigente(c, hoy):
+    """Active rentals (car still out) and upcoming bookings whose dates haven't passed."""
+    return c['status'] == 'active' or (c['status'] == 'reserved' and local(c['end_date']).date() >= hoy)
+
+
+def main(ruta, limpio=False):
     d = json.load(open(ruta, encoding='utf-8'))
-    contratos = [c for c in d['contracts'] if not c.get('is_deleted')]
+    hoy = (datetime.utcnow() + TZ).date()
+    todos = [c for c in d['contracts'] if not c.get('is_deleted')]
+    folio_max = max(int(c['contract_number']) for c in d['contracts'] if str(c['contract_number']).isdigit())
+    contratos = [c for c in todos if vigente(c, hoy)] if limpio else todos
     ids_contrato = {c['id'] for c in contratos}
     con_contrato = {c['customer_id'] for c in contratos}
 
@@ -112,20 +127,41 @@ def main(ruta):
              for p in d['contract_payments']
              if p.get('payment_status') == 'succeeded' and not p.get('is_deleted') and p['contract_id'] in ids_contrato]
 
-    out = [f'-- Importación del respaldo del sistema anterior · generado {datetime.now():%Y-%m-%d %H:%M}',
+    titulo = 'CAMBIO LIMPIO: borra los datos actuales y carga solo rentas activas y próximas' if limpio else 'Importación del respaldo del sistema anterior'
+    out = [f'-- {titulo} · generado {datetime.now():%Y-%m-%d %H:%M} (hoy en Sonora: {hoy})',
            f'-- {len(veh)} vehículos · {len(cli)} clientes · {len(res)} reservas · {len(pagos)} pagos',
            '-- CONTIENE DATOS PERSONALES DE CLIENTES. No compartir ni subir al repositorio.',
            'begin;', '']
     for m in MIGRACIONES:
         out += [f'-- ── {m} ──', (RAIZ / m).read_text(encoding='utf-8'), '']
+    if limpio:
+        out += [BORRAR]
     out += [CREAR_STAGING,
             'insert into _v values\n' + values(veh) + ';',
             'insert into _c values\n' + values(cli) + ';',
             'insert into _r values\n' + values(res) + ';',
             ('insert into _p values\n' + values(pagos) + ';') if pagos else '',
-            FUSION, 'commit;', '', RESUMEN]
+            FUSION,
+            # Keep numbering after the last contract of the old system (even ones not imported)
+            f"select setval(pg_get_serial_sequence('public.reservas', 'folio'), greatest({folio_max}, (select coalesce(max(folio), 0) from reservas)));",
+            'select public.sincronizar_flota();',
+            'commit;', '', RESUMEN]
     sys.stdout.write('\n'.join(out))
 
+
+BORRAR = """
+-- ── Borrar los datos actuales de la app (los usuarios y archivos no se tocan) ──
+do $$ begin
+  if to_regclass('public.movimientos_caja') is not null then execute 'delete from movimientos_caja'; end if;
+  if to_regclass('public.solicitudes') is not null then execute 'delete from solicitudes'; end if;
+  if to_regclass('public.logs') is not null then execute 'delete from logs'; end if;
+end $$;
+delete from pagos;
+delete from cotizaciones;
+delete from reservas;
+delete from clientes;
+delete from vehiculos;
+"""
 
 CREAR_STAGING = """
 create temp table _v (legacy_id text, placa text, modelo text, anio int, color text, tono text, segmento text, transmision text,
@@ -266,10 +302,14 @@ select
   (select count(*) from pagos     where legacy_id is not null) as pagos_importados,
   (select count(*) from reservas  where legacy_id is null)     as reservas_de_esta_app,
   (select count(*) from vehiculos where legacy_id is null)     as vehiculos_no_del_respaldo,
-  (select max(folio) from reservas)                            as ultimo_contrato;
+  (select count(*) from reservas where status = 'entregada')   as rentas_activas,
+  (select count(*) from reservas where status in ('confirmada', 'pendiente')) as rentas_proximas,
+  (select coalesce(sum(greatest(total - deposito, 0)), 0) from reservas where status <> 'cancelada') as saldo_por_cobrar,
+  (select last_value + 1 from pg_sequences where schemaname = 'public' and sequencename like 'reservas_folio%') as siguiente_contrato;
 """
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
+    args = [a for a in sys.argv[1:] if not a.startswith('--')]
+    if len(args) != 1:
         sys.exit(__doc__)
-    main(sys.argv[1])
+    main(args[0], limpio='--limpio' in sys.argv)

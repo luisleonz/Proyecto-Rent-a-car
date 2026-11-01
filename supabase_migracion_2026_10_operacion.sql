@@ -104,10 +104,7 @@ do $$ begin
     update auth.users
     set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || jsonb_build_object('role', raw_user_meta_data->>'role')
     where raw_user_meta_data->>'role' is not null and (raw_app_meta_data->>'role') is null;
-    -- Everyone who already had an account keeps access as Empleado
-    update auth.users
-    set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"role":"Empleado"}'::jsonb
-    where (raw_app_meta_data->>'role') is null;
+    -- Accounts without a role get no access until the owner grants it from the app
   end if;
 end $$;
 
@@ -168,6 +165,7 @@ do $$ begin
 end $$;
 
 -- ── 7. Empleados (solo administradores) ───────────────
+drop function if exists public.listar_empleados();
 create or replace function public.listar_empleados()
 returns table (id uuid, email text, nombre text, rol text, creado timestamptz, ultimo_acceso timestamptz, confirmado boolean)
 language plpgsql security definer set search_path = public, auth as $$

@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, Key, Check, Wrench, X, AlertTriangle, Camera, Star, Trash2, Pencil, ShieldCheck, Gauge, CalendarClock } from 'lucide-react'
+import { ChevronLeft, Key, Check, Wrench, X, AlertTriangle, Camera, Star, Trash2, Pencil, ShieldCheck, Gauge, CalendarClock, MessageCircle, Repeat } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
 import { insertLog } from '../../lib/log'
 import { subirFotoVehiculo, borrarFotoVehiculo } from '../../lib/fotos'
-import { mensajeError } from '../../lib/operacion'
+import { mensajeError, whatsappUrl } from '../../lib/operacion'
+import { EMPRESA } from '../../lib/empresa'
 import { hoyISO, diffDias, addDias } from '../../lib/fechas'
 import VehiculoFoto from '../../components/VehiculoFoto'
 import type { Vehiculo } from '../../lib/database.types'
@@ -22,7 +23,95 @@ const SEGMENTOS = ['Sedán', 'SUV', 'Hatchback', 'Camioneta', 'Pickup', 'Van', '
 const fmt = (n: number) => Math.round(n).toLocaleString('es-MX')
 const fmtDate = (s: string) => new Date(s + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
 
-type ReservaHist = { id: string; folio: number | null; fecha_entrega: string; fecha_devolucion: string; status: string; total: number | null; clientes: { nombre: string } | null }
+type ReservaHist = { id: string; folio: number | null; fecha_entrega: string; fecha_devolucion: string; status: string; total: number | null; clientes: { nombre: string; telefono?: string | null } | null }
+
+const DIAS_AVISO = 15
+const fechaCorta = (iso: string) => new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' })
+
+/** Bookings that the workshop visit puts at risk: the car is out now, or is picked up in the next 15 days. */
+export function reservasEnRiesgo(hist: ReservaHist[]) {
+  const hoy = hoyISO(), limite = addDias(hoy, DIAS_AVISO)
+  return hist.filter(r => r.status === 'entregada'
+    || ((r.status === 'pendiente' || r.status === 'confirmada') && r.fecha_entrega.slice(0, 10) <= limite && r.fecha_devolucion.slice(0, 10) >= hoy))
+    .sort((a, b) => a.fecha_entrega.localeCompare(b.fecha_entrega))
+}
+
+/** Lists those bookings with a WhatsApp notice and a quick swap to another free car. */
+function ReservasAfectadas({ v, reservas, enTaller, onCambio }: { v: Vehiculo; reservas: ReservaHist[]; enTaller: boolean; onCambio: (t: string) => void }) {
+  const { currentEmail } = useAuth()
+  const navigate = useNavigate()
+  const [abierta, setAbierta] = useState<string | null>(null)
+  const [opciones, setOpciones] = useState<{ id: string; modelo: string; placa: string; anio: number | null }[] | null>(null)
+  const [cambiando, setCambiando] = useState(false)
+  const [error, setError] = useState('')
+
+  async function verOpciones(r: ReservaHist) {
+    setAbierta(r.id); setOpciones(null); setError('')
+    const [{ data: autos }, { data: ocupados }] = await Promise.all([
+      db.from('vehiculos').select('id, modelo, placa, anio, status').neq('status', 'taller').neq('id', v.id).order('modelo'),
+      db.from('reservas').select('vehiculo_id').in('status', ['pendiente', 'confirmada', 'entregada']).neq('id', r.id)
+        .lt('fecha_entrega', r.fecha_devolucion).gt('fecha_devolucion', r.fecha_entrega),
+    ])
+    const ocupado = new Set((ocupados ?? []).map((x: { vehiculo_id: string }) => x.vehiculo_id))
+    setOpciones((autos ?? []).filter((a: { id: string }) => !ocupado.has(a.id)))
+  }
+
+  async function cambiar(r: ReservaHist, nuevo: { id: string; modelo: string; placa: string }) {
+    if (!confirm(`¿Pasar la reserva #${r.folio ?? '—'} de ${r.clientes?.nombre ?? 'cliente'} al ${nuevo.modelo} (${nuevo.placa})? Se respeta el precio acordado.`)) return
+    setCambiando(true); setError('')
+    const { error: e } = await db.from('reservas').update({ vehiculo_id: nuevo.id }).eq('id', r.id)
+    if (e) { setError(mensajeError(e)); setCambiando(false); return }
+    await Promise.all([v.id, nuevo.id].map(id => db.rpc('sincronizar_vehiculo', { vid: id }).then(() => null, () => null)))
+    await insertLog({ accion: 'cambiar_vehiculo', entidad: 'reservas', entidad_id: r.id, realizado_por: currentEmail,
+      descripcion: `Reserva #${r.folio ?? '—'} (${r.clientes?.nombre ?? ''}): ${v.modelo} ${v.placa} → ${nuevo.modelo} ${nuevo.placa} por taller` })
+    setCambiando(false); setAbierta(null)
+    onCambio(`Reserva #${r.folio ?? '—'} pasada al ${nuevo.modelo} (${nuevo.placa}). Avísale al cliente.`)
+  }
+
+  const mensaje = (r: ReservaHist) => `Hola ${r.clientes?.nombre?.split(' ')[0] ?? ''}, le escribimos de ${EMPRESA.nombreComercial} sobre su reserva #${r.folio ?? ''} del ${fechaCorta(r.fecha_entrega)}. `
+    + `El ${v.modelo} que tenía apartado tuvo que entrar a mantenimiento, por lo que le asignaremos otro vehículo similar con el mismo precio. Cualquier duda estamos a sus órdenes.`
+
+  if (reservas.length === 0) return enTaller ? null : (
+    <div style={{ fontSize: 12.5, color: 'var(--ink3)' }}>Sin reservas en los próximos {DIAS_AVISO} días.</div>
+  )
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ fontSize: 13, color: 'var(--warn-ink)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <AlertTriangle size={14} />{reservas.length === 1 ? 'Hay 1 reserva' : `Hay ${reservas.length} reservas`} con este auto en los próximos {DIAS_AVISO} días
+      </div>
+      {reservas.map(r => (
+        <div key={r.id} style={{ background: 'var(--card)', border: '1px solid var(--card-line)', borderRadius: 10, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ fontSize: 13.5 }}>
+            <b>#{r.folio ?? '—'} · {r.clientes?.nombre ?? 'Sin cliente'}</b>
+            <div style={{ fontSize: 12, color: 'var(--ink3)' }}>
+              {r.status === 'entregada' ? `En renta ahora · regresa ${fechaCorta(r.fecha_devolucion)}` : `${fechaCorta(r.fecha_entrega)} → ${fechaCorta(r.fecha_devolucion)}`}
+              {r.clientes?.telefono ? ` · ${r.clientes.telefono}` : ''}
+            </div>
+          </div>
+          {r.status !== 'entregada' && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {r.clientes?.telefono && <a className="btn sm" href={whatsappUrl(r.clientes.telefono, mensaje(r))} target="_blank" rel="noreferrer"><MessageCircle size={13} />Avisar por WhatsApp</a>}
+              <button className="btn sm" onClick={() => (abierta === r.id ? setAbierta(null) : verOpciones(r))}><Repeat size={13} />Cambiar auto</button>
+              <button className="btn sm" onClick={() => navigate(`/app/reservations?res=${r.id}`)}>Ver reserva</button>
+            </div>
+          )}
+          {abierta === r.id && (
+            opciones == null ? <div className="spinner" style={{ width: 18, height: 18 }} />
+              : opciones.length === 0 ? <div style={{ fontSize: 12.5, color: 'var(--danger-ink)' }}>No hay otro auto libre en esas fechas.</div>
+              : <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {opciones.map(o => (
+                    <button key={o.id} className="btn sm" style={{ justifyContent: 'space-between' }} disabled={cambiando} onClick={() => cambiar(r, o)}>
+                      <span>{o.modelo}{o.anio ? ` ${o.anio}` : ''}</span><span className="mono" style={{ color: 'var(--ink3)' }}>{o.placa}</span>
+                    </button>
+                  ))}
+                </div>
+          )}
+        </div>
+      ))}
+      {error && <div style={{ fontSize: 12.5, color: 'var(--danger-ink)' }}>{error}</div>}
+    </div>
+  )
+}
 
 /* ── Expiry badge ── */
 function Vence({ label, fecha }: { label: string; fecha?: string | null }) {
@@ -170,7 +259,7 @@ export default function VehicleDetailScreen() {
     if (error || !data) { setLoading(false); return }
     setV(data); setLoading(false)
     const { data: hist } = await db.from('reservas')
-      .select('id, folio, fecha_entrega, fecha_devolucion, status, total, clientes(nombre)')
+      .select('id, folio, fecha_entrega, fecha_devolucion, status, total, clientes(nombre, telefono)')
       .eq('vehiculo_id', data.id).order('fecha_entrega', { ascending: false })
     setHistory(hist ?? [])
     const act = (hist ?? []).filter((r: ReservaHist) => r.status === 'entregada' || r.status === 'confirmada' || r.status === 'pendiente')
@@ -227,12 +316,17 @@ export default function VehicleDetailScreen() {
     setMsg({ ok: true, t: 'Vehículo fuera del taller.' }); setWorking(false); cargar()
   }
 
+  const [faltaMotivo, setFaltaMotivo] = useState(false)
+  const enRiesgo = reservasEnRiesgo(history)
+
   async function enviarTaller() {
     if (!v) return
+    if (!tallerNota.trim()) { setFaltaMotivo(true); return }
     setWorking(true)
     const nota = tallerNota.trim() || null
     await db.from('vehiculos').update({ status: 'taller', info_cliente: nota }).eq('id', v.id)
-    await insertLog({ accion: 'vehiculo_taller', entidad: 'vehiculos', entidad_id: v.id, descripcion: `${v.modelo} (${v.placa}) enviado a taller${nota ? ` — ${nota}` : ''}`, realizado_por: currentEmail })
+    await insertLog({ accion: 'vehiculo_taller', entidad: 'vehiculos', entidad_id: v.id, realizado_por: currentEmail,
+      descripcion: `${v.modelo} (${v.placa}) enviado a taller${nota ? ` — ${nota}` : ''}${enRiesgo.length ? ` · ${enRiesgo.length} reserva(s) en los próximos ${DIAS_AVISO} días: ${enRiesgo.map(r => `#${r.folio ?? '—'}`).join(', ')}` : ''}` })
     setV(x => x ? { ...x, status: 'taller', info_cliente: nota } : x)
     setShowTaller(false); setTallerNota(''); setMsg({ ok: true, t: 'Vehículo enviado a taller.' }); setWorking(false)
   }
@@ -361,15 +455,26 @@ export default function VehicleDetailScreen() {
             {showTaller && (
               <div style={{ background: 'var(--paper-alt)', borderRadius: 10, padding: '12px 14px', border: '1.5px solid var(--warn-line)', display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div className="field" style={{ margin: 0 }}>
-                  <label className="field-l">Motivo del taller</label>
-                  <input className="field-i" value={tallerNota} onChange={e => setTallerNota(e.target.value)} placeholder="Ej. Cambio de aceite, revisión general…" autoFocus />
+                  <label className="field-l">Motivo del taller *</label>
+                  <input className="field-i" value={tallerNota} onChange={e => { setTallerNota(e.target.value); setFaltaMotivo(false) }} placeholder="Ej. Cambio de aceite, revisión general…" autoFocus />
+                  {faltaMotivo && <div role="alert" style={{ fontSize: 12.5, color: 'var(--danger-ink)' }}>Falta el motivo del taller.</div>}
                 </div>
+                <ReservasAfectadas v={v} reservas={enRiesgo} enTaller={false} onCambio={t => { setMsg({ ok: true, t }); cargar() }} />
+                {enRiesgo.some(r => r.status === 'entregada') && (
+                  <div style={{ fontSize: 12.5, color: 'var(--danger-ink)' }}>Este auto está rentado ahora: regístralo en taller hasta que el cliente lo devuelva.</div>
+                )}
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn" style={{ flex: 1 }} onClick={() => { setShowTaller(false); setTallerNota('') }}>Cancelar</button>
+                  <button className="btn" style={{ flex: 1 }} onClick={() => { setShowTaller(false); setTallerNota(''); setFaltaMotivo(false) }}>Cancelar</button>
                   <button className="btn" style={{ flex: 2, background: 'var(--warn-soft)', borderColor: 'var(--warn-line)', color: 'var(--warn-ink)' }} onClick={enviarTaller} disabled={working}>
                     <Wrench size={14} />Confirmar envío
                   </button>
                 </div>
+              </div>
+            )}
+
+            {v.status === 'taller' && enRiesgo.length > 0 && (
+              <div style={{ background: 'var(--warn-soft)', borderRadius: 10, padding: '12px 14px', border: '1px solid var(--warn-line)' }}>
+                <ReservasAfectadas v={v} reservas={enRiesgo} enTaller onCambio={t => { setMsg({ ok: true, t }); cargar() }} />
               </div>
             )}
 

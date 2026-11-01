@@ -7,6 +7,7 @@ import { insertLog } from '../../lib/log'
 import type { Vehiculo, VehiculoStatus } from '../../lib/database.types'
 import VehiculoFoto, { TONES } from '../../components/VehiculoFoto'
 import { insertarConExtras } from '../../lib/insertar'
+import { EMPRESA } from '../../lib/empresa'
 import { sincronizarFlota } from '../../lib/operacion'
 import { subirFotoVehiculo } from '../../lib/fotos'
 
@@ -194,7 +195,7 @@ function AgregarPanel({ open, onClose, onCreated, fleet }: AgregarPanelProps) {
   const [km,          setKm]          = useState('0')
   const [combustible, setCombustible] = useState('100')
   const [asientos,    setAsientos]    = useState('5')
-  const [fianza,      setFianza]      = useState('2000')
+  const [fianza,      setFianza]      = useState(String(EMPRESA.fianzaPredeterminada))
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
 
@@ -215,7 +216,7 @@ function AgregarPanel({ open, onClose, onCreated, fleet }: AgregarPanelProps) {
     setPlaca(''); setMarca(''); setModeloNom(''); setAnio(String(new Date().getFullYear()))
     setColorPick(''); setColorCustom(false); setColorText(''); setTono('slate')
     setSegmento('Sedán'); setTransmision('Automático'); setTarifa('')
-    setKm('0'); setCombustible('100'); setAsientos('5'); setFianza('2000'); setError('')
+    setKm('0'); setCombustible('100'); setAsientos('5'); setFianza(String(EMPRESA.fianzaPredeterminada)); setError('')
   }
 
   async function handleGuardar() {

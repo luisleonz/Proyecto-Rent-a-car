@@ -7,10 +7,11 @@ import { insertLog } from '../../lib/log'
 import { hoyISO, diffDias } from '../../lib/fechas'
 import { actualizarConExtras } from '../../lib/insertar'
 import { subirDocumento, urlsFirmadas } from '../../lib/fotos'
-import { registrarPago, mensajeError, metodoLabel, METODOS, whatsappUrl, AVISO_MIGRACION, type MetodoPago } from '../../lib/operacion'
-import FlujoPasos, { Bloque, Casilla } from '../../components/FlujoPasos'
+import { registrarPago, mensajeError, metodoLabel, metodosActivos, whatsappUrl, AVISO_MIGRACION, type MetodoPago } from '../../lib/operacion'
+import FlujoPasos, { Bloque, Casilla, AvisoFalta } from '../../components/FlujoPasos'
 import { SelectorGasolina, CapturaFotos, nivelGas, etiquetaGas } from '../../components/Captura'
 import type { ReservaContrato } from '../print/ContratoPrint'
+import { EMPRESA } from '../../lib/empresa'
 
 const db = supabase as any // eslint-disable-line @typescript-eslint/no-explicit-any
 const fmt = (n: number) => new Intl.NumberFormat('es-MX', { maximumFractionDigits: 2 }).format(n)
@@ -26,6 +27,8 @@ export default function DevolucionScreen() {
   const [error, setError] = useState('')
   const [errConfirm, setErrConfirm] = useState('')
   const [paso, setPaso] = useState(0)
+  const [avisoPaso, setAvisoPaso] = useState(false)
+  useEffect(() => { setAvisoPaso(false) }, [paso])
   const [guardando, setGuardando] = useState<string | null>(null)
   const [listo, setListo] = useState<{ avisos: string[]; devolver: number } | null>(null)
   const [fotosSalida, setFotosSalida] = useState<string[]>([])
@@ -56,7 +59,7 @@ export default function DevolucionScreen() {
         setCargos([
           { id: 'dias', concepto: `Días extra (${diasExtra})`, monto: String(diasExtra * tarifa), activo: diasExtra > 0, ayuda: diasExtra > 0 ? `Regresó ${diasExtra} día${diasExtra > 1 ? 's' : ''} tarde × $${fmt(tarifa)}/día (cláusula NOVENA)` : undefined },
           { id: 'gasolina', concepto: 'Gasolina faltante', monto: '', activo: false, ayuda: 'Sin cargo si regresa con 1/4 de tanque o más (cláusula DÉCIMA PRIMERA).' },
-          { id: 'limpieza', concepto: 'Lavado de interiores / malos olores', monto: esVan ? '3200' : '1600', activo: false, ayuda: 'Según la póliza: $1,600 sedán/SUV · $3,200 van.' },
+          { id: 'limpieza', concepto: 'Lavado de interiores / malos olores', monto: String(esVan ? EMPRESA.limpiezaVan : EMPRESA.limpiezaSedan), activo: false, ayuda: `Según la póliza: $${fmt(EMPRESA.limpiezaSedan)} sedán/SUV · $${fmt(EMPRESA.limpiezaVan)} van.` },
           { id: 'danos', concepto: 'Daños', monto: '', activo: false },
           { id: 'otros', concepto: 'Otros (llavero, placas, multas…)', monto: '', activo: false },
         ])
@@ -164,13 +167,17 @@ export default function DevolucionScreen() {
     setGuardando(null)
   }
 
-  const puedeSeguir = [!!km && gas != null && (r.km_salida == null || kmNum >= r.km_salida), true, true][paso]
+  const faltaPaso = (paso === 0 ? [!km && 'El kilometraje de regreso', gas == null && 'El nivel de gasolina',
+    !!km && r.km_salida != null && kmNum < r.km_salida && `El kilometraje no puede ser menor al de salida (${fmt(r.km_salida)} km)`] : []).filter(Boolean) as string[]
 
   return (
     <FlujoPasos titulo={`Recibir ${r.vehiculos?.modelo ?? ''}`} subtitulo={`${nombre}${r.folio != null ? ` · contrato #${r.folio}` : ''}`}
       pasos={PASOS} actual={paso} onAtras={() => (paso === 0 ? navigate(-1) : setPaso(paso - 1))}
       pie={paso < PASOS.length - 1
-        ? <button className="btn primary" style={{ flex: 1, padding: 14 }} disabled={!puedeSeguir} onClick={() => setPaso(paso + 1)}>Siguiente<ChevronRight size={16} /></button>
+        ? <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {avisoPaso && faltaPaso.length > 0 && <AvisoFalta items={faltaPaso} />}
+            <button className="btn primary" style={{ padding: 14 }} onClick={() => (faltaPaso.length ? setAvisoPaso(true) : setPaso(paso + 1))}>Siguiente<ChevronRight size={16} /></button>
+          </div>
         : <button className="btn primary" style={{ flex: 1, padding: 14 }} disabled={!!guardando} onClick={confirmar}><CornerDownLeft size={16} />{guardando ?? 'Confirmar devolución'}</button>}>
 
       {paso === 0 && <>
@@ -242,7 +249,7 @@ export default function DevolucionScreen() {
               <div className="field-money" style={{ flex: 1 }}><span>$</span><input className="field-i" inputMode="decimal" value={cobro} onChange={e => setCobro(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="0" /></div>
               <button className="btn sm" onClick={() => setCobro(String(saldo - deGarantia))}>Todo ${fmt(saldo - deGarantia)}</button>
             </div>
-            {cobroNum > 0 && <div style={{ display: 'flex', gap: 6 }}>{METODOS.map(m => <button key={m} className={`btn sm${metodoCobro === m ? ' primary' : ''}`} style={{ flex: 1 }} onClick={() => setMetodoCobro(m)}>{metodoLabel(m)}</button>)}</div>}
+            {cobroNum > 0 && <div style={{ display: 'flex', gap: 6 }}>{metodosActivos().map(m => <button key={m} className={`btn sm${metodoCobro === m ? ' primary' : ''}`} style={{ flex: 1 }} onClick={() => setMetodoCobro(m)}>{metodoLabel(m)}</button>)}</div>}
             {saldoFinal > 0 && <div style={{ fontSize: 12.5, color: 'var(--warn-ink)' }}>Quedará pendiente ${fmt(saldoFinal)}.</div>}
           </Bloque>
         )}
@@ -250,7 +257,7 @@ export default function DevolucionScreen() {
         <Bloque titulo="Depósito en garantía" ayuda={fianzaRecibida > 0 ? `Recibido: $${fmt(fianzaRecibida)}${r.metodo_fianza ? ` (${metodoLabel(r.metodo_fianza)})` : ''}` : 'No se registró depósito en garantía.'}>
           {fianzaRecibida > 0 && <>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 15 }}><span>Devolver al cliente</span><span>${fmt(devolver)}</span></div>
-            {devolver > 0 && <div style={{ display: 'flex', gap: 6 }}>{METODOS.map(m => <button key={m} className={`btn sm${metodoDevol === m ? ' primary' : ''}`} style={{ flex: 1 }} onClick={() => setMetodoDevol(m)}>{metodoLabel(m)}</button>)}</div>}
+            {devolver > 0 && <div style={{ display: 'flex', gap: 6 }}>{metodosActivos().map(m => <button key={m} className={`btn sm${metodoDevol === m ? ' primary' : ''}`} style={{ flex: 1 }} onClick={() => setMetodoDevol(m)}>{metodoLabel(m)}</button>)}</div>}
           </>}
         </Bloque>
         {errConfirm && <div style={{ color: 'var(--danger-ink)', fontSize: 13 }}>{errConfirm}</div>}

@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
 import { insertLog } from '../../lib/log'
 import { hoyISO, diffDias } from '../../lib/fechas'
-import { registrarPago, mensajeError, whatsappUrl, metodoLabel, CONCEPTO_LABEL, METODOS,
+import { registrarPago, mensajeError, whatsappUrl, metodoLabel, CONCEPTO_LABEL, metodosActivos,
   type Pago, type MetodoPago, type ConceptoPago } from '../../lib/operacion'
 import { urlsFirmadas } from '../../lib/fotos'
 import type { ReservaConDetalle, ReservaStatus } from '../../lib/database.types'
@@ -293,7 +293,7 @@ export default function ReservaPanel({ res, open, onClose, onChanged }: {
                   </select>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  {METODOS.map(m => (
+                  {metodosActivos().map(m => (
                     <button key={m} className={`btn sm${metodo === m ? ' primary' : ''}`} style={{ flex: 1 }} onClick={() => setMetodo(m)}>{metodoLabel(m)}</button>
                   ))}
                 </div>

@@ -203,10 +203,10 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
   const [lugarEntrega, setLugarEntrega] = useState(EMPRESA.lugarEntregaPredeterminado)
   const [lugarDev,     setLugarDev]     = useState(EMPRESA.lugarEntregaPredeterminado)
   const [cobertura,    setCobertura]    = useState<Cobertura>('basica')
-  const [ceroDiario,   setCeroDiario]   = useState('')
+  const [ceroDiario,   setCeroDiario]   = useState(EMPRESA.ceroDeducibleDia ? String(EMPRESA.ceroDeducibleDia) : '')
   const [fianza,       setFianza]       = useState('')
   const [metodoFianza, setMetodoFianza] = useState<'efectivo' | 'tarjeta' | 'transferencia'>('efectivo')
-  const [conIva,       setConIva]       = useState(true)
+  const [conIva,       setConIva]       = useState(EMPRESA.ivaPorDefecto)
 
   const [working, setWorking] = useState(false)
   const [error,   setError]   = useState('')
@@ -280,8 +280,8 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
     setDescuento(''); setTieneDeposito(false); setDeposito(''); setMetodoDeposito('efectivo')
     setHoraEntrega('10:00'); setHoraDev('10:00')
     setLugarEntrega(EMPRESA.lugarEntregaPredeterminado); setLugarDev(EMPRESA.lugarEntregaPredeterminado)
-    setCobertura('basica'); setCeroDiario(''); setFianza(''); setMetodoFianza('efectivo'); setConIva(true)
-    setError(''); setCreated(null)
+    setCobertura('basica'); setCeroDiario(EMPRESA.ceroDeducibleDia ? String(EMPRESA.ceroDeducibleDia) : ''); setFianza(''); setMetodoFianza('efectivo'); setConIva(EMPRESA.ivaPorDefecto)
+    setError(''); setCreated(null); setIntento(false)
   }
 
   useEffect(() => {
@@ -314,8 +314,22 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
   const showCalc = dias > 0 && tarifa > 0
   const datesSet = !!(fechaEntrega && fechaDev && fechaDev > fechaEntrega)
 
+  // What is still missing, in plain words, so the button never fails silently
+  const [intento, setIntento] = useState(false)
+  const faltan = [
+    !clienteNombre && 'El nombre del cliente',
+    !selectedCliente && clienteNombre && clienteTel.replace(/\D/g, '').length < 10 && 'El número de teléfono del cliente (10 dígitos)',
+    !fechaEntrega && 'La fecha de entrega',
+    !fechaDev && 'La fecha de devolución',
+    fechaEntrega && fechaDev && fechaDev <= fechaEntrega && 'La fecha de devolución debe ser después de la entrega',
+    datesSet && !vehiculoId && (loadingVeh ? 'Espera a que carguen los vehículos' : vehicles.length === 0 ? 'No hay vehículos disponibles en esas fechas: cambia las fechas' : 'El vehículo'),
+    selectedVehicle && !tarifa && 'El vehículo no tiene tarifa diaria (agrégala en Flota)',
+    cobertura === 'cero_deducible' && !(Number(ceroDiario) > 0) && 'El costo por día del cero deducible',
+    tieneDeposito && !(Number(deposito) > 0) && 'El monto del anticipo',
+  ].filter(Boolean) as string[]
+
   async function handleCreate() {
-    if (!clienteNombre || !fechaEntrega || !fechaDev || !vehiculoId) return
+    if (faltan.length) { setIntento(true); return }
     setWorking(true); setError('')
 
     let clienteId: string | null = null
@@ -515,7 +529,7 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
               <label className="field-l">
                 Teléfono{' '}
                 <span style={{ color: 'var(--ink4)', fontWeight: 400 }}>
-                  {clientSearch.trim() ? '(nuevo cliente)' : '(opcional)'}
+                  {clientSearch.trim() ? '* (nuevo cliente)' : ''}
                 </span>
               </label>
               <input className="field-i" value={clienteTel}
@@ -636,7 +650,7 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
                 )}
                 <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, color: 'var(--ink3)', cursor: 'pointer' }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <input type="checkbox" checked={conIva} onChange={e => setConIva(e.target.checked)} />{ivaEtiqueta}
+                    <input type="checkbox" checked={conIva} onChange={e => setConIva(e.target.checked)} />{ivaEtiqueta()}
                   </span>
                   <span>{conIva ? `+$${fmt(ivaMonto)}` : 'sin IVA'}</span>
                 </label>
@@ -787,9 +801,15 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
         </div>
 
         <div className="qpanel-foot">
+          {intento && faltan.length > 0 && (
+            <div role="alert" style={{ background: 'var(--warn-soft)', border: '1px solid var(--warn-line)', color: 'var(--warn-ink)', borderRadius: 10, padding: '10px 14px', fontSize: 13 }}>
+              <b>Falta para crear la reserva:</b>
+              <ul style={{ margin: '4px 0 0', paddingLeft: 18, lineHeight: 1.55 }}>{faltan.map(f => <li key={f}>{f}</li>)}</ul>
+            </div>
+          )}
           <button className="btn primary" style={{ width: '100%', justifyContent: 'center' }}
             onClick={handleCreate}
-            disabled={working || !clienteNombre || !fechaEntrega || !fechaDev || !vehiculoId}>
+            disabled={working}>
             {working
               ? <><div className="spinner" style={{ width: 15, height: 15, borderWidth: 2, borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.3)' }} />Creando…</>
               : <><Check size={15} />Crear reserva</>}
@@ -834,13 +854,13 @@ export default function ReservationsScreen() {
   }, [])
 
   // Open a specific reservation (e.g. clicked from the fleet calendar)
+  const resPedida = searchParams.get('res')
   useEffect(() => {
-    const id = searchParams.get('res')
-    if (!id || reservas.length === 0) return
-    const r = reservas.find(x => x.id === id)
+    if (!resPedida || reservas.length === 0) return
+    const r = reservas.find(x => x.id === resPedida)
     if (r) openPanel(r)
     setSearchParams({}, { replace: true })
-  }, [reservas])
+  }, [reservas, resPedida])
 
   async function fetchReservas() {
     const { data, error } = await db

@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { EMPRESA } from './empresa'
 
 const db = supabase as any // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -9,6 +10,8 @@ export const CONCEPTO_LABEL: Record<ConceptoPago, string> = {
   renta: 'Pago de renta', cargo_extra: 'Cargo extra', fianza: 'Depósito en garantía', devolucion_fianza: 'Devolución de garantía',
 }
 export const METODOS: MetodoPago[] = ['efectivo', 'tarjeta', 'transferencia']
+/** Payment methods the owner enabled in Ajustes. */
+export const metodosActivos = () => METODOS.filter(m => EMPRESA.metodosPago.includes(m))
 export const metodoLabel = (m?: string | null) => (m ? m[0].toUpperCase() + m.slice(1) : '—')
 
 export type Pago = {
@@ -20,7 +23,7 @@ export type Pago = {
 export function faltaMigracion(e: { code?: string; message?: string } | null | undefined) {
   return !!e && (['PGRST204', 'PGRST202', 'PGRST205', '42703', '42883', '42P01'].includes(e.code ?? '') || /schema cache|does not exist|bucket not found/i.test(e.message ?? ''))
 }
-export const AVISO_MIGRACION = 'Falta ejecutar en Supabase (SQL Editor, como postgres) la actualización "supabase_migracion_2026_10_operacion.sql". Sin ella no se pueden guardar fotos ni usar las funciones nuevas.'
+export const AVISO_MIGRACION = 'Falta ejecutar en Supabase (SQL Editor, como postgres) la actualización de la base de datos ("cambio_limpio_lucianos.sql", o "supabase_migracion_2026_10_operacion.sql" y "supabase_migracion_2026_11_control.sql"). Sin ella no funcionan las fotos, la caja ni los ajustes nuevos.'
 export const mensajeError = (e: { code?: string; message?: string }) => (faltaMigracion(e) ? AVISO_MIGRACION : e.message ?? 'Error desconocido')
 
 /** Records a payment; rent and extra-charge payments also raise the reservation's paid amount. */

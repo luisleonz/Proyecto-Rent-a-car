@@ -189,7 +189,7 @@ function PaginaAnexo({ r, firmaUrl, firmaCliente }: { r: ReservaContrato; firmaU
           <tr><td>Renta: {dias} {dias === 1 ? 'día' : 'días'} × {money(tarifa)} por día</td><td>{money(subtotal)}</td></tr>
           {descuento > 0 && <tr><td>Descuento</td><td>−{money(descuento)}</td></tr>}
           <tr><td>Protección adicional cero deducible</td><td>{cero ? money(cobCosto) : 'No contratada'}</td></tr>
-          {iva > 0 && <tr><td>{ivaEtiqueta}</td><td>{money(iva)}</td></tr>}
+          {iva > 0 && <tr><td>{ivaEtiqueta()}</td><td>{money(iva)}</td></tr>}
           <tr className="tot"><td>TOTAL DEL ARRENDAMIENTO (moneda nacional)</td><td>{money(total)}</td></tr>
           <tr><td>Anticipo / apartado recibido{r.metodo_deposito ? ` (${metodo(r.metodo_deposito)})` : ''}</td><td>{money(anticipo)}</td></tr>
           <tr className="tot"><td>SALDO PENDIENTE AL ENTREGAR</td><td>{money(saldo)}</td></tr>

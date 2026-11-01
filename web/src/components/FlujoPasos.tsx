@@ -47,3 +47,13 @@ export function Casilla({ ok, onChange, children }: { ok: boolean; onChange: (v:
     </label>
   )
 }
+
+/** Lists what is missing before moving to the next step. */
+export function AvisoFalta({ items }: { items: string[] }) {
+  return (
+    <div role="alert" style={{ background: 'var(--warn-soft)', border: '1px solid var(--warn-line)', color: 'var(--warn-ink)', borderRadius: 10, padding: '9px 13px', fontSize: 13 }}>
+      <b>Falta:</b>
+      <ul style={{ margin: '3px 0 0', paddingLeft: 18, lineHeight: 1.5 }}>{items.map(i => <li key={i}>{i}</li>)}</ul>
+    </div>
+  )
+}

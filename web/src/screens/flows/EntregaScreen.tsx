@@ -7,8 +7,8 @@ import { insertLog } from '../../lib/log'
 import { hoyISO } from '../../lib/fechas'
 import { actualizarConExtras } from '../../lib/insertar'
 import { subirDocumento } from '../../lib/fotos'
-import { registrarPago, mensajeError, metodoLabel, METODOS, whatsappUrl, AVISO_MIGRACION, type MetodoPago } from '../../lib/operacion'
-import FlujoPasos, { Bloque, Casilla } from '../../components/FlujoPasos'
+import { registrarPago, mensajeError, metodoLabel, metodosActivos, whatsappUrl, AVISO_MIGRACION, type MetodoPago } from '../../lib/operacion'
+import FlujoPasos, { Bloque, Casilla, AvisoFalta } from '../../components/FlujoPasos'
 import { SelectorGasolina, CapturaFotos, FirmaPad, canvasABlob, nivelGas } from '../../components/Captura'
 import type { ReservaContrato } from '../print/ContratoPrint'
 import { EMPRESA } from '../../lib/empresa'
@@ -45,6 +45,8 @@ export default function EntregaScreen() {
   const [fianza, setFianza] = useState('')
   const [metodoFianza, setMetodoFianza] = useState<MetodoPago>('efectivo')
   const [fianzaOk, setFianzaOk] = useState(true)
+  const [avisoPaso, setAvisoPaso] = useState(false)
+  useEffect(() => { setAvisoPaso(false) }, [paso])
   // Step 4 · signature
   const [firma, setFirma] = useState<HTMLCanvasElement | null>(null)
 
@@ -101,12 +103,12 @@ export default function EntregaScreen() {
     )
   }
 
-  const puedeSeguir = [
-    licOk && idOk && !!licencia.trim(),
-    !!km && gas != null && (r.vehiculos?.km == null || kmNum >= 0),
-    !fianzaOk || Number(fianza) >= 0,
-    true,
-  ][paso]
+  const faltaPaso = ([
+    [!licencia.trim() && 'El número de licencia', !licOk && 'Marcar que revisaste la licencia', !idOk && 'Marcar que revisaste la identificación'],
+    [!km && 'El kilometraje de salida', gas == null && 'El nivel de gasolina'],
+    [fianzaOk && !(Number(fianza) >= 0) && 'El monto del depósito en garantía'],
+    [],
+  ][paso] ?? []).filter(Boolean) as string[]
 
   async function confirmar() {
     if (!r) return
@@ -173,7 +175,10 @@ export default function EntregaScreen() {
     <FlujoPasos titulo={`Entregar ${r.vehiculos?.modelo ?? ''}`} subtitulo={`${nombre}${r.folio != null ? ` · contrato #${r.folio}` : ''}`}
       pasos={PASOS} actual={paso} onAtras={() => (paso === 0 ? navigate(-1) : setPaso(paso - 1))}
       pie={paso < PASOS.length - 1
-        ? <button className="btn primary" style={{ flex: 1, padding: 14 }} disabled={!puedeSeguir} onClick={() => setPaso(paso + 1)}>Siguiente<ChevronRight size={16} /></button>
+        ? <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {avisoPaso && faltaPaso.length > 0 && <AvisoFalta items={faltaPaso} />}
+            <button className="btn primary" style={{ padding: 14 }} onClick={() => (faltaPaso.length ? setAvisoPaso(true) : setPaso(paso + 1))}>Siguiente<ChevronRight size={16} /></button>
+          </div>
         : <button className="btn primary" style={{ flex: 1, padding: 14 }} disabled={!!guardando} onClick={confirmar}><Key size={16} />{guardando ?? 'Confirmar entrega'}</button>}>
 
       {paso === 0 && <>
@@ -220,14 +225,14 @@ export default function EntregaScreen() {
           </div>
           <label className="field-l">Cobrar ahora</label>
           <div className="field-money"><span>$</span><input className="field-i" inputMode="decimal" value={cobro} onChange={e => setCobro(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="0" /></div>
-          {Number(cobro) > 0 && <div style={{ display: 'flex', gap: 6 }}>{METODOS.map(m => <button key={m} className={`btn sm${metodoCobro === m ? ' primary' : ''}`} style={{ flex: 1 }} onClick={() => setMetodoCobro(m)}>{metodoLabel(m)}</button>)}</div>}
+          {Number(cobro) > 0 && <div style={{ display: 'flex', gap: 6 }}>{metodosActivos().map(m => <button key={m} className={`btn sm${metodoCobro === m ? ' primary' : ''}`} style={{ flex: 1 }} onClick={() => setMetodoCobro(m)}>{metodoLabel(m)}</button>)}</div>}
           {Number(cobro) < saldo && <div style={{ fontSize: 12.5, color: 'var(--warn-ink)' }}>Quedará un saldo de ${fmt(saldo - (Number(cobro) || 0))}.</div>}
         </Bloque>
         <Bloque titulo="Depósito en garantía" ayuda="Se devuelve al regresar el vehículo en buen estado (cláusula OCTAVA).">
           <Casilla ok={fianzaOk} onChange={setFianzaOk}>Recibí el depósito en garantía</Casilla>
           {fianzaOk && <>
             <div className="field-money"><span>$</span><input className="field-i" inputMode="numeric" value={fianza} onChange={e => setFianza(e.target.value.replace(/\D/g, ''))} /></div>
-            <div style={{ display: 'flex', gap: 6 }}>{METODOS.map(m => <button key={m} className={`btn sm${metodoFianza === m ? ' primary' : ''}`} style={{ flex: 1 }} onClick={() => setMetodoFianza(m)}>{metodoLabel(m)}</button>)}</div>
+            <div style={{ display: 'flex', gap: 6 }}>{metodosActivos().map(m => <button key={m} className={`btn sm${metodoFianza === m ? ' primary' : ''}`} style={{ flex: 1 }} onClick={() => setMetodoFianza(m)}>{metodoLabel(m)}</button>)}</div>
           </>}
         </Bloque>
       </>}

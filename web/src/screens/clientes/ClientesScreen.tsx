@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Search, Plus, Phone, Mail, CreditCard, MapPin, X, Check, ChevronRight, Pencil, Fingerprint, Cake, LifeBuoy, StickyNote } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
@@ -88,7 +88,7 @@ function AgregarClientePanel({ open, onClose, onCreated }: {
   }
 
   async function handleGuardar() {
-    if (!nombre.trim()) { setError('El nombre es obligatorio'); return }
+    if (!nombre.trim()) { setError('Falta el nombre del cliente.'); return }
     setSaving(true); setError('')
     const { data, error: err } = await insertarConExtras('clientes', {
       nombre:   nombre.trim(),
@@ -192,7 +192,7 @@ function AgregarClientePanel({ open, onClose, onCreated }: {
         </div>
         <div className="qpanel-foot">
           <button className="btn primary" style={{ width: '100%', justifyContent: 'center' }}
-            onClick={handleGuardar} disabled={saving || !nombre.trim()}>
+            onClick={handleGuardar} disabled={saving}>
             {saving
               ? <><div className="spinner" style={{ width: 15, height: 15, borderWidth: 2, borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.3)' }} />Guardando…</>
               : <><Check size={15} />Agregar cliente</>}
@@ -251,7 +251,7 @@ function ClienteDetail({ cliente, onNewReserva, onCotizar, onUpdated }: {
   }
 
   async function handleSave() {
-    if (!editNombre.trim()) { setEditError('El nombre es obligatorio'); return }
+    if (!editNombre.trim()) { setEditError('Falta el nombre del cliente.'); return }
     setEditSaving(true); setEditError('')
     const base = {
       nombre:   editNombre.trim(),
@@ -353,7 +353,7 @@ function ClienteDetail({ cliente, onNewReserva, onCotizar, onUpdated }: {
             <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setEditing(false)} disabled={editSaving}>
               Cancelar
             </button>
-            <button className="btn primary" style={{ flex: 2, justifyContent: 'center' }} onClick={handleSave} disabled={editSaving || !editNombre.trim()}>
+            <button className="btn primary" style={{ flex: 2, justifyContent: 'center' }} onClick={handleSave} disabled={editSaving}>
               {editSaving
                 ? <><div className="spinner" style={{ width: 14, height: 14, borderWidth: 2, borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.3)' }} />Guardando…</>
                 : <><Check size={14} />Guardar cambios</>}
@@ -489,6 +489,16 @@ export default function ClientesScreen() {
   }
 
   useEffect(() => { fetchClientes() }, [])
+
+  // Open a client picked from the global search (?c=id)
+  const [params, setParams] = useSearchParams()
+  const pedido = params.get('c')
+  useEffect(() => {
+    if (!pedido || clientes.length === 0) return
+    const c = clientes.find(x => x.id === pedido)
+    if (c) setSelected(c)
+    setParams({}, { replace: true })
+  }, [pedido, clientes])
 
   function handleCreated(c: Cliente) {
     setClientes(prev =>

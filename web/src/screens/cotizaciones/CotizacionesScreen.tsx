@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
 import { insertLog } from '../../lib/log'
 import { isoLocal } from '../../lib/fechas'
-import { ivaDe, ivaEtiqueta } from '../../lib/empresa'
+import { EMPRESA, ivaDe, ivaEtiqueta } from '../../lib/empresa'
 import { insertarConExtras } from '../../lib/insertar'
 import type { Vehiculo, Cotizacion, CotizacionStatus } from '../../lib/database.types'
 
@@ -123,7 +123,7 @@ function generatePDF(q: QuoteData): Blob {
   ]
   if (q.insurance.cost > 0) rows.push([`Seguro ${q.insurance.label}`, `$${fmt(q.insurance.cost)}`])
   if (q.discount > 0) rows.push([`Descuento aplicado`, `-$${fmt(q.discount)}`])
-  if (q.iva > 0) rows.push([ivaEtiqueta, `$${fmt(q.iva)}`])
+  if (q.iva > 0) rows.push([ivaEtiqueta(), `$${fmt(q.iva)}`])
 
   let y = 130
   rows.forEach(([label, amount]) => {
@@ -256,6 +256,10 @@ function QuoteDetailPanel({ cot, open, onClose, onStatusChange, onConvert }: Pan
 
   async function handleConvert() {
     if (!cot || working) return
+    const falta = [!fechaEntrega && 'la fecha de entrega', !fechaDevolucion && 'la fecha de devolución',
+      fechaEntrega && fechaDevolucion && fechaDevolucion <= fechaEntrega && 'que la devolución sea después de la entrega',
+      tieneDeposito && !(parseFloat(deposito) > 0) && 'el monto del anticipo'].filter(Boolean)
+    if (falta.length) { setConvertError(`Falta ${falta.join(', ')}.`); return }
     setWorking(true)
     setConvertError('')
     const depositoNum = tieneDeposito ? (parseFloat(deposito) || 0) : 0
@@ -326,7 +330,7 @@ function QuoteDetailPanel({ cot, open, onClose, onStatusChange, onConvert }: Pan
                 )}
                 {(cot.iva ?? 0) > 0 && (
                   <div className="qpanel-row">
-                    <span className="lbl">{ivaEtiqueta}</span>
+                    <span className="lbl">{ivaEtiqueta()}</span>
                     <span className="val mono">${fmt(cot.iva ?? 0)}</span>
                   </div>
                 )}
@@ -462,7 +466,7 @@ function QuoteDetailPanel({ cot, open, onClose, onStatusChange, onConvert }: Pan
                       <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => { setConfirmStep(false); setConvertError('') }} disabled={working}>
                         Cancelar
                       </button>
-                      <button className="btn primary" style={{ flex: 2, justifyContent: 'center' }} onClick={handleConvert} disabled={working || !fechaEntrega || !fechaDevolucion}>
+                      <button className="btn primary" style={{ flex: 2, justifyContent: 'center' }} onClick={handleConvert} disabled={working}>
                         {working
                           ? <><div className="spinner" style={{ width: 15, height: 15, borderWidth: 2, borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.3)' }} />Creando…</>
                           : <><Check size={15} />Confirmar reserva</>}
@@ -530,10 +534,11 @@ export default function CotizacionesScreen() {
   const { currentEmail } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [clientName, setClientName]     = useState(() => searchParams.get('nombre') ?? '')
+  const [intentoCot, setIntentoCot]     = useState(false)
   const [clientPhone, setClientPhone]   = useState(() => searchParams.get('telefono') ?? '')
   const [days, setDays]                 = useState(3)
   const [discount, setDiscount]         = useState('')
-  const [conIva, setConIva]             = useState(true)
+  const [conIva, setConIva]             = useState(EMPRESA.ivaPorDefecto)
   const [selectedId, setSelectedId]     = useState<string>('')
   const [insurance, setInsurance]       = useState(INSURANCE_OPTIONS[0])
   const [filter, setFilter]             = useState('Todas')
@@ -573,6 +578,8 @@ export default function CotizacionesScreen() {
   }, [])
 
   const selectedVehicle = vehicles.find(v => v.id === selectedId)
+  const faltaCot = [!clientName.trim() && 'el nombre del cliente', !selectedVehicle && (vehicles.length === 0 ? 'no hay vehículos disponibles para cotizar' : 'elegir un vehículo'),
+    selectedVehicle && !selectedVehicle.tarifa_diaria && 'el vehículo no tiene tarifa diaria (agrégala en Flota)'].filter(Boolean).join(' · ')
 
   const discountAmount = parseInt(discount) || 0
   const vehicleRate    = selectedVehicle?.tarifa_diaria ?? 0
@@ -887,7 +894,7 @@ export default function CotizacionesScreen() {
             )}
             <label className="qb-line" style={{ cursor: 'pointer' }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <input type="checkbox" checked={conIva} onChange={e => setConIva(e.target.checked)} />{ivaEtiqueta}
+                <input type="checkbox" checked={conIva} onChange={e => setConIva(e.target.checked)} />{ivaEtiqueta()}
               </span>
               <span className="mono">{conIva ? `$${fmt(ivaMonto)}` : 'sin IVA'}</span>
             </label>
@@ -898,18 +905,21 @@ export default function CotizacionesScreen() {
             <p className="qb-note">{conIva ? 'IVA incluido en el total' : 'No incluye IVA'} · vigencia 7 días</p>
           </div>
 
+          {intentoCot && faltaCot && (
+            <div role="alert" style={{ background: 'var(--warn-soft)', border: '1px solid var(--warn-line)', color: 'var(--warn-ink)', borderRadius: 10, padding: '9px 13px', fontSize: 13, marginTop: 10 }}>
+              Falta: {faltaCot}
+            </div>
+          )}
           <div className="qb-actions">
             <button
               className="btn"
-              onClick={handleDownload}
-              disabled={!clientName.trim() || vehicles.length === 0}
+              onClick={() => (faltaCot ? setIntentoCot(true) : handleDownload())}
             >
               <Download size={15} />PDF
             </button>
             <button
               className={`btn primary${sent ? ' is-sent' : ''}`}
-              onClick={handleWhatsApp}
-              disabled={!clientName.trim() || vehicles.length === 0}
+              onClick={() => (faltaCot ? setIntentoCot(true) : handleWhatsApp())}
             >
               {sent
                 ? <><Check size={15} />¡Listo!</>

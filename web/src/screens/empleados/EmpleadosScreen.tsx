@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react'
-import { UserPlus, ShieldCheck, Shield, ExternalLink } from 'lucide-react'
+import { UserPlus, X, Copy, MessageCircle, Link2, ShieldCheck, Check } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
-import { insertLog } from '../../lib/log'
-import { mensajeError } from '../../lib/operacion'
+import { mensajeError, whatsappUrl } from '../../lib/operacion'
+import { EMPRESA } from '../../lib/empresa'
 
 const db = supabase as any // eslint-disable-line @typescript-eslint/no-explicit-any
 
-type Empleado = { id: string; email: string; nombre: string | null; rol: string; creado: string; ultimo_acceso: string | null; confirmado: boolean }
+type Usuario = { id: string; email: string; nombre: string | null; rol: string; creado: string; ultimo_acceso: string | null
+  confirmado: boolean; activo?: boolean; dos_pasos?: boolean }
 type Actividad = { reservas: number; entregas: number; devoluciones: number; cobros: number; total: number }
 
-const proyecto = new URL(import.meta.env.VITE_SUPABASE_URL as string).hostname.split('.')[0]
-const URL_USUARIOS = `https://supabase.com/dashboard/project/${proyecto}/auth/users`
+const ROL_INFO: Record<string, string> = {
+  'Administrador': 'Opera todo: reservas, entregas, cobros, flota, clientes, caja y reportes. No puede borrar registros.',
+  'Dueño': 'Todo lo anterior, más usuarios, ajustes del negocio, apertura de caja, borrar registros y ver el historial detallado.',
+}
+
 const hace = (iso: string | null) => {
   if (!iso) return 'Nunca'
   const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
@@ -20,13 +24,137 @@ const hace = (iso: string | null) => {
   return new Date(iso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-export default function EmpleadosScreen() {
-  const { user, currentEmail } = useAuth()
-  const [lista, setLista] = useState<Empleado[]>([])
+/** Calls the Netlify function that manages accounts with the service key (owner only). */
+async function llamar(accion: string, datos: Record<string, string> = {}) {
+  const { data: { session } } = await supabase.auth.getSession()
+  try {
+    const r = await fetch('/.netlify/functions/usuarios', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${session?.access_token ?? ''}` },
+      body: JSON.stringify({ accion, ...datos }),
+    })
+    // Without the function, Netlify answers with the app's own page (HTML) instead of JSON
+    if (r.status === 404 || !(r.headers.get('content-type') ?? '').includes('json'))
+      return { error: 'La función de usuarios aún no está publicada en Netlify. Vuelve a publicar el sitio (Deploys → Trigger deploy).', codigo: 'sin_funcion' }
+    const j = await r.json().catch(() => ({ error: `Error ${r.status}` }))
+    return j as { ok?: boolean; error?: string; codigo?: string; enlace?: string; tipo?: string }
+  } catch {
+    return { error: 'Sin conexión. Revisa el internet e inténtalo de nuevo.' }
+  }
+}
+
+const mensajeInvitacion = (nombre: string, enlace: string) =>
+  `Hola${nombre ? ` ${nombre.split(' ')[0]}` : ''}, te di acceso a la app de ${EMPRESA.nombreComercial}. Abre este enlace para crear tu contraseña (es personal, no lo compartas):\n${enlace}`
+
+function EnlaceListo({ enlace, nombre, onClose }: { enlace: string; nombre: string; onClose: () => void }) {
+  const [copiado, setCopiado] = useState(false)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ padding: '10px 13px', background: 'var(--primary-soft)', color: 'var(--primary-dark)', borderRadius: 'var(--radius-sm)', fontSize: 13, lineHeight: 1.5 }}>
+        Enlace listo. Envíalo a la persona: al abrirlo crea su contraseña y entra directo. Es de un solo uso y vence en 24 horas.
+      </div>
+      <code style={{ fontSize: 11.5, wordBreak: 'break-all', background: 'var(--paper-alt)', padding: 10, borderRadius: 8, fontFamily: 'var(--font-mono)' }}>{enlace}</code>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <a className="btn primary" href={whatsappUrl('', mensajeInvitacion(nombre, enlace))} target="_blank" rel="noreferrer"><MessageCircle size={15} />Enviar por WhatsApp</a>
+        <button className="btn" onClick={() => { navigator.clipboard?.writeText(enlace); setCopiado(true) }}>{copiado ? <Check size={15} /> : <Copy size={15} />}{copiado ? 'Copiado' : 'Copiar'}</button>
+        <button className="btn" onClick={onClose}>Listo</button>
+      </div>
+    </div>
+  )
+}
+
+function NuevoUsuario({ onClose, onCreado }: { onClose: () => void; onCreado: () => void }) {
+  const [nombre, setNombre] = useState('')
+  const [email, setEmail] = useState('')
+  const [rol, setRol] = useState<'Administrador' | 'Dueño'>('Administrador')
+  const [modo, setModo] = useState<'enlace' | 'correo' | 'crear'>('enlace')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [listo, setListo] = useState<{ enlace?: string; msg?: string } | null>(null)
+
+  async function guardar() {
+    const faltan = [!nombre.trim() && 'el nombre', !/^\S+@\S+\.\S+$/.test(email.trim()) && 'un correo válido',
+      modo === 'crear' && password.length < 8 && 'una contraseña temporal de al menos 8 caracteres'].filter(Boolean)
+    if (faltan.length) { setError(`Falta ${faltan.join(', ')}.`); return }
+    setGuardando(true); setError('')
+    const r = await llamar(modo === 'enlace' ? 'invitar_enlace' : modo === 'correo' ? 'invitar_correo' : 'crear', { nombre: nombre.trim(), email: email.trim(), rol, password })
+    setGuardando(false)
+    if (r.error) { setError(r.error); return }
+    onCreado()
+    setListo(modo === 'enlace' ? { enlace: r.enlace } : modo === 'correo'
+      ? { msg: `Se envió la invitación a ${email.trim()}. Si no le llega en unos minutos (revisar spam), usa "Nuevo enlace" en la lista y envíalo por WhatsApp.` }
+      : { msg: `Cuenta creada. Dale a la persona su correo y la contraseña temporal; pídele que la cambie en Ajustes → Seguridad.` })
+  }
+
+  return (
+    <>
+      <div className="qpanel-overlay" onClick={onClose} />
+      <div className="qpanel open" role="dialog" aria-label="Agregar usuario">
+        <div className="qpanel-head">
+          <div><div className="eyebrow">Usuarios</div><h2 className="h-display" style={{ fontSize: 24, marginTop: 4 }}>Agregar usuario</h2></div>
+          <button className="iconbtn" onClick={onClose} aria-label="Cerrar"><X size={18} /></button>
+        </div>
+        <div className="qpanel-body">
+          {listo ? (listo.enlace ? <EnlaceListo enlace={listo.enlace} nombre={nombre} onClose={onClose} /> : (
+            <>
+              <div style={{ padding: '10px 13px', background: 'var(--primary-soft)', color: 'var(--primary-dark)', borderRadius: 'var(--radius-sm)', fontSize: 13, lineHeight: 1.5 }}>{listo.msg}</div>
+              <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={onClose}>Listo</button>
+            </>
+          )) : (
+            <>
+              <div className="field"><label className="field-l">Nombre *</label>
+                <input className="field-i" value={nombre} onChange={e => { setNombre(e.target.value); setError('') }} placeholder="Nombre y apellido" /></div>
+              <div className="field"><label className="field-l">Correo *</label>
+                <input className="field-i" type="email" value={email} onChange={e => { setEmail(e.target.value); setError('') }} placeholder="correo@ejemplo.com" autoCapitalize="off" /></div>
+              <div className="field">
+                <label className="field-l">Tipo de usuario</label>
+                <div className="filterbar" style={{ margin: 0 }}>
+                  {(['Administrador', 'Dueño'] as const).map(r => <button key={r} className={`fbtn${rol === r ? ' on' : ''}`} onClick={() => setRol(r)}>{r}</button>)}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--ink3)', lineHeight: 1.45 }}>{ROL_INFO[rol]}</div>
+              </div>
+              <div className="field">
+                <label className="field-l">¿Cómo le das acceso?</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {([['enlace', 'Enlace por WhatsApp (recomendado)', 'La app genera un enlace para que cree su contraseña.'],
+                    ['correo', 'Invitación por correo', 'Supabase le envía un correo. Puede tardar o caer en spam.'],
+                    ['crear', 'Crear con contraseña temporal', 'Para cuando la persona está contigo.']] as const).map(([v, t, s]) => (
+                    <label key={v} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer', fontSize: 13.5 }}>
+                      <input type="radio" name="modo" checked={modo === v} onChange={() => setModo(v)} style={{ marginTop: 3 }} />
+                      <span><b>{t}</b><br /><span style={{ color: 'var(--ink3)', fontSize: 12 }}>{s}</span></span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              {modo === 'crear' && (
+                <div className="field"><label className="field-l">Contraseña temporal *</label>
+                  <input className="field-i" value={password} onChange={e => { setPassword(e.target.value); setError('') }} placeholder="Mínimo 8 caracteres" /></div>
+              )}
+              {error && <div style={{ padding: '10px 13px', background: 'var(--danger-soft)', color: 'var(--danger-ink)', borderRadius: 'var(--radius-sm)', fontSize: 13 }}>{error}</div>}
+            </>
+          )}
+        </div>
+        {!listo && (
+          <div className="qpanel-foot">
+            <button className="btn primary" onClick={guardar} disabled={guardando}><UserPlus size={15} />{guardando ? 'Creando…' : 'Agregar usuario'}</button>
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
+export default function UsuariosScreen() {
+  const { user } = useAuth()
+  const [lista, setLista] = useState<Usuario[]>([])
   const [act, setAct] = useState<Record<string, Actividad>>({})
   const [error, setError] = useState('')
+  const [aviso, setAviso] = useState('')
   const [loading, setLoading] = useState(true)
   const [cambiando, setCambiando] = useState<string | null>(null)
+  const [nuevo, setNuevo] = useState(false)
+  const [enlace, setEnlace] = useState<{ id: string; enlace: string; nombre: string } | null>(null)
 
   async function cargar() {
     const { data, error: e } = await db.rpc('listar_empleados')
@@ -48,60 +176,95 @@ export default function EmpleadosScreen() {
   }
   useEffect(() => { cargar() }, [])
 
-  async function cambiarRol(e: Empleado, nuevo: 'Administrador' | 'Empleado' | 'Sin acceso') {
-    const quien = e.nombre ?? e.email
-    if (!confirm(nuevo === 'Administrador' ? `¿Dar permisos de administrador a ${quien}? Podrá editar precios y vehículos, aprobar cambios y ver reportes.`
-      : nuevo === 'Sin acceso' ? `¿Quitar el acceso a ${quien}? Ya no podrá ver ni modificar datos.`
-      : e.rol === 'Administrador' ? `¿Quitar permisos de administrador a ${quien}?` : `¿Dar acceso a ${quien} como empleado?`)) return
-    setCambiando(e.id)
-    const { error: err } = await db.rpc('asignar_rol', { uid: e.id, rol: nuevo })
+  async function cambiarRol(u: Usuario, rol: string) {
+    if (rol === u.rol) return
+    const quien = u.nombre ?? u.email
+    if (!confirm(rol === 'Dueño' ? `¿Hacer dueño a ${quien}? Podrá administrar usuarios, ajustes, la caja y borrar registros.`
+      : rol === 'Sin acceso' ? `¿Quitar el acceso a ${quien}? Ya no podrá ver ni modificar datos.`
+      : `¿Dejar a ${quien} como administrador?`)) return
+    setCambiando(u.id); setError(''); setAviso('')
+    const { error: e } = await db.rpc('asignar_rol', { uid: u.id, rol })
     setCambiando(null)
-    if (err) { setError(mensajeError(err)); return }
-    await insertLog({ accion: 'cambiar_rol', entidad: 'empleados', entidad_id: e.id, descripcion: `${e.email} ahora es ${nuevo}`, realizado_por: currentEmail })
+    if (e) { setError(mensajeError(e)); return }
+    setAviso(`${quien} ahora es ${rol}. El cambio se aplica la próxima vez que abra la app (máximo en una hora).`)
     cargar()
   }
+
+  async function accion(u: Usuario, a: 'enlace' | 'desactivar' | 'reactivar') {
+    const quien = u.nombre ?? u.email
+    if (a === 'desactivar' && !confirm(`¿Desactivar la cuenta de ${quien}? No podrá entrar a la app. Su historial se conserva y puedes reactivarla después.`)) return
+    setCambiando(u.id); setError(''); setAviso('')
+    const r = await llamar(a, { id: u.id })
+    setCambiando(null)
+    if (r.error) { setError(r.error); return }
+    if (a === 'enlace' && r.enlace) setEnlace({ id: u.id, enlace: r.enlace, nombre: u.nombre ?? '' })
+    else setAviso(a === 'desactivar' ? `Cuenta de ${quien} desactivada.` : `Cuenta de ${quien} reactivada.`)
+    cargar()
+  }
+
+  const activos = lista.filter(u => u.activo !== false && u.rol !== 'Sin acceso')
 
   return (
     <div className="screen">
       <div className="pagehead">
         <div>
           <div className="eyebrow">Gestión</div>
-          <h1 className="h-display" style={{ fontSize: 'clamp(28px, 4cqw, 42px)', marginTop: 6 }}>Empleados</h1>
-          <p style={{ fontSize: 13.5, color: 'var(--ink3)', marginTop: 4 }}>{loading ? 'Cargando…' : `${lista.length} usuarios · ${lista.filter(e => e.rol === 'Administrador').length} administradores`}</p>
+          <h1 className="h-display" style={{ fontSize: 'clamp(28px, 4cqw, 42px)', marginTop: 6 }}>Usuarios</h1>
+          <p style={{ fontSize: 13.5, color: 'var(--ink3)', marginTop: 4 }}>{loading ? 'Cargando…' : `${activos.length} con acceso · ${activos.filter(u => u.rol === 'Dueño').length} dueño(s)`}</p>
         </div>
         <div className="pagehead-actions">
-          <a className="btn sm primary" href={URL_USUARIOS} target="_blank" rel="noreferrer"><UserPlus size={14} />Invitar empleado<ExternalLink size={12} /></a>
+          <button className="btn sm primary" onClick={() => setNuevo(true)}><UserPlus size={14} />Agregar usuario</button>
         </div>
       </div>
 
-      <div className="card" style={{ padding: '12px 16px', marginBottom: 'var(--gap)', fontSize: 13, color: 'var(--ink2)', lineHeight: 1.5 }}>
-        Para dar de alta a alguien: <strong>Invitar empleado</strong> abre Supabase → <em>Invite user</em> → escribe su correo. Le llegará un enlace para crear su contraseña. Después aparecerá aquí <strong>Sin acceso</strong>: toca <strong>Dar acceso</strong> para que pueda trabajar. Los cambios de permisos se aplican la próxima vez que entre a la app.
+      <div className="card" style={{ padding: '12px 16px', marginBottom: 'var(--gap)', fontSize: 13, color: 'var(--ink2)', lineHeight: 1.55 }}>
+        <b>Administrador:</b> {ROL_INFO.Administrador}<br />
+        <b>Dueño:</b> {ROL_INFO['Dueño']}<br />
+        Todo lo que hace cada usuario queda en <b>Actividad</b> y no se puede borrar.
       </div>
 
       {error && <div style={{ padding: '12px 16px', background: 'var(--danger-soft)', color: 'var(--danger-ink)', borderRadius: 'var(--radius-sm)', marginBottom: 'var(--gap)' }}>{error}</div>}
+      {aviso && <div style={{ padding: '12px 16px', background: 'var(--primary-soft)', color: 'var(--primary-dark)', borderRadius: 'var(--radius-sm)', marginBottom: 'var(--gap)' }}>{aviso}</div>}
+      {enlace && (
+        <div className="card" style={{ padding: 16, marginBottom: 'var(--gap)' }}>
+          <EnlaceListo enlace={enlace.enlace} nombre={enlace.nombre} onClose={() => setEnlace(null)} />
+        </div>
+      )}
 
       <div className="card tilelist">
-        {lista.map(e => {
-          const a = act[e.email]
-          const yo = e.id === user?.id
+        {lista.map(u => {
+          const a = act[u.email]
+          const yo = u.id === user?.id
+          const inactivo = u.activo === false
           return (
-            <div key={e.id} className="tilerow" style={{ flexWrap: 'wrap' }}>
-              <div className="avatar accent" style={{ width: 40, height: 40, fontSize: 14 }}>{(e.nombre ?? e.email).slice(0, 2).toUpperCase()}</div>
+            <div key={u.id} className="tilerow" style={{ flexWrap: 'wrap', opacity: inactivo ? 0.65 : 1 }}>
+              <div className="avatar accent" style={{ width: 40, height: 40, fontSize: 14 }}>{(u.nombre ?? u.email).slice(0, 2).toUpperCase()}</div>
               <div className="tile-main" style={{ minWidth: 200 }}>
                 <div className="tile-l" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                  {e.nombre ?? e.email.split('@')[0]}{yo && <span className="chip sm">tú</span>}
-                  <span className={`chip sm ${e.rol === 'Administrador' ? 'primary' : e.rol === 'Sin acceso' ? 'danger' : ''}`}>{e.rol}</span>
-                  {!e.confirmado && <span className="chip sm warn">Invitación pendiente</span>}
+                  {u.nombre ?? u.email.split('@')[0]}{yo && <span className="chip sm">tú</span>}
+                  <span className={`chip sm ${u.rol === 'Dueño' ? 'primary' : u.rol === 'Sin acceso' ? 'danger' : ''}`}>{u.rol}</span>
+                  {inactivo && <span className="chip sm danger">Desactivado</span>}
+                  {!u.confirmado && !inactivo && <span className="chip sm warn">Invitación pendiente</span>}
+                  {u.dos_pasos && <span className="chip sm" title="Verificación en dos pasos activa"><ShieldCheck size={11} />2FA</span>}
                 </div>
-                <div className="tile-s">{e.email} · último acceso {hace(e.ultimo_acceso)}</div>
+                <div className="tile-s">{u.email} · último acceso {hace(u.ultimo_acceso)}</div>
                 {a && <div className="tile-s">Últimos 30 días: {a.reservas} reservas · {a.entregas} entregas · {a.devoluciones} devoluciones · {a.cobros} cobros</div>}
               </div>
               {!yo && (
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {e.rol === 'Sin acceso' && <button className="btn sm primary" onClick={() => cambiarRol(e, 'Empleado')} disabled={cambiando === e.id}><ShieldCheck size={13} />Dar acceso</button>}
-                  {e.rol === 'Empleado' && <button className="btn sm" onClick={() => cambiarRol(e, 'Administrador')} disabled={cambiando === e.id}><ShieldCheck size={13} />Hacer admin</button>}
-                  {e.rol === 'Administrador' && <button className="btn sm" onClick={() => cambiarRol(e, 'Empleado')} disabled={cambiando === e.id}><Shield size={13} />Quitar admin</button>}
-                  {e.rol !== 'Sin acceso' && <button className="btn sm" onClick={() => cambiarRol(e, 'Sin acceso')} disabled={cambiando === e.id}>Quitar acceso</button>}
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {!inactivo && (
+                    <select className="field-i" style={{ width: 'auto', padding: '6px 10px', fontSize: 13 }} value={u.rol} disabled={cambiando === u.id}
+                      onChange={e => cambiarRol(u, e.target.value)} aria-label={`Tipo de usuario de ${u.email}`}>
+                      <option value="Administrador">Administrador</option>
+                      <option value="Dueño">Dueño</option>
+                      <option value="Sin acceso">Sin acceso</option>
+                    </select>
+                  )}
+                  {!inactivo && <button className="btn sm" onClick={() => accion(u, 'enlace')} disabled={cambiando === u.id}
+                    title={u.confirmado ? 'Enlace para que cree una contraseña nueva' : 'Reenviar invitación'}><Link2 size={13} />{u.confirmado ? 'Restablecer contraseña' : 'Nuevo enlace'}</button>}
+                  {inactivo
+                    ? <button className="btn sm primary" onClick={() => accion(u, 'reactivar')} disabled={cambiando === u.id}>Reactivar</button>
+                    : <button className="btn sm" style={{ color: 'var(--danger-ink)' }} onClick={() => accion(u, 'desactivar')} disabled={cambiando === u.id}>Desactivar</button>}
                 </div>
               )}
             </div>
@@ -109,6 +272,8 @@ export default function EmpleadosScreen() {
         })}
         {!loading && !error && lista.length === 0 && <div style={{ padding: 24, color: 'var(--ink3)' }}>Sin usuarios.</div>}
       </div>
+
+      {nuevo && <NuevoUsuario onClose={() => setNuevo(false)} onCreado={cargar} />}
     </div>
   )
 }

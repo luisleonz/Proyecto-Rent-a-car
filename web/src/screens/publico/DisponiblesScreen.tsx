@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { MessageCircle, Users, Settings2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { EMPRESA } from '../../lib/empresa'
+import { EMPRESA, cargarDatosPublicos } from '../../lib/empresa'
 import { whatsappUrl } from '../../lib/operacion'
 import VehiculoFoto from '../../components/VehiculoFoto'
 
@@ -15,9 +15,11 @@ const fmt = (n: number) => new Intl.NumberFormat('es-MX').format(n)
 export default function DisponiblesScreen() {
   const [autos, setAutos] = useState<Auto[]>([])
   const [estado, setEstado] = useState<'cargando' | 'ok' | 'error'>('cargando')
+  const [, setTick] = useState(0)
 
   useEffect(() => {
     document.title = `${EMPRESA.nombreComercial} · Renta de autos en ${EMPRESA.ciudadFirma}`
+    cargarDatosPublicos().then(() => setTick(t => t + 1)).catch(() => null)
     db.rpc('vehiculos_publicos').then(({ data, error }: { data: Auto[] | null; error: unknown }) => {
       if (error) { setEstado('error'); return }
       setAutos(data ?? []); setEstado('ok')

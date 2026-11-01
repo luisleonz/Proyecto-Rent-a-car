@@ -1,21 +1,17 @@
 import { useLocation } from 'react-router-dom'
-import { Search, Bell } from 'lucide-react'
+import BuscadorGlobal from './BuscadorGlobal'
 
-const CRUMBS: Record<string, string[]> = {
-  '/app/home':         ['Lucianos', 'Inicio'],
-  '/app/reservations': ['Lucianos', 'Reservas'],
-  '/app/cotizaciones': ['Lucianos', 'Cotizaciones'],
-  '/app/vehicles':     ['Lucianos', 'Flota'],
-  '/app/more':         ['Lucianos', 'Ajustes'],
-  '/app/caja':         ['Lucianos', 'Caja'],
-  '/app/clientes':     ['Lucianos', 'Clientes'],
-  '/app/reportes':     ['Lucianos', 'Reportes'],
-  '/app/empleados':    ['Lucianos', 'Empleados'],
+const CRUMBS: Record<string, string> = {
+  '/app/home': 'Inicio', '/app/reservations': 'Reservas', '/app/calendario': 'Calendario', '/app/cotizaciones': 'Cotizaciones',
+  '/app/vehicles': 'Flota', '/app/clientes': 'Clientes', '/app/caja': 'Caja', '/app/reportes': 'Reportes',
+  '/app/actividad': 'Actividad', '/app/usuarios': 'Usuarios', '/app/more': 'Ajustes', '/app/edit-profile': 'Perfil',
 }
 
 export default function TopBar() {
   const location = useLocation()
-  const crumbs = CRUMBS[location.pathname] ?? ['Lucianos']
+  const seccion = CRUMBS[location.pathname] ?? (location.pathname.startsWith('/app/vehicles/') ? 'Flota' : location.pathname.startsWith('/app/entrega') ? 'Entrega'
+    : location.pathname.startsWith('/app/devolucion') ? 'Devolución' : '')
+  const crumbs = ['Lucianos', ...(seccion ? [seccion] : [])]
 
   return (
     <header className="topbar">
@@ -27,13 +23,7 @@ export default function TopBar() {
           </span>
         ))}
       </div>
-      <div className="search">
-        <Search size={16} />
-        <span>Buscar placa, cliente o reserva…</span>
-      </div>
-      <div className="actions">
-        <button className="iconbtn"><Bell size={17} /></button>
-      </div>
+      <BuscadorGlobal />
     </header>
   )
 }

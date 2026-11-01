@@ -47,4 +47,5 @@ export default defineConfig({
     }),
   ],
   base: './',
+  define: { __VERSION__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ')) },
 })

@@ -147,6 +147,7 @@ body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; color
 .topbar .crumbs { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink3); }
 .topbar .crumbs .cur { color: var(--ink); font-weight: 600; }
 .topbar .search { flex: 1; max-width: 420px; margin-left: 4px; display: flex; align-items: center; gap: 9px; background: var(--paper-alt); border: 1px solid var(--card-line); border-radius: 11px; padding: 9px 13px; color: var(--ink3); font-size: 13.5px; }
+.mtop .search { flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; background: var(--paper-alt); border: 1px solid var(--card-line); border-radius: 11px; padding: 8px 12px; color: var(--ink3); font-size: 16px; }
 .topbar .actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
 .iconbtn { width: 38px; height: 38px; border-radius: 11px; flex-shrink: 0; background: var(--paper-alt); border: 1px solid var(--card-line); color: var(--ink2); display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; }
 .iconbtn:hover { color: var(--ink); border-color: var(--ink4); }

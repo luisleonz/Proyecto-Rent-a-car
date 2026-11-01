@@ -20,7 +20,7 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 MIGRACIONES = ['supabase_migracion_2026_10_contratos.sql', 'supabase_migracion_2026_10_importacion.sql',
-               'supabase_migracion_2026_10_operacion.sql']
+               'supabase_migracion_2026_10_operacion.sql', 'supabase_migracion_2026_11_control.sql']
 TZ = timedelta(hours=-7)  # America/Hermosillo, sin horario de verano
 
 METODO = {'cash': 'efectivo', 'bank_transfer': 'transferencia', 'card': 'tarjeta', 'pos': 'tarjeta'}
@@ -170,6 +170,9 @@ def main(ruta, limpio=False):
             # Keep numbering after the last contract of the old system (even ones not imported)
             f"select setval(pg_get_serial_sequence('public.reservas', 'folio'), greatest({folio_max}, (select coalesce(max(folio), 0) from reservas)));",
             'select public.sincronizar_flota();',
+            ("alter table auditoria disable trigger user; delete from auditoria; alter table auditoria enable trigger user;\n"
+             "insert into logs (accion, entidad, descripcion, realizado_por) values ('cambio_de_sistema', 'sistema', "
+             f"'Inicio con datos del sistema anterior: {len(res)} rentas activas y próximas', 'importación');") if limpio else '',
             'commit;', '', RESUMEN]
     sys.stdout.write('\n'.join(out))
 
@@ -179,7 +182,13 @@ BORRAR = """
 do $$ begin
   if to_regclass('public.movimientos_caja') is not null then execute 'delete from movimientos_caja'; end if;
   if to_regclass('public.solicitudes') is not null then execute 'delete from solicitudes'; end if;
-  if to_regclass('public.logs') is not null then execute 'delete from logs'; end if;
+  -- The activity log is permanent for app users; the cutover starts it fresh
+  if to_regclass('public.logs') is not null then
+    execute 'alter table logs disable trigger user'; execute 'delete from logs'; execute 'alter table logs enable trigger user';
+  end if;
+  if to_regclass('public.caja_movimientos') is not null then
+    execute 'alter table caja_movimientos disable trigger user'; execute 'delete from caja_movimientos'; execute 'alter table caja_movimientos enable trigger user';
+  end if;
 end $$;
 delete from pagos;
 delete from cotizaciones;

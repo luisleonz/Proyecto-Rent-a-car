@@ -9,3 +9,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+/** Build date, shown in Ajustes so everyone can tell which version they are using. */
+declare const __VERSION__: string

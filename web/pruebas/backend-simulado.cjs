@@ -12,6 +12,7 @@ const sumarDias = (iso, n) => new Date(Date.parse(iso + 'T12:00:00Z') + n * 864e
 const RELACIONES = {
   reservas: { clientes: ['clientes', 'cliente_id'], vehiculos: ['vehiculos', 'vehiculo_id'] },
   pagos: { reservas: ['reservas', 'reserva_id'] },
+  cotizaciones: { vehiculos: ['vehiculos', 'vehiculo_id'] },
 }
 
 const DEFAULTS = {
@@ -23,7 +24,15 @@ const DEFAULTS = {
   cotizaciones: () => ({ status: 'enviada', iva: 0, reserva_id: null }),
   solicitudes: () => ({ estado: 'pendiente', revisado_por: null, revisado_at: null, nota_rechazo: null }),
   logs: () => ({}),
+  caja_movimientos: () => ({ metodo: 'efectivo', fecha: ahora() }),
+  configuracion: () => ({}),
+  auditoria: () => ({ fecha: ahora() }),
 }
+const ACCESO = ['Dueño', 'Administrador', 'Empleado']
+const PERMANENTES = ['logs', 'caja_movimientos', 'auditoria']
+// Token shaped like a Supabase JWT (unsigned) so the client can read its claims
+const jwt = (u, aal = 'aal1') => ['{"alg":"none","typ":"JWT"}', JSON.stringify({ sub: u.id, email: u.email, role: 'authenticated', aal, exp: Math.floor(Date.now() / 1000) + 3600 })]
+  .map(x => Buffer.from(x).toString('base64url')).join('.') + '.' + crypto.randomUUID()
 
 function compara(a, b) {
   if (a == null || b == null) return a == null && b == null ? 0 : a == null ? -1 : 1
@@ -67,7 +76,7 @@ function cumple(fila, col, expr) {
 
 class Backend {
   constructor(semilla) {
-    this.t = { vehiculos: [], clientes: [], reservas: [], pagos: [], cotizaciones: [], solicitudes: [], logs: [] }
+    this.t = { vehiculos: [], clientes: [], reservas: [], pagos: [], cotizaciones: [], solicitudes: [], logs: [], caja_movimientos: [], configuracion: [{ id: 1, datos: {} }], auditoria: [] }
     this.usuarios = []       // { id, email, password, user_metadata, app_metadata, email_confirmed_at, last_sign_in_at }
     this.tokens = {}         // token → user id
     this.archivos = {}       // "bucket/path" → Buffer
@@ -104,12 +113,12 @@ class Backend {
     const tok = (req.headers()['authorization'] ?? '').replace('Bearer ', '')
     return this.usuarios.find(u => u.id === this.tokens[tok]) ?? null
   }
-  rol(u) { return u?.app_metadata?.role ?? null }
+  rol(u) { const r = u?.app_metadata?.role ?? null; return r === 'Empleado' ? 'Administrador' : r }
 
   embeber(tabla, fila, select) {
     const out = { ...fila }
     for (const parte of partirNivelSuperior(select)) {
-      const m = parte.match(/^(\w+)\((.*)\)$/s)
+      const m = parte.match(/^(\w+)(?:!\w+)?\((.*)\)$/s)
       if (!m) continue
       const [, nombre, sub] = m
       const rel = RELACIONES[tabla]?.[nombre]
@@ -124,6 +133,12 @@ class Backend {
     let filas = this.t[tabla]
     for (const [k, val] of params) {
       if (['select', 'order', 'limit', 'offset', 'columns'].includes(k)) continue
+      if (k.includes('.')) {
+        // Filter on an embedded table (used with !inner joins)
+        const [rel, col] = k.split('.'), def = RELACIONES[tabla]?.[rel]
+        if (def) filas = filas.filter(f => { const d = this.t[def[0]].find(x => x.id === f[def[1]]); return d && cumple(d, col, val) })
+        continue
+      }
       if (k === 'or') {
         const conds = partirNivelSuperior(val.replace(/^\(|\)$/g, ''))
         filas = filas.filter(f => conds.some(c => { const i = c.indexOf('.'); return cumple(f, c.slice(0, i), c.slice(i + 1)) }))
@@ -142,11 +157,12 @@ class Backend {
 
     /* ── auth ── */
     if (ruta.startsWith('/auth/v1/')) {
-      const sesion = u => { const tok = 'tok-' + uuid(); this.tokens[tok] = u.id; u.last_sign_in_at = ahora()
+      const sesion = (u, aal = 'aal1') => { const tok = jwt(u, aal); this.tokens[tok] = u.id; u.last_sign_in_at = ahora()
         return { access_token: tok, token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, refresh_token: 'rt-' + u.id, user: this.publico(u) } }
       if (ruta === '/auth/v1/token' && url.searchParams.get('grant_type') === 'password') {
         const { email, password } = cuerpo()
         const u = this.usuarios.find(x => x.email === email && x.password === password)
+        if (u?.desactivado) return json(400, { code: 'user_banned', error_code: 'user_banned', msg: 'User is banned' })
         return u ? json(200, sesion(u)) : json(400, { code: 'invalid_credentials', error_code: 'invalid_credentials', msg: 'Invalid login credentials' })
       }
       if (ruta === '/auth/v1/token' && url.searchParams.get('grant_type') === 'refresh_token') {
@@ -159,6 +175,27 @@ class Backend {
         if (b.password) u.password = b.password
         if (b.data) u.user_metadata = { ...u.user_metadata, ...b.data }
         return json(200, this.publico(u))
+      }
+      // Two-step verification (TOTP); the valid code in tests is 123456
+      const mf = ruta.match(/^\/auth\/v1\/factors(?:\/([^/]+))?(?:\/(challenge|verify))?$/)
+      if (mf) {
+        const u = this.usuarioDe(req); if (!u) return json(401, { msg: 'no session' })
+        u.factores ??= []
+        const [, fid, paso] = mf
+        if (!fid && metodo === 'POST') {
+          const f = { id: uuid(), factor_type: 'totp', status: 'unverified', friendly_name: cuerpo().friendly_name, created_at: ahora(), updated_at: ahora() }
+          u.factores.push(f)
+          return json(200, { id: f.id, type: 'totp', friendly_name: f.friendly_name, totp: { qr_code: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>', secret: 'JBSWY3DPEHPK3PXP', uri: 'otpauth://totp/x' } })
+        }
+        const f = u.factores.find(x => x.id === fid)
+        if (!f) return json(404, { msg: 'factor not found' })
+        if (metodo === 'DELETE') { u.factores = u.factores.filter(x => x !== f); return json(200, { id: f.id }) }
+        if (paso === 'challenge') return json(200, { id: uuid(), type: 'totp', expires_at: Math.floor(Date.now() / 1000) + 300 })
+        if (paso === 'verify') {
+          if (cuerpo().code !== '123456') return json(422, { code: 'mfa_verification_failed', error_code: 'mfa_verification_failed', msg: 'Invalid TOTP code entered' })
+          f.status = 'verified'
+          return json(200, sesion(u, 'aal2'))
+        }
       }
       if (ruta === '/auth/v1/recover') return json(200, {})
       if (ruta === '/auth/v1/logout') return json(204)
@@ -192,18 +229,24 @@ class Backend {
     if (ruta.startsWith('/rest/v1/rpc/')) {
       const fn = ruta.split('/').pop(), args = cuerpo() ?? {}, u = this.usuarioDe(req), rol = this.rol(u)
       if (this.sinMigracion) return json(404, { code: 'PGRST202', message: `Could not find the function public.${fn}` })
-      if (fn === 'es_empleado') return json(200, rol === 'Empleado' || rol === 'Administrador')
+      if (fn === 'es_empleado') return json(200, ACCESO.includes(rol))
+      if (fn === 'es_dueno') return json(200, rol === 'Dueño')
+      if (fn === 'datos_publicos') { const d = this.t.configuracion[0].datos; return json(200, { nombreComercial: d.nombreComercial ?? null, telefono: d.telefono ?? null, whatsapp: d.whatsapp ?? null, email: d.email ?? null, ciudadFirma: d.ciudadFirma ?? null }) }
       if (fn === 'sincronizar_vehiculo') { this.sincronizar(args.vid); return json(204) }
       if (fn === 'sincronizar_flota') { this.t.vehiculos.forEach(v => this.sincronizar(v.id)); return json(204) }
       if (fn === 'vehiculos_publicos') return json(200, this.t.vehiculos.filter(v => v.status !== 'taller').map(v => ({ id: v.id, modelo: v.modelo, anio: v.anio, segmento: v.segmento,
         transmision: v.transmision, asientos: v.asientos, tarifa_diaria: v.tarifa_diaria, foto_url: v.foto_url, disponible_hoy: v.status === 'disponible' })))
-      if (rol !== 'Administrador' && ['listar_empleados', 'asignar_rol'].includes(fn)) return json(400, { code: 'P0001', message: 'Solo administradores' })
+      if (rol !== 'Dueño' && ['listar_empleados', 'asignar_rol'].includes(fn)) return json(400, { code: 'P0001', message: 'Solo el dueño puede ver los usuarios' })
       if (fn === 'listar_empleados') return json(200, this.usuarios.map(x => ({ id: x.id, email: x.email, nombre: x.user_metadata?.first_name ?? null,
-        rol: x.app_metadata?.role ?? 'Sin acceso', creado: ahora(), ultimo_acceso: x.last_sign_in_at ?? null, confirmado: !!x.email_confirmed_at })))
+        rol: this.rol(x) ?? 'Sin acceso', creado: ahora(), ultimo_acceso: x.last_sign_in_at ?? null, confirmado: !!x.email_confirmed_at, activo: !x.desactivado,
+        dos_pasos: (x.factores ?? []).some(f => f.status === 'verified') })))
       if (fn === 'asignar_rol') {
-        if (args.uid === u.id && args.rol !== 'Administrador') return json(400, { code: 'P0001', message: 'No puedes quitarte tu propio rol de administrador' })
+        const nuevo = args.rol === 'Empleado' ? 'Administrador' : args.rol
+        if (args.uid === u.id && nuevo !== 'Dueño') return json(400, { code: 'P0001', message: 'No puedes quitarte tu propio rol de dueño' })
         const x = this.usuarios.find(y => y.id === args.uid)
-        if (args.rol === 'Sin acceso') delete x.app_metadata.role; else x.app_metadata.role = args.rol
+        if (nuevo !== 'Dueño' && this.rol(x) === 'Dueño' && this.usuarios.filter(y => this.rol(y) === 'Dueño').length <= 1) return json(400, { code: 'P0001', message: 'Debe quedar al menos un dueño' })
+        if (nuevo === 'Sin acceso') delete x.app_metadata.role; else x.app_metadata.role = nuevo
+        this.insertar('logs', { accion: 'cambiar_rol', entidad: 'usuarios', entidad_id: x.id, descripcion: `${x.email} ahora es ${nuevo}`, realizado_por: u.email })
         return json(204)
       }
       return json(404, { code: 'PGRST202', message: 'unknown rpc ' + fn })
@@ -213,7 +256,12 @@ class Backend {
     const tabla = ruta.replace('/rest/v1/', '')
     if (!this.t[tabla]) return json(404, { code: 'PGRST205', message: `Could not find the table 'public.${tabla}'` })
     const u = this.usuarioDe(req), rol = this.rol(u)
-    if (!['Empleado', 'Administrador'].includes(rol)) return metodo === 'GET' ? json(200, []) : json(403, { code: '42501', message: 'new row violates row-level security policy' })
+    if (!ACCESO.includes(rol)) return metodo === 'GET' ? json(200, []) : json(403, { code: '42501', message: 'new row violates row-level security policy' })
+    const permanente = () => json(400, { code: 'P0001', message: 'Este registro es permanente: no se puede modificar ni borrar.' })
+    const rls = () => json(403, { code: '42501', message: 'new row violates row-level security policy' })
+    if (PERMANENTES.includes(tabla) && (metodo === 'PATCH' || metodo === 'DELETE')) return permanente()
+    if (tabla === 'auditoria' && metodo === 'GET' && rol !== 'Dueño') return json(200, [])
+    if (tabla === 'caja_movimientos' && metodo === 'POST' && (Array.isArray(cuerpo()) ? cuerpo() : [cuerpo()]).some(f => f.tipo === 'apertura') && rol !== 'Dueño') return rls()
     const params = [...url.searchParams.entries()]
     const select = url.searchParams.get('select') ?? '*'
     const unico = (req.headers()['accept'] ?? '').includes('vnd.pgrst.object')
@@ -237,9 +285,13 @@ class Backend {
     }
     if (metodo === 'POST') {
       const b = cuerpo(), lista = Array.isArray(b) ? b : [b]
-      return devolver(lista.map(f => this.insertar(tabla, f)), 201)
+      // Like the "quien" trigger: who did it comes from the session, not from the app
+      const quien = f => (tabla === 'logs' ? { ...f, realizado_por: u.email } : ['caja_movimientos', 'pagos'].includes(tabla) ? { ...f, registrado_por: u.email } : f)
+      return devolver(lista.map(f => this.insertar(tabla, quien(f))), 201)
     }
     if (metodo === 'PATCH') {
+      // Without permission Postgres changes nothing and returns no rows
+      if (tabla === 'configuracion' && rol !== 'Dueño') return devolver([], 200)
       const filas = this.filtrar(tabla, params), b = cuerpo()
       const viejos = filas.map(f => f.vehiculo_id)
       filas.forEach(f => Object.assign(f, b))
@@ -247,7 +299,7 @@ class Backend {
       return devolver(filas, 200)
     }
     if (metodo === 'DELETE') {
-      if (rol !== 'Administrador') return devolver([], 200)
+      if (rol !== 'Dueño') return devolver([], 200)
       const filas = this.filtrar(tabla, params)
       this.t[tabla] = this.t[tabla].filter(f => !filas.includes(f))
       return devolver(filas, 200)
@@ -255,7 +307,7 @@ class Backend {
     return json(405, { message: metodo })
   }
 
-  publico(u) { return { id: u.id, aud: 'authenticated', role: 'authenticated', email: u.email, user_metadata: u.user_metadata, app_metadata: { ...u.app_metadata }, created_at: '2026-01-01T00:00:00Z' } }
+  publico(u) { return { id: u.id, aud: 'authenticated', role: 'authenticated', email: u.email, user_metadata: u.user_metadata, app_metadata: { ...u.app_metadata }, factors: u.factores ?? [], created_at: '2026-01-01T00:00:00Z' } }
 
   agregarUsuario(email, password, rol, nombre) {
     const u = { id: uuid(), email, password, user_metadata: { first_name: nombre }, app_metadata: rol ? { role: rol } : {}, email_confirmed_at: ahora() }
@@ -263,4 +315,4 @@ class Backend {
   }
 }
 
-module.exports = { Backend, hoyHmo, sumarDias }
+module.exports = { Backend, hoyHmo, sumarDias, jwt }

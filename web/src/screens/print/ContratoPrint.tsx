@@ -5,13 +5,11 @@ import { supabase } from '../../lib/supabase'
 import { EMPRESA, ivaEtiqueta } from '../../lib/empresa'
 import { contrato, basica, ceroDeducible, type Para } from '../../lib/contratoTextos'
 import type { Reserva, Cliente, Vehiculo } from '../../lib/database.types'
-import { urlsFirmadas } from '../../lib/fotos'
+import { urlsFirmadas, urlFirmaArrendador } from '../../lib/fotos'
 
 const db = supabase as any // eslint-disable-line @typescript-eslint/no-explicit-any
 
 // Private bucket: only logged-in employees can read it (see supabase_seguridad.sql).
-const FIRMA_BUCKET = 'Firma'
-const FIRMA_PATH = 'firma-arrendador.png'
 
 export type ReservaContrato = Reserva & { clientes: Cliente | null; vehiculos: Vehiculo | null }
 type DocKey = 'contrato' | 'anexo' | 'basica' | 'cero'
@@ -277,8 +275,7 @@ export default function ContratoPrint() {
   const [firmaCliente, setFirmaCliente] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase.storage.from(FIRMA_BUCKET).createSignedUrl(FIRMA_PATH, 3600)
-      .then(({ data }) => setFirmaUrl(data?.signedUrl ?? null))
+    urlFirmaArrendador().then(setFirmaUrl, () => setFirmaUrl(null))
   }, [])
 
   useEffect(() => {
@@ -308,7 +305,7 @@ export default function ContratoPrint() {
             <label key={k}><input type="checkbox" checked={docs.includes(k)} onChange={() => toggle(k)} />{DOC_LABEL[k]}</label>
           ))}
         </div>
-        {firmaUrl === null && <span className="ct-nofirma">Sin firma guardada: el arrendador firmará a mano</span>}
+        {firmaUrl === null && <span className="ct-nofirma">Sin firma del arrendador: el dueño puede guardarla en Ajustes → Contrato (mientras, se firma a mano)</span>}
         <button className="btn sm primary" onClick={() => window.print()} disabled={!r || docs.length === 0}>
           <Printer size={15} />Imprimir
         </button>

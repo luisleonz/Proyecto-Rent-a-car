@@ -24,6 +24,8 @@ export const EMPRESA = {
   ceroDeducibleDia: 0,
   limpiezaSedan: 1600,
   limpiezaVan: 3200,
+  // Path in the private "documentos" storage of the lessor's signature image ('' = sign by hand)
+  firmaArrendador: '',
 }
 export type Empresa = typeof EMPRESA
 

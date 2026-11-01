@@ -95,7 +95,7 @@ export default function EntregaScreen() {
           {listo.length > 0 && <div style={{ background: 'var(--warn-soft)', color: 'var(--warn-ink)', borderRadius: 10, padding: '10px 12px', fontSize: 13, textAlign: 'left' }}>{listo.map(t => <div key={t}>⚠ {t}</div>)}</div>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
             <button className="btn primary" onClick={() => navigate(`/imprimir/contrato/${r.id}`)}><Printer size={15} />Imprimir contrato</button>
-            {tel && <a className="btn" target="_blank" rel="noreferrer" href={whatsappUrl(tel, `Hola ${nombre.split(' ')[0]}, gracias por rentar con Luciano's Tours. Su ${r.vehiculos?.modelo} debe regresar el ${new Date(r.fecha_devolucion + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })}${r.hora_devolucion ? ` a las ${r.hora_devolucion.slice(0, 5)}` : ''}. Cualquier duda: ${EMPRESA.telefono}.`)}><MessageCircle size={15} />Enviar confirmación por WhatsApp</a>}
+            {tel && <a className="btn" target="_blank" rel="noreferrer" href={whatsappUrl(tel, `Hola ${nombre.split(' ')[0]}, gracias por rentar con ${EMPRESA.nombreComercial}. Su ${r.vehiculos?.modelo} debe regresar el ${new Date(r.fecha_devolucion + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })}${r.hora_devolucion ? ` a las ${r.hora_devolucion.slice(0, 5)}` : ''}. Cualquier duda: ${EMPRESA.telefono}.`)}><MessageCircle size={15} />Enviar confirmación por WhatsApp</a>}
             <button className="btn" onClick={() => navigate('/app/reservations')}>Volver a reservas</button>
           </div>
         </div>

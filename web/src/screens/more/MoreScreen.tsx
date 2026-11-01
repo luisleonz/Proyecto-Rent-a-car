@@ -1,11 +1,13 @@
-import { useEffect, useState, ReactNode } from 'react'
+import { useEffect, useRef, useState, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Building2, DollarSign, CreditCard, FileText, Key, ShieldCheck, RefreshCw, Download, LogOut, ChevronDown, ChevronRight, Lock, Check } from 'lucide-react'
+import { Building2, DollarSign, CreditCard, FileText, Key, ShieldCheck, RefreshCw, Download, LogOut, ChevronDown, ChevronRight, Lock, Check, PenLine, Upload, Trash2 } from 'lucide-react'
 import { useAuth } from '../../state/auth'
 import { supabase } from '../../lib/supabase'
 import { EMPRESA, Empresa, guardarConfig, cargarConfig } from '../../lib/empresa'
 import { METODOS, metodoLabel, mensajeError } from '../../lib/operacion'
 import { insertLog } from '../../lib/log'
+import { urlFirmaArrendador, subirFirmaArrendador } from '../../lib/fotos'
+import { FirmaPad, canvasABlob } from '../../components/Captura'
 
 const db = supabase as any // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -165,6 +167,69 @@ function CobrosForm({ puede }: { puede: boolean }) {
   )
 }
 
+// ── Firma del arrendador ──────────────────────────────────────────────────
+function FirmaArrendador({ puede }: { puede: boolean }) {
+  const [url, setUrl] = useState<string | null | undefined>(undefined)
+  const [modo, setModo] = useState<'ver' | 'dibujar'>('ver')
+  const [lienzo, setLienzo] = useState<HTMLCanvasElement | null>(null)
+  const [estado, setEstado] = useState<{ tipo: 'ok' | 'error'; msg: string } | null>(null)
+  const [guardando, setGuardando] = useState(false)
+  const archivo = useRef<HTMLInputElement>(null)
+  const cargar = () => urlFirmaArrendador().then(setUrl, () => setUrl(null))
+  useEffect(() => { cargar() }, [])
+
+  async function guardar(imagen: Blob | null) {
+    if (!imagen) { setEstado({ tipo: 'error', msg: 'Falta la firma: dibújala en el recuadro.' }); return }
+    setGuardando(true); setEstado(null)
+    try {
+      const ruta = await subirFirmaArrendador(imagen)
+      const e = await guardarConfig({ firmaArrendador: ruta })
+      if (e) throw e
+      insertLog({ accion: 'firma_arrendador', descripcion: 'Actualizó la firma del arrendador para los contratos' })
+      setModo('ver'); setEstado({ tipo: 'ok', msg: 'Firma guardada. Ya aparece en los contratos impresos.' }); await cargar()
+    } catch (e) {
+      setEstado({ tipo: 'error', msg: mensajeError(e as { message: string }) })
+    }
+    setGuardando(false)
+    if (archivo.current) archivo.current.value = ''
+  }
+
+  async function quitar() {
+    if (!confirm('¿Quitar la firma del arrendador? Los contratos se imprimirán para firmar a mano.')) return
+    const e = await guardarConfig({ firmaArrendador: '' })
+    if (e) { setEstado({ tipo: 'error', msg: mensajeError(e) }); return }
+    insertLog({ accion: 'firma_arrendador', descripcion: 'Quitó la firma del arrendador de los contratos' })
+    setEstado({ tipo: 'ok', msg: 'Firma quitada.' }); cargar()
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div className="field-l">Firma del arrendador ({EMPRESA.representante})</div>
+      {url === undefined ? <div className="spinner" style={{ width: 18, height: 18 }} />
+        : modo === 'ver' && (url
+          ? <img src={url} alt="Firma del arrendador" style={{ maxWidth: 260, maxHeight: 110, objectFit: 'contain', background: '#fff', border: '1px solid var(--card-line)', borderRadius: 10, padding: 8 }} />
+          : <div style={{ fontSize: 13, color: 'var(--ink3)' }}>No hay firma guardada: los contratos salen con la línea para firmar a mano.</div>)}
+      {modo === 'dibujar' && <FirmaPad onChange={(_, c) => setLienzo(c)} />}
+      {estado && <Aviso tipo={estado.tipo}>{estado.msg}</Aviso>}
+      {puede ? (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {modo === 'dibujar' ? <>
+            <button className="btn primary" disabled={guardando} onClick={async () => guardar(lienzo ? await canvasABlob(lienzo) : null)}><Check size={15} />{guardando ? 'Guardando…' : 'Guardar firma'}</button>
+            <button className="btn" onClick={() => { setModo('ver'); setLienzo(null) }}>Cancelar</button>
+          </> : <>
+            <button className="btn" onClick={() => { setModo('dibujar'); setEstado(null) }}><PenLine size={15} />Dibujar firma</button>
+            <button className="btn" disabled={guardando} onClick={() => archivo.current?.click()}><Upload size={15} />{guardando ? 'Subiendo…' : 'Subir imagen'}</button>
+            {EMPRESA.firmaArrendador && <button className="btn" style={{ color: 'var(--danger-ink)' }} onClick={quitar}><Trash2 size={15} />Quitar</button>}
+          </>}
+          <input ref={archivo} type="file" accept="image/png,image/jpeg,image/webp" hidden aria-label="Imagen de la firma"
+            onChange={e => { const f = e.target.files?.[0]; if (f) guardar(f) }} />
+        </div>
+      ) : <SoloDuenoNota />}
+      <div style={{ fontSize: 12, color: 'var(--ink3)' }}>Recomendado: foto o escaneo de la firma en tinta negra sobre fondo blanco (PNG con fondo transparente queda mejor). Se guarda en un almacenamiento privado.</div>
+    </div>
+  )
+}
+
 // ── Contrato ──────────────────────────────────────────────────────────────
 function ContratoForm({ puede }: { puede: boolean }) {
   const { f, set, guardar, estado, guardando } = useFormConfig(['lugarEntregaPredeterminado'])
@@ -183,6 +248,9 @@ function ContratoForm({ puede }: { puede: boolean }) {
       {!puede && <SoloDuenoNota />}
       <Campo label="Lugar de entrega predeterminado" value={f.lugarEntregaPredeterminado} onChange={v => set('lugarEntregaPredeterminado', v)} disabled={!puede}
         ayuda="Se propone al crear una reserva; se puede cambiar en cada una." />
+      <div style={{ borderTop: '1px solid var(--hairline)', margin: '4px 0' }} />
+      <FirmaArrendador puede={puede} />
+      <div style={{ borderTop: '1px solid var(--hairline)', margin: '4px 0' }} />
       <div style={{ fontSize: 13, color: 'var(--ink2)', lineHeight: 1.6 }}>
         Datos del arrendador en el contrato: <b>{EMPRESA.nombreComercial}</b> · {EMPRESA.representante} · RFC {EMPRESA.rfc} · {EMPRESA.domicilio || 'domicilio a mano'} · {EMPRESA.ciudadFirma}
       </div>

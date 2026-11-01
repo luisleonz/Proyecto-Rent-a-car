@@ -43,8 +43,11 @@ export async function urlsFirmadas(rutas: string[]) {
   return Object.fromEntries((data ?? []).filter(d => d.signedUrl).map(d => [d.path, d.signedUrl])) as Record<string, string>
 }
 
-/** The lessor's signature, the same on every contract: the image stored in the private "Firma" storage. */
+/** The lessor's signature, the same on every contract: the image stored in the private "Firma" storage
+ *  (or, where it was originally uploaded, "privado/firma-arrendador.png"). */
 export async function urlFirmaArrendador(): Promise<string | null> {
+  const { data: original } = await supabase.storage.from('privado').createSignedUrl('firma-arrendador.png', 3600)
+  if (original?.signedUrl) return original.signedUrl
   for (const bucket of ['Firma', 'firma']) {
     const { data } = await supabase.storage.from(bucket).createSignedUrl('firma-arrendador.png', 3600)
     if (data?.signedUrl) return data.signedUrl

@@ -165,6 +165,10 @@ do $$ begin
   if to_regclass('storage.objects') is not null then
     drop policy if exists admin_borra_documentos on storage.objects;
     create policy admin_borra_documentos on storage.objects for delete to authenticated using (bucket_id = 'documentos' and public.es_dueno());
+    -- The lessor's signature lives in "privado"; users with access may read only that file
+    drop policy if exists empleados_leen_firma_arrendador on storage.objects;
+    create policy empleados_leen_firma_arrendador on storage.objects for select to authenticated
+      using (bucket_id = 'privado' and name = 'firma-arrendador.png' and public.es_empleado());
   end if;
 end $$;
 

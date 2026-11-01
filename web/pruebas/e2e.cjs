@@ -636,6 +636,11 @@ async function otraSesion(ctx, b) {
     ok(await p.locator('img[alt="Firma del arrendador"]').count(), 'Se ve la firma en Ajustes')
     ok(!(await p.locator('button:has-text("Dibujar firma"), button:has-text("Subir imagen")').count()), 'No se puede cambiar desde la app')
   })
+  await escenario('Contrato', 'Firma guardada en el almacenamiento "privado"', async ({ p, b, ok }) => {
+    b.buckets.add('privado'); b.archivos['privado/firma-arrendador.png'] = require('fs').readFileSync(FOTO)
+    await entrar(p); await ir(p, `/imprimir/contrato/${b.r1.id}`); await p.waitForTimeout(1000)
+    ok(await p.locator('.ct-firma:has(.ct-firma-rol:text-is("ARRENDADOR")) img.ct-firma-img').count() >= 2, 'Usa privado/firma-arrendador.png')
+  })
   await escenario('Contrato', 'Firma subida antes en el almacenamiento "Firma" con otro nombre', async ({ p, b, ok }) => {
     b.archivos['Firma/firma-arrendador.png'] = require('fs').readFileSync(FOTO)
     await entrar(p); await ir(p, `/imprimir/contrato/${b.r1.id}`); await p.waitForTimeout(1000)

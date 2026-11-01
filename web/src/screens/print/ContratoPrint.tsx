@@ -305,7 +305,7 @@ export default function ContratoPrint() {
             <label key={k}><input type="checkbox" checked={docs.includes(k)} onChange={() => toggle(k)} />{DOC_LABEL[k]}</label>
           ))}
         </div>
-        {firmaUrl === null && <span className="ct-nofirma">Sin firma del arrendador: el dueño puede guardarla en Ajustes → Contrato (mientras, se firma a mano)</span>}
+        {firmaUrl === null && <span className="ct-nofirma">No se encontró la firma del arrendador: se firmará a mano</span>}
         <button className="btn sm primary" onClick={() => window.print()} disabled={!r || docs.length === 0}>
           <Printer size={15} />Imprimir
         </button>

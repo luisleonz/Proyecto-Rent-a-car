@@ -626,20 +626,15 @@ async function otraSesion(ctx, b) {
     ok(await p.locator('.ct-firma-img').count() >= 2, 'Firma del cliente en contrato y anexo')
     ok((await texto(p)).includes('CONTRATO NÚM'), 'Lleva número de contrato')
   })
-  await escenario('Contrato', 'El dueño guarda la firma del arrendador y sale impresa', async ({ p, b, ok }) => {
+  await escenario('Contrato', 'Firma fija del arrendador en contratos; en Ajustes solo se ve', async ({ p, b, ok }) => {
     await entrar(p); await ir(p, `/imprimir/contrato/${b.r1.id}`); await p.waitForTimeout(800)
-    ok((await texto(p)).includes('Sin firma del arrendador'), 'Sin firma: avisa dónde guardarla')
-    await ir(p, '/app/more'); await p.click('.set-link:has-text("Contrato")')
-    await p.click('button:has-text("Dibujar firma")')
-    await p.click('button:has-text("Guardar firma")')
-    ok((await texto(p)).includes('Falta la firma'), 'Pide dibujar antes de guardar')
-    await p.setInputFiles('input[aria-label="Imagen de la firma"]', FOTO); await p.waitForTimeout(1200)
-    const ruta = b.t.configuracion[0].datos.firmaArrendador
-    ok(ruta && b.archivos['documentos/' + ruta], 'Firma guardada en almacenamiento privado y en los ajustes')
-    ok(await p.locator('img[alt="Firma del arrendador"]').count(), 'Se ve la firma en Ajustes')
-    await ir(p, `/imprimir/contrato/${b.r1.id}`); await p.waitForTimeout(1000)
-    ok(!(await texto(p)).includes('Sin firma del arrendador'), 'Ya no avisa que falta')
+    ok((await texto(p)).includes('No se encontró la firma del arrendador'), 'Sin archivo: avisa que se firmará a mano')
+    b.archivos['Firma/firma-arrendador.png'] = require('fs').readFileSync(FOTO)
+    await p.reload({ waitUntil: 'networkidle' }); await p.waitForTimeout(1000)
     ok(await p.locator('.ct-firma:has(.ct-firma-rol:text-is("ARRENDADOR")) img.ct-firma-img').count() >= 2, 'Firma del arrendador en contrato y anexo')
+    await ir(p, '/app/more'); await p.click('.set-link:has-text("Contrato")'); await p.waitForTimeout(600)
+    ok(await p.locator('img[alt="Firma del arrendador"]').count(), 'Se ve la firma en Ajustes')
+    ok(!(await p.locator('button:has-text("Dibujar firma"), button:has-text("Subir imagen")').count()), 'No se puede cambiar desde la app')
   })
   await escenario('Contrato', 'Firma subida antes en el almacenamiento "Firma" con otro nombre', async ({ p, b, ok }) => {
     b.archivos['Firma/firma-arrendador.png'] = require('fs').readFileSync(FOTO)

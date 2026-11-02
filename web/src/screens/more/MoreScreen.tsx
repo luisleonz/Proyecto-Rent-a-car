@@ -334,7 +334,7 @@ function SeguridadForm() {
 }
 
 // ── Sincronización y respaldo ─────────────────────────────────────────────
-const TABLAS_RESPALDO = ['configuracion', 'vehiculos', 'clientes', 'reservas', 'pagos', 'cotizaciones', 'documentos', 'caja_movimientos', 'logs', 'auditoria']
+const TABLAS_RESPALDO = ['configuracion', 'vehiculos', 'clientes', 'reservas', 'pagos', 'cotizaciones', 'documentos', 'caja_movimientos', 'clientes_vetos', 'logs', 'auditoria']
 
 function RespaldoForm({ esDueno }: { esDueno: boolean }) {
   const [conexion, setConexion] = useState<'probando' | 'ok' | 'error'>('probando')

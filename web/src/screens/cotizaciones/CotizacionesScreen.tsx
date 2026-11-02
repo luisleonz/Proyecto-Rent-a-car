@@ -9,6 +9,7 @@ import { isoLocal } from '../../lib/fechas'
 import { EMPRESA, ivaDe, ivaEtiqueta } from '../../lib/empresa'
 import { insertarConExtras } from '../../lib/insertar'
 import type { Vehiculo, Cotizacion, CotizacionStatus } from '../../lib/database.types'
+import { clienteVetado, mensajeVetado } from '../../lib/noDeseados'
 
 const db = supabase as any
 
@@ -671,6 +672,8 @@ export default function CotizacionesScreen() {
   }
 
   async function handleConvert(cot: Cotizacion, fechaEntrega: string, fechaDevolucion: string, deposito: number, metodoDeposito: string | null): Promise<string | null> {
+    const vetado = await clienteVetado({ nombre: cot.cliente_nombre, telefono: cot.cliente_telefono })
+    if (vetado) return mensajeVetado(vetado)
     // The vehicle must be free for those dates
     if (cot.vehiculo_id) {
       const { data: choques } = await db.from('reservas').select('folio')

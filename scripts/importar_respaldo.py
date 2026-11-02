@@ -20,7 +20,8 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 MIGRACIONES = ['supabase_migracion_2026_10_contratos.sql', 'supabase_migracion_2026_10_importacion.sql',
-               'supabase_migracion_2026_10_operacion.sql', 'supabase_migracion_2026_11_control.sql']
+               'supabase_migracion_2026_10_operacion.sql', 'supabase_migracion_2026_11_control.sql',
+               'supabase_migracion_2026_11_clientes.sql']
 TZ = timedelta(hours=-7)  # America/Hermosillo, sin horario de verano
 
 METODO = {'cash': 'efectivo', 'bank_transfer': 'transferencia', 'card': 'tarjeta', 'pos': 'tarjeta'}
@@ -170,12 +171,42 @@ def main(ruta, limpio=False):
             # Keep numbering after the last contract of the old system (even ones not imported)
             f"select setval(pg_get_serial_sequence('public.reservas', 'folio'), greatest({folio_max}, (select coalesce(max(folio), 0) from reservas)));",
             'select public.sincronizar_flota();',
+            REAPLICAR_VETOS,
             ("alter table auditoria disable trigger user; delete from auditoria; alter table auditoria enable trigger user;\n"
              "insert into logs (accion, entidad, descripcion, realizado_por) values ('cambio_de_sistema', 'sistema', "
              f"'Inicio con datos del sistema anterior: {len(res)} rentas activas y próximas', 'importación');") if limpio else '',
             'commit;', '', RESUMEN]
     sys.stdout.write('\n'.join(out))
 
+
+# Clients marked "no rentar" keep their mark after a re-import: the history is matched again
+# to the (re-created) clients by phone or name, and the latest entry sets the flag.
+REAPLICAR_VETOS = r"""
+do $$ begin
+  if to_regclass('public.clientes_vetos') is not null then
+    execute 'alter table clientes_vetos disable trigger user';
+    -- Same name first (relatives often share a phone), then same phone
+    update clientes_vetos v set cliente_id = c.id
+    from clientes c
+    where not exists (select 1 from clientes x where x.id = v.cliente_id)
+      and lower(trim(c.nombre)) = lower(trim(v.cliente_nombre));
+    update clientes_vetos v set cliente_id = c.id
+    from clientes c
+    where not exists (select 1 from clientes x where x.id = v.cliente_id)
+      and length(regexp_replace(coalesce(v.cliente_telefono, ''), '\D', '', 'g')) >= 10
+      and right(regexp_replace(coalesce(c.telefono, ''), '\D', '', 'g'), 10) = right(regexp_replace(v.cliente_telefono, '\D', '', 'g'), 10);
+    execute 'alter table clientes_vetos enable trigger user';
+    perform set_config('app.vetos', 'si', true);
+    update clientes c set no_rentar = (u.accion = 'marcar'),
+      no_rentar_motivo = case when u.accion = 'marcar' then u.motivo end,
+      no_rentar_desde  = case when u.accion = 'marcar' then u.fecha end,
+      no_rentar_por    = case when u.accion = 'marcar' then u.registrado_por end
+    from (select distinct on (cliente_id) * from clientes_vetos order by cliente_id, fecha desc) u
+    where u.cliente_id = c.id;
+    perform set_config('app.vetos', '', true);
+  end if;
+end $$;
+"""
 
 BORRAR = """
 -- ── Borrar los datos actuales de la app (los usuarios y archivos no se tocan) ──

@@ -42,6 +42,7 @@ export interface Database {
           licencia_vence?: string | null; identificacion?: string | null
           fecha_nacimiento?: string | null; nacionalidad?: string | null; notas?: string | null
           contacto_emergencia?: string | null; contacto_emergencia_tel?: string | null
+          no_rentar?: boolean; no_rentar_motivo?: string | null; no_rentar_desde?: string | null; no_rentar_por?: string | null
           created_at: string
         }
         Insert: {
@@ -152,6 +153,6 @@ export type Cotizacion = Database['public']['Tables']['cotizaciones']['Row']
 export type Solicitud  = Database['public']['Tables']['solicitudes']['Row']
 
 export interface ReservaConDetalle extends Reserva {
-  clientes:  { nombre: string; telefono: string | null } | null
+  clientes:  { nombre: string; telefono: string | null; no_rentar?: boolean; no_rentar_motivo?: string | null } | null
   vehiculos: { modelo: string; placa: string; anio: number | null; tarifa_diaria: number | null } | null
 }

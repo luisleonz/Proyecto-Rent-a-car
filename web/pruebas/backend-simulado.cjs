@@ -17,7 +17,8 @@ const RELACIONES = {
 
 const DEFAULTS = {
   vehiculos: () => ({ status: 'disponible', km: 0, combustible: 100, fotos: [], cliente_actual: null, info_cliente: null, foto_url: null }),
-  clientes: () => ({}),
+  clientes: () => ({ no_rentar: false, no_rentar_motivo: null, no_rentar_desde: null, no_rentar_por: null }),
+  clientes_vetos: () => ({ fecha: ahora(), reserva_id: null, reserva_folio: null }),
   reservas: () => ({ status: 'pendiente', deposito: 0, iva: 0, cobertura: 'basica', cobertura_costo: 0, fianza: 0, cargos_extra: 0,
     fotos_entrega: [], fotos_devolucion: [], legacy_id: null, notas: null }),
   pagos: () => ({ concepto: 'renta', fecha: ahora() }),
@@ -29,7 +30,7 @@ const DEFAULTS = {
   auditoria: () => ({ fecha: ahora() }),
 }
 const ACCESO = ['Dueño', 'Administrador', 'Empleado']
-const PERMANENTES = ['logs', 'caja_movimientos', 'auditoria']
+const PERMANENTES = ['logs', 'caja_movimientos', 'auditoria', 'clientes_vetos']
 // Token shaped like a Supabase JWT (unsigned) so the client can read its claims
 const jwt = (u, aal = 'aal1') => ['{"alg":"none","typ":"JWT"}', JSON.stringify({ sub: u.id, email: u.email, role: 'authenticated', aal, exp: Math.floor(Date.now() / 1000) + 3600 })]
   .map(x => Buffer.from(x).toString('base64url')).join('.') + '.' + crypto.randomUUID()
@@ -76,7 +77,7 @@ function cumple(fila, col, expr) {
 
 class Backend {
   constructor(semilla) {
-    this.t = { vehiculos: [], clientes: [], reservas: [], pagos: [], cotizaciones: [], solicitudes: [], logs: [], caja_movimientos: [], configuracion: [{ id: 1, datos: {} }], auditoria: [] }
+    this.t = { vehiculos: [], clientes: [], reservas: [], pagos: [], cotizaciones: [], solicitudes: [], logs: [], caja_movimientos: [], configuracion: [{ id: 1, datos: {} }], auditoria: [], clientes_vetos: [] }
     this.usuarios = []       // { id, email, password, user_metadata, app_metadata, email_confirmed_at, last_sign_in_at }
     this.tokens = {}         // token → user id
     this.archivos = {}       // "bucket/path" → Buffer
@@ -261,6 +262,20 @@ class Backend {
     const rls = () => json(403, { code: '42501', message: 'new row violates row-level security policy' })
     if (PERMANENTES.includes(tabla) && (metodo === 'PATCH' || metodo === 'DELETE')) return permanente()
     if (tabla === 'auditoria' && metodo === 'GET' && rol !== 'Dueño') return json(200, [])
+    if (tabla === 'clientes_vetos' && metodo === 'POST') {
+      // Mirrors tg_veto_aplicar: only the owner lifts a mark; the client's flag and the log follow the history
+      const v = cuerpo()
+      if (v.accion === 'quitar' && rol !== 'Dueño') return json(400, { code: 'P0001', message: 'Solo el dueño puede quitar a un cliente de la lista de no deseados.' })
+      if (!String(v.motivo ?? '').trim()) return json(400, { code: '23514', message: 'violates check constraint "clientes_vetos_motivo_check"' })
+      const fila = this.insertar('clientes_vetos', { ...v, registrado_por: u.email })
+      const c = this.t.clientes.find(x => x.id === v.cliente_id)
+      if (c) Object.assign(c, v.accion === 'marcar' ? { no_rentar: true, no_rentar_motivo: v.motivo, no_rentar_desde: fila.fecha, no_rentar_por: u.email }
+        : { no_rentar: false, no_rentar_motivo: null, no_rentar_desde: null, no_rentar_por: null })
+      this.insertar('logs', { accion: v.accion === 'marcar' ? 'cliente_no_deseado' : 'cliente_permitido', entidad: 'clientes', entidad_id: v.cliente_id,
+        descripcion: `${v.accion === 'marcar' ? 'Marcó a' : 'Quitó de no deseados a'} ${v.cliente_nombre}: ${v.motivo}`, realizado_por: u.email })
+      return json(201, [fila], { 'content-range': '0-0/1' })
+    }
+    if (tabla === 'clientes' && metodo === 'PATCH' && ('no_rentar' in (cuerpo() ?? {}))) return json(400, { code: 'P0001', message: 'Para marcar o quitar un cliente no deseado usa el botón de la app (queda en el historial).' })
     if (tabla === 'caja_movimientos' && metodo === 'POST' && (Array.isArray(cuerpo()) ? cuerpo() : [cuerpo()]).some(f => f.tipo === 'apertura') && rol !== 'Dueño') return rls()
     const params = [...url.searchParams.entries()]
     const select = url.searchParams.get('select') ?? '*'

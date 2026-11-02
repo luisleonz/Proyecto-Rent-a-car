@@ -12,6 +12,7 @@ import FlujoPasos, { Bloque, Casilla, AvisoFalta } from '../../components/FlujoP
 import { SelectorGasolina, CapturaFotos, FirmaPad, canvasABlob, nivelGas } from '../../components/Captura'
 import type { ReservaContrato } from '../print/ContratoPrint'
 import { EMPRESA } from '../../lib/empresa'
+import { mensajeVetado } from '../../lib/noDeseados'
 
 const db = supabase as any // eslint-disable-line @typescript-eslint/no-explicit-any
 const fmt = (n: number) => new Intl.NumberFormat('es-MX', { maximumFractionDigits: 2 }).format(n)
@@ -104,7 +105,7 @@ export default function EntregaScreen() {
   }
 
   const faltaPaso = ([
-    [!licencia.trim() && 'El número de licencia', !licOk && 'Marcar que revisaste la licencia', !idOk && 'Marcar que revisaste la identificación'],
+    [r?.clientes?.no_rentar && 'El cliente está marcado como no deseado: no se le puede entregar el vehículo', !licencia.trim() && 'El número de licencia', !licOk && 'Marcar que revisaste la licencia', !idOk && 'Marcar que revisaste la identificación'],
     [!km && 'El kilometraje de salida', gas == null && 'El nivel de gasolina'],
     [fianzaOk && !(Number(fianza) >= 0) && 'El monto del depósito en garantía'],
     [],
@@ -182,6 +183,11 @@ export default function EntregaScreen() {
         : <button className="btn primary" style={{ flex: 1, padding: 14 }} disabled={!!guardando} onClick={confirmar}><Key size={16} />{guardando ?? 'Confirmar entrega'}</button>}>
 
       {paso === 0 && <>
+        {r.clientes?.no_rentar && (
+          <div role="alert" style={{ background: 'var(--danger-soft)', color: 'var(--danger-ink)', borderRadius: 10, padding: '10px 12px', fontSize: 13.5, fontWeight: 600 }}>
+            ⛔ {mensajeVetado({ nombre, motivo: r.clientes.no_rentar_motivo ?? '' })}
+          </div>
+        )}
         {r.fecha_entrega > hoy && (
           <div style={{ background: 'var(--warn-soft)', color: 'var(--warn-ink)', borderRadius: 10, padding: '10px 12px', fontSize: 13 }}>
             Esta reserva es para el {new Date(r.fecha_entrega + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })}. Puedes entregarla antes si el cliente ya está aquí.

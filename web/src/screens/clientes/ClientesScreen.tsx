@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Search, Plus, Phone, Mail, CreditCard, MapPin, X, Check, ChevronRight, Pencil, Fingerprint, Cake, LifeBuoy, StickyNote } from 'lucide-react'
+import { Search, Plus, Phone, Mail, CreditCard, MapPin, X, Check, ChevronRight, Pencil, Fingerprint, Cake, LifeBuoy, StickyNote, Ban, ShieldCheck } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
 import { insertLog } from '../../lib/log'
 import { insertarConExtras } from '../../lib/insertar'
 import { hoyISO } from '../../lib/fechas'
+import { mensajeError } from '../../lib/operacion'
+import { identificador } from '../../lib/usuarios'
+import { marcarNoDeseado, quitarNoDeseado, historialVetos, fechaVeto, type Veto } from '../../lib/noDeseados'
+import MotivoNoDeseado from '../../components/MotivoNoDeseado'
 
 const db = supabase as any
 
@@ -24,6 +28,10 @@ type Cliente = {
   contacto_emergencia?: string | null
   contacto_emergencia_tel?: string | null
   notas?: string | null
+  no_rentar?: boolean
+  no_rentar_motivo?: string | null
+  no_rentar_desde?: string | null
+  no_rentar_por?: string | null
   created_at: string
 }
 
@@ -210,9 +218,28 @@ function ClienteDetail({ cliente, onNewReserva, onCotizar, onUpdated }: {
   onCotizar: () => void
   onUpdated: (c: Cliente) => void
 }) {
-  const { currentEmail } = useAuth()
+  const { currentEmail, esDueno } = useAuth()
   const [reservas, setReservas] = useState<ReservaResumen[]>([])
   const [loading,  setLoading]  = useState(true)
+
+  // "No rentar" (unwanted client)
+  const [vetos, setVetos] = useState<Veto[]>([])
+  const [vetoForm, setVetoForm] = useState(false)
+  const [vetoMotivo, setVetoMotivo] = useState('')
+  const [vetoError, setVetoError] = useState('')
+  const [vetoGuardando, setVetoGuardando] = useState(false)
+  useEffect(() => { setVetoForm(false); setVetoMotivo(''); setVetoError(''); historialVetos(cliente.id).then(setVetos) }, [cliente.id, cliente.no_rentar])
+
+  async function guardarVeto() {
+    if (!vetoMotivo.trim()) { setVetoError('Falta el motivo.'); return }
+    setVetoGuardando(true); setVetoError('')
+    const e = cliente.no_rentar ? await quitarNoDeseado(cliente, vetoMotivo) : await marcarNoDeseado(cliente, vetoMotivo)
+    if (e) { setVetoError(mensajeError(e)); setVetoGuardando(false); return }
+    const { data } = await db.from('clientes').select('*').eq('id', cliente.id).single()
+    setVetoGuardando(false)
+    if (data) onUpdated(data as Cliente)
+  }
+  const proximas = reservas.filter(r => (r.status === 'pendiente' || r.status === 'confirmada') && r.fecha_devolucion >= hoyISO())
 
   // Edit state
   const [editing,    setEditing]    = useState(false)
@@ -298,14 +325,53 @@ function ClienteDetail({ cliente, onNewReserva, onCotizar, onUpdated }: {
         </div>
       </div>
 
+      {cliente.no_rentar && (
+        <div role="alert" style={{ background: 'var(--danger-soft)', border: '1px solid var(--danger-line)', color: 'var(--danger-ink)', borderRadius: 10, padding: '11px 14px', fontSize: 13.5, lineHeight: 1.5 }}>
+          <b style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Ban size={15} />Cliente no deseado: no rentarle</b>
+          {cliente.no_rentar_motivo}
+          <div style={{ fontSize: 12, opacity: 0.85 }}>
+            {cliente.no_rentar_desde ? `Desde ${fechaVeto(cliente.no_rentar_desde)}` : ''}{cliente.no_rentar_por ? ` · marcado por ${identificador(cliente.no_rentar_por)}` : ''}
+          </div>
+          {proximas.length > 0 && <div style={{ marginTop: 4, fontWeight: 600 }}>Tiene {proximas.length === 1 ? '1 reserva próxima' : `${proximas.length} reservas próximas`}: revísalas o cancélalas en Reservas.</div>}
+        </div>
+      )}
+
       {/* Actions */}
       <div className="cli-dactions">
-        <button className="btn sm primary" onClick={onNewReserva}>Nueva reserva</button>
+        <button className="btn sm primary" onClick={onNewReserva} disabled={!!cliente.no_rentar} title={cliente.no_rentar ? 'Cliente no deseado' : undefined}>Nueva reserva</button>
         <button className="btn sm" onClick={onCotizar}>Cotizar</button>
         <button className="btn sm" onClick={startEdit} style={{ marginLeft: 'auto' }}>
           <Pencil size={13} />Editar
         </button>
+        {!cliente.no_rentar && !vetoForm && (
+          <button className="btn sm" style={{ color: 'var(--danger-ink)' }} onClick={() => setVetoForm(true)}><Ban size={13} />No rentarle</button>
+        )}
+        {cliente.no_rentar && esDueno && !vetoForm && (
+          <button className="btn sm" onClick={() => setVetoForm(true)}><ShieldCheck size={13} />Volver a permitir</button>
+        )}
       </div>
+
+      {vetoForm && (
+        <div style={{ background: 'var(--paper-alt)', borderRadius: 10, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10,
+          border: `1.5px solid ${cliente.no_rentar ? 'var(--primary-line)' : 'var(--danger-line)'}` }}>
+          <div style={{ fontSize: 13.5, fontWeight: 600 }}>{cliente.no_rentar ? 'Volver a permitir rentarle' : 'Marcar como cliente no deseado'}</div>
+          <div style={{ fontSize: 12.5, color: 'var(--ink3)', lineHeight: 1.45 }}>
+            {cliente.no_rentar ? 'Explica por qué ya se le puede rentar (por ejemplo, pagó lo que debía).'
+              : 'No se le podrán hacer reservas nuevas. Queda en el historial con tu nombre; solo el dueño puede quitar la marca.'}
+          </div>
+          {cliente.no_rentar
+            ? <textarea className="field-i" rows={2} value={vetoMotivo} onChange={e => { setVetoMotivo(e.target.value); setVetoError('') }} placeholder="Motivo (obligatorio)" aria-label="Motivo" />
+            : <MotivoNoDeseado value={vetoMotivo} onChange={v => { setVetoMotivo(v); setVetoError('') }} />}
+          {vetoError && <div role="alert" style={{ fontSize: 12.5, color: 'var(--danger-ink)' }}>{vetoError}</div>}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={() => { setVetoForm(false); setVetoMotivo(''); setVetoError('') }}>Cancelar</button>
+            <button className="btn" style={{ flex: 2, justifyContent: 'center', ...(cliente.no_rentar ? {} : { background: 'var(--danger-soft)', borderColor: 'var(--danger-line)', color: 'var(--danger-ink)' }) }}
+              onClick={guardarVeto} disabled={vetoGuardando}>
+              {vetoGuardando ? 'Guardando…' : cliente.no_rentar ? 'Permitir de nuevo' : 'Marcar como no deseado'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Inline edit form */}
       {editing && (
@@ -456,6 +522,21 @@ function ClienteDetail({ cliente, onNewReserva, onCotizar, onUpdated }: {
           </div>
         )}
       </div>
+
+      {vetos.length > 0 && (
+        <div>
+          <div className="eyebrow" style={{ marginBottom: 6 }}>Historial de no deseado</div>
+          <div className="cli-data">
+            {vetos.map(v => (
+              <div key={v.id} className="cli-data-row" style={{ alignItems: 'flex-start' }}>
+                {v.accion === 'marcar' ? <Ban size={15} color="var(--danger-ink)" /> : <ShieldCheck size={15} color="var(--primary)" />}
+                <span><b>{v.accion === 'marcar' ? 'Marcado' : 'Permitido de nuevo'}</b> · {fechaVeto(v.fecha)}{v.registrado_por ? ` · ${identificador(v.registrado_por)}` : ''}
+                  {v.reserva_folio != null ? ` · renta #${v.reserva_folio}` : ''}<br /><span style={{ color: 'var(--ink2)' }}>{v.motivo}</span></span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -481,6 +562,7 @@ export default function ClientesScreen() {
   const [query,     setQuery]     = useState('')
   const [selected,  setSelected]  = useState<Cliente | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
+  const [soloNoDeseados, setSoloNoDeseados] = useState(false)
 
   async function fetchClientes() {
     const { data } = await db.from('clientes').select('*').order('nombre')
@@ -533,12 +615,14 @@ export default function ClientesScreen() {
     navigate(`/app/cotizaciones?${params.toString()}`)
   }
 
+  const noDeseados = clientes.filter(c => c.no_rentar)
+  const base = soloNoDeseados ? noDeseados : clientes
   const filtered = query.trim()
-    ? clientes.filter(c =>
+    ? base.filter(c =>
         c.nombre.toLowerCase().includes(query.toLowerCase()) ||
         (c.telefono ?? '').includes(query.trim())
       )
-    : clientes
+    : base
 
   return (
     <div className="screen">
@@ -576,12 +660,16 @@ export default function ClientesScreen() {
               style={{ border: 0, background: 'transparent', outline: 'none', flex: 1, font: 'inherit', fontSize: 13.5, color: 'var(--ink)' }}
             />
           </div>
+          <div className="filterbar" style={{ margin: '0 0 10px' }}>
+            <button className={`fbtn${!soloNoDeseados ? ' on' : ''}`} onClick={() => setSoloNoDeseados(false)}>Todos <span className="fbtn-n">{clientes.length}</span></button>
+            <button className={`fbtn${soloNoDeseados ? ' on' : ''}`} onClick={() => setSoloNoDeseados(true)}><Ban size={13} />No deseados <span className="fbtn-n">{noDeseados.length}</span></button>
+          </div>
           <div className="card cli-list">
             {loading ? (
               Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} />)
             ) : filtered.length === 0 ? (
               <p style={{ textAlign: 'center', color: 'var(--ink4)', padding: '32px 0', fontSize: 14 }}>
-                {clientes.length === 0 ? 'Aún no hay clientes.' : 'Sin resultados.'}
+                {soloNoDeseados && !query.trim() ? 'No hay clientes marcados como no deseados.' : clientes.length === 0 ? 'Aún no hay clientes.' : 'Sin resultados.'}
               </p>
             ) : filtered.map(c => (
               <button
@@ -596,9 +684,10 @@ export default function ClientesScreen() {
                 <div className="cli-row-main">
                   <div className="cli-row-top">
                     <span className="cli-row-n">{c.nombre}</span>
+                    {c.no_rentar && <span className="chip sm danger"><Ban size={10} />No rentar</span>}
                   </div>
                   <div className="cli-row-meta">
-                    {c.telefono ?? 'Sin teléfono'} · desde {since(c.created_at)}
+                    {c.no_rentar && soloNoDeseados ? `${c.no_rentar_motivo ?? ''}${c.no_rentar_desde ? ` · ${fechaVeto(c.no_rentar_desde)}` : ''}` : `${c.telefono ?? 'Sin teléfono'} · desde ${since(c.created_at)}`}
                   </div>
                 </div>
                 <ChevronRight size={15} style={{ color: 'var(--ink4)', flexShrink: 0 }} />

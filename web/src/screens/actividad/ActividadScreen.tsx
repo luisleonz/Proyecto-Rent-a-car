@@ -12,7 +12,7 @@ type Audit = { id: number; fecha: string; usuario: string | null; tabla: string;
   datos_anteriores: Record<string, unknown> | null; datos_nuevos: Record<string, unknown> | null }
 
 const TABLA: Record<string, string> = { reservas: 'Reserva', pagos: 'Pago', vehiculos: 'Vehículo', clientes: 'Cliente', cotizaciones: 'Cotización',
-  caja_movimientos: 'Caja', configuracion: 'Configuración' }
+  caja_movimientos: 'Caja', configuracion: 'Configuración', clientes_vetos: 'Cliente no deseado' }
 const OPER: Record<string, string> = { insert: 'creó', update: 'cambió', delete: 'borró' }
 const IGNORAR = new Set(['updated_at', 'created_at'])
 

@@ -4,6 +4,7 @@ import { Plus, ChevronRight, X, Check, Clock, Printer, Search, CalendarRange, Al
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
 import { insertLog } from '../../lib/log'
+import { clienteVetado, mensajeVetado } from '../../lib/noDeseados'
 import { EMPRESA, ivaDe, ivaEtiqueta } from '../../lib/empresa'
 import { insertarConExtras } from '../../lib/insertar'
 import { hoyISO, addDias, diffDias } from '../../lib/fechas'
@@ -99,7 +100,7 @@ function ResRow({ r, hoy, onClick }: { r: ReservaConDetalle; hoy: string; onClic
       <div className="rs-who">
         <div className="avatar accent" style={{ width: 32, height: 32, fontSize: 12, flexShrink: 0 }}>{initials(r)}</div>
         <div style={{ minWidth: 0 }}>
-          <div className="rs-name">{clientName(r)}</div>
+          <div className="rs-name">{clientName(r)}{r.clientes?.no_rentar && r.status !== 'devuelta' && r.status !== 'cancelada' && <span className="chip sm danger" style={{ marginLeft: 6 }}>No rentar</span>}</div>
           {r.clientes?.telefono && <div className="rs-sub">{r.clientes.telefono}</div>}
         </div>
       </div>
@@ -137,7 +138,7 @@ function SkeletonRow() {
 
 /* ─── New reservation modal ──────────────────────────────────── */
 type VehicleOption   = { id: string; modelo: string; placa: string; tarifa_diaria: number | null; fianza?: number | null; returnsToday?: boolean }
-type ClienteOption   = { id: string; nombre: string; telefono: string | null }
+type ClienteOption   = { id: string; nombre: string; telefono: string | null; no_rentar?: boolean }
 
 function Opt({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
@@ -212,16 +213,19 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
   const [error,   setError]   = useState('')
   const [created, setCreated] = useState<{ id: string; aviso: string } | null>(null)
   const [alertasCliente, setAlertasCliente] = useState<string[]>([])
+  const [vetado, setVetado] = useState<{ nombre: string; motivo: string } | null>(null)
+  useEffect(() => { if (!selectedCliente) setVetado(null) }, [clientSearch, clienteTel])
 
   // Warn about an expired license or money owed from earlier rentals
   useEffect(() => {
-    setAlertasCliente([])
+    setAlertasCliente([]); setVetado(null)
     if (!selectedCliente) return
     Promise.all([
       db.from('clientes').select('*').eq('id', selectedCliente.id).single(),
       db.from('reservas').select('total, deposito, status, folio').eq('cliente_id', selectedCliente.id).neq('status', 'cancelada'),
-    ]).then(([c, r]: [{ data: { licencia_vence?: string | null; licencia?: string | null } | null }, { data: { total: number | null; deposito: number; status: string; folio: number | null }[] | null }]) => {
+    ]).then(([c, r]: [{ data: { nombre: string; licencia_vence?: string | null; licencia?: string | null; no_rentar?: boolean; no_rentar_motivo?: string | null } | null }, { data: { total: number | null; deposito: number; status: string; folio: number | null }[] | null }]) => {
       const a: string[] = []
+      if (c.data?.no_rentar) setVetado({ nombre: c.data.nombre, motivo: c.data.no_rentar_motivo ?? '' })
       const lic = c.data?.licencia_vence
       if (lic && lic < (fechaDev || today)) a.push(`Su licencia ${lic < today ? 'está vencida' : 'vence antes de la devolución'} (${new Date(lic + 'T12:00:00').toLocaleDateString('es-MX')}).`)
       if (c.data && !c.data.licencia) a.push('No tiene número de licencia registrado.')
@@ -237,7 +241,7 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
     const s = clientSearch.trim()
     if (s.length < 2) { setClientResults([]); return }
     const t = setTimeout(async () => {
-      const { data } = await db.from('clientes').select('id, nombre, telefono')
+      const { data } = await db.from('clientes').select('*')
         .ilike('nombre', `%${s}%`).limit(6)
       setClientResults(data ?? [])
       if ((data ?? []).length > 0) setShowClientDrop(true)
@@ -281,7 +285,7 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
     setHoraEntrega('10:00'); setHoraDev('10:00')
     setLugarEntrega(EMPRESA.lugarEntregaPredeterminado); setLugarDev(EMPRESA.lugarEntregaPredeterminado)
     setCobertura('basica'); setCeroDiario(EMPRESA.ceroDeducibleDia ? String(EMPRESA.ceroDeducibleDia) : ''); setFianza(''); setMetodoFianza('efectivo'); setConIva(EMPRESA.ivaPorDefecto)
-    setError(''); setCreated(null); setIntento(false)
+    setError(''); setCreated(null); setIntento(false); setVetado(null)
   }
 
   useEffect(() => {
@@ -326,11 +330,15 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
     selectedVehicle && !tarifa && 'El vehículo no tiene tarifa diaria (agrégala en Flota)',
     cobertura === 'cero_deducible' && !(Number(ceroDiario) > 0) && 'El costo por día del cero deducible',
     tieneDeposito && !(Number(deposito) > 0) && 'El monto del anticipo',
+    vetado && mensajeVetado(vetado),
   ].filter(Boolean) as string[]
 
   async function handleCreate() {
     if (faltan.length) { setIntento(true); return }
     setWorking(true); setError('')
+    // Also catches an unwanted client typed again as "new" (same name or phone)
+    const v = await clienteVetado(selectedCliente ? { id: selectedCliente.id } : { nombre: clienteNombre, telefono: clienteTel })
+    if (v) { setVetado(v); setIntento(true); setWorking(false); return }
 
     let clienteId: string | null = null
     if (selectedCliente) {
@@ -506,7 +514,7 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
                           {inits(c.nombre)}
                         </div>
                         <div>
-                          <div style={{ fontWeight: 600 }}>{c.nombre}</div>
+                          <div style={{ fontWeight: 600 }}>{c.nombre}{c.no_rentar && <span className="chip sm danger" style={{ marginLeft: 6 }}>No rentar</span>}</div>
                           {c.telefono && <div style={{ fontSize: 12, color: 'var(--ink3)' }}>{c.telefono}</div>}
                         </div>
                       </button>
@@ -517,6 +525,11 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
             )}
           </div>
 
+          {vetado && (
+            <div role="alert" style={{ background: 'var(--danger-soft)', border: '1px solid var(--danger-line)', color: 'var(--danger-ink)', borderRadius: 10, padding: '10px 12px', fontSize: 13, fontWeight: 600 }}>
+              ⛔ {mensajeVetado(vetado)}
+            </div>
+          )}
           {alertasCliente.length > 0 && (
             <div style={{ background: 'var(--warn-soft)', border: '1px solid var(--warn-line)', color: 'var(--warn-ink)', borderRadius: 10, padding: '10px 12px', fontSize: 12.5, display: 'flex', flexDirection: 'column', gap: 4 }}>
               {alertasCliente.map(t => <span key={t}>⚠ {t}</span>)}
@@ -865,7 +878,7 @@ export default function ReservationsScreen() {
   async function fetchReservas() {
     const { data, error } = await db
       .from('reservas')
-      .select('*, clientes(nombre, telefono), vehiculos(modelo, placa, anio, tarifa_diaria)')
+      .select('*, clientes(*), vehiculos(modelo, placa, anio, tarifa_diaria)')
       .order('fecha_entrega', { ascending: true })
     if (error) console.error('fetchReservas:', error)
     const lista = (data as ReservaConDetalle[]) ?? []

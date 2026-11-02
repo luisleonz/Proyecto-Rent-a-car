@@ -23,7 +23,7 @@ export type Pago = {
 export function faltaMigracion(e: { code?: string; message?: string } | null | undefined) {
   return !!e && (['PGRST204', 'PGRST202', 'PGRST205', '42703', '42883', '42P01'].includes(e.code ?? '') || /schema cache|does not exist|bucket not found/i.test(e.message ?? ''))
 }
-export const AVISO_MIGRACION = 'Falta ejecutar en Supabase (SQL Editor, como postgres) la actualización de la base de datos ("cambio_limpio_lucianos.sql", o "supabase_migracion_2026_10_operacion.sql" y "supabase_migracion_2026_11_control.sql"). Sin ella no funcionan las fotos, la caja ni los ajustes nuevos.'
+export const AVISO_MIGRACION = 'Falta ejecutar en Supabase (SQL Editor, como postgres) la actualización de la base de datos ("cambio_limpio_lucianos.sql", o los archivos "supabase_migracion_2026_10_operacion.sql", "supabase_migracion_2026_11_control.sql" y "supabase_migracion_2026_11_clientes.sql"). Sin ella no funcionan las fotos, la caja, los ajustes ni los clientes no deseados.'
 export const mensajeError = (e: { code?: string; message?: string }) => (faltaMigracion(e) ? AVISO_MIGRACION : e.message ?? 'Error desconocido')
 
 /** Records a payment; rent and extra-charge payments also raise the reservation's paid amount. */

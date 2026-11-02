@@ -18,14 +18,14 @@ async function buscar(texto: string): Promise<Resultado[]> {
   const like = `%${q}%`
   const soloDigitos = q.replace(/\D/g, '')
   const [cli, veh, folio] = await Promise.all([
-    db.from('clientes').select('id, nombre, telefono, email')
+    db.from('clientes').select('*')
       .or(`nombre.ilike.${like},telefono.ilike.${like},email.ilike.${like}${soloDigitos.length >= 4 && soloDigitos !== q ? `,telefono.ilike.%${soloDigitos}%` : ''}`).order('nombre').limit(5),
     db.from('vehiculos').select('id, modelo, placa, anio, status').or(`placa.ilike.${like},modelo.ilike.${like}`).limit(5),
     /^#?\d{1,7}$/.test(q)
       ? db.from('reservas').select('id, folio, status, fecha_entrega, fecha_devolucion, clientes(nombre), vehiculos(modelo)').eq('folio', Number(soloDigitos)).limit(3)
       : Promise.resolve({ data: [] }),
   ])
-  const clientes = (cli.data ?? []) as { id: string; nombre: string; telefono: string | null; email: string | null }[]
+  const clientes = (cli.data ?? []) as { id: string; nombre: string; telefono: string | null; email: string | null; no_rentar?: boolean }[]
   // Latest reservations of the matching clients, so typing a name also finds their bookings
   const porCliente = clientes.length
     ? (await db.from('reservas').select('id, folio, status, fecha_entrega, fecha_devolucion, clientes(nombre), vehiculos(modelo)')
@@ -37,7 +37,7 @@ async function buscar(texto: string): Promise<Resultado[]> {
     ...reservas.map(r => ({ tipo: 'reserva' as const, id: r.id, ruta: `/app/reservations?res=${r.id}`,
       titulo: `#${r.folio ?? '—'} · ${r.clientes?.nombre ?? 'Sin cliente'}`,
       detalle: `${r.vehiculos?.modelo ?? ''} · ${fechaCorta(r.fecha_entrega)} → ${fechaCorta(r.fecha_devolucion)} · ${ESTADO[r.status] ?? r.status}` })),
-    ...clientes.map(c => ({ tipo: 'cliente' as const, id: c.id, ruta: `/app/clientes?c=${c.id}`, titulo: c.nombre, detalle: [c.telefono, c.email].filter(Boolean).join(' · ') || 'Cliente' })),
+    ...clientes.map(c => ({ tipo: 'cliente' as const, id: c.id, ruta: `/app/clientes?c=${c.id}`, titulo: c.nombre, detalle: [c.no_rentar && '⛔ No rentar', c.telefono, c.email].filter(Boolean).join(' · ') || 'Cliente' })),
     ...((veh.data ?? []) as { id: string; modelo: string; placa: string; anio: number | null; status: string | null }[]).map(v => ({
       tipo: 'vehiculo' as const, id: v.id, ruta: `/app/vehicles/${encodeURIComponent(v.placa)}`,
       titulo: `${v.modelo}${v.anio ? ` ${v.anio}` : ''}`, detalle: `${v.placa}${v.status ? ` · ${ESTADO_AUTO[v.status] ?? v.status}` : ''}` })),

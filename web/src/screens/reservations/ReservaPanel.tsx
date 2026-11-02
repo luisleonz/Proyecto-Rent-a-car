@@ -9,6 +9,7 @@ import { registrarPago, mensajeError, whatsappUrl, metodoLabel, CONCEPTO_LABEL, 
   type Pago, type MetodoPago, type ConceptoPago } from '../../lib/operacion'
 import { urlsFirmadas } from '../../lib/fotos'
 import type { ReservaConDetalle, ReservaStatus } from '../../lib/database.types'
+import { EMPRESA } from '../../lib/empresa'
 
 const db = supabase as any // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -155,9 +156,9 @@ export default function ReservaPanel({ res, open, onClose, onChanged }: {
 
   const nombre = res.clientes?.nombre ?? 'Cliente'
   const veh = res.vehiculos ? `${res.vehiculos.modelo} (${res.vehiculos.placa})` : 'el vehículo'
-  const msjEntrega = `Hola ${nombre.split(' ')[0]}, le recordamos su renta de ${veh} con Luciano's Tours el ${fmtDate(res.fecha_entrega)}${res.hora_entrega ? ` a las ${res.hora_entrega.slice(0, 5)}` : ''}. Traiga su licencia vigente e identificación.${saldo > 0 ? ` Saldo por pagar: $${fmt(saldo)}.` : ''}`
-  const msjDevolucion = `Hola ${nombre.split(' ')[0]}, le recordamos que la devolución de ${veh} es el ${fmtDate(res.fecha_devolucion)}${res.hora_devolucion ? ` a las ${res.hora_devolucion.slice(0, 5)}` : ''}. Gracias por rentar con Luciano's Tours.`
-  const msjSaldo = `Hola ${nombre.split(' ')[0]}, de su renta #${res.folio ?? ''} con Luciano's Tours queda un saldo pendiente de $${fmt(saldo)}. Puede pagarlo en efectivo, tarjeta o transferencia. ¡Gracias!`
+  const msjEntrega = `Hola ${nombre.split(' ')[0]}, le recordamos su renta de ${veh} con ${EMPRESA.nombreComercial} el ${fmtDate(res.fecha_entrega)}${res.hora_entrega ? ` a las ${res.hora_entrega.slice(0, 5)}` : ''}. Traiga su licencia vigente e identificación.${saldo > 0 ? ` Saldo por pagar: $${fmt(saldo)}.` : ''}`
+  const msjDevolucion = `Hola ${nombre.split(' ')[0]}, le recordamos que la devolución de ${veh} es el ${fmtDate(res.fecha_devolucion)}${res.hora_devolucion ? ` a las ${res.hora_devolucion.slice(0, 5)}` : ''}. Gracias por rentar con ${EMPRESA.nombreComercial}.`
+  const msjSaldo = `Hola ${nombre.split(' ')[0]}, de su renta #${res.folio ?? ''} con ${EMPRESA.nombreComercial} queda un saldo pendiente de $${fmt(saldo)}. Puede pagarlo en efectivo, tarjeta o transferencia. ¡Gracias!`
 
   return (
     <>
@@ -167,6 +168,11 @@ export default function ReservaPanel({ res, open, onClose, onChanged }: {
           <div style={{ minWidth: 0 }}>
             <div className="eyebrow" style={{ marginBottom: 4 }}>Reserva{res.folio != null ? ` #${res.folio}` : ''}</div>
             <div style={{ fontSize: 20, fontFamily: 'var(--font-display)' }}>{nombre}</div>
+            {res.clientes?.no_rentar && (
+              <div role="alert" style={{ marginTop: 6, background: 'var(--danger-soft)', color: 'var(--danger-ink)', borderRadius: 8, padding: '7px 10px', fontSize: 12.5, fontWeight: 600 }}>
+                ⛔ Cliente no deseado{res.clientes.no_rentar_motivo ? `: ${res.clientes.no_rentar_motivo}` : ''}. Revisa si se debe cancelar esta reserva.
+              </div>
+            )}
             {tel && <div style={{ fontSize: 13, color: 'var(--ink3)', marginTop: 3 }}>{tel}</div>}
             <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <span className={`chip sm ${STATUS_CHIP[res.status]}`}>{STATUS_LABEL[res.status]}</span>

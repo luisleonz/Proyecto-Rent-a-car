@@ -7,6 +7,8 @@ import { insertLog } from '../../lib/log'
 import { hoyISO, diffDias } from '../../lib/fechas'
 import { actualizarConExtras } from '../../lib/insertar'
 import { subirDocumento, urlsFirmadas } from '../../lib/fotos'
+import { marcarNoDeseado } from '../../lib/noDeseados'
+import MotivoNoDeseado from '../../components/MotivoNoDeseado'
 import { registrarPago, mensajeError, metodoLabel, metodosActivos, whatsappUrl, AVISO_MIGRACION, type MetodoPago } from '../../lib/operacion'
 import FlujoPasos, { Bloque, Casilla, AvisoFalta } from '../../components/FlujoPasos'
 import { SelectorGasolina, CapturaFotos, nivelGas, etiquetaGas } from '../../components/Captura'
@@ -30,7 +32,7 @@ export default function DevolucionScreen() {
   const [avisoPaso, setAvisoPaso] = useState(false)
   useEffect(() => { setAvisoPaso(false) }, [paso])
   const [guardando, setGuardando] = useState<string | null>(null)
-  const [listo, setListo] = useState<{ avisos: string[]; devolver: number } | null>(null)
+  const [listo, setListo] = useState<{ avisos: string[]; devolver: number; vetado?: boolean } | null>(null)
   const [fotosSalida, setFotosSalida] = useState<string[]>([])
 
   const [km, setKm] = useState('')
@@ -43,6 +45,9 @@ export default function DevolucionScreen() {
   const [metodoCobro, setMetodoCobro] = useState<MetodoPago>('efectivo')
   const [usarGarantia, setUsarGarantia] = useState(false)
   const [metodoDevol, setMetodoDevol] = useState<MetodoPago>('efectivo')
+  // Mark the client as unwanted right at the return
+  const [noRentar, setNoRentar] = useState(false)
+  const [motivoNoRentar, setMotivoNoRentar] = useState('')
 
   useEffect(() => {
     db.from('reservas').select('*, clientes(*), vehiculos(*)').eq('id', resId).single()
@@ -104,9 +109,10 @@ export default function DevolucionScreen() {
           <h1 className="h-display" style={{ fontSize: 28 }}>Devolución registrada</h1>
           {listo.devolver > 0 && <p style={{ margin: 0, fontSize: 15 }}>Devuelve al cliente <strong>${fmt(listo.devolver)}</strong> de su garantía ({metodoLabel(metodoDevol)}).</p>}
           {saldoFinal > 0 && <p style={{ margin: 0, color: 'var(--warn-ink)' }}>Queda un saldo pendiente de <strong>${fmt(saldoFinal)}</strong>.</p>}
+          {listo.vetado && <p style={{ margin: 0, color: 'var(--danger-ink)', fontWeight: 600 }}>{nombre} quedó marcado como cliente no deseado.</p>}
           {listo.avisos.length > 0 && <div style={{ background: 'var(--warn-soft)', color: 'var(--warn-ink)', borderRadius: 10, padding: '10px 12px', fontSize: 13, textAlign: 'left' }}>{listo.avisos.map(t => <div key={t}>⚠ {t}</div>)}</div>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
-            {tel && <a className="btn" target="_blank" rel="noreferrer" href={whatsappUrl(tel, `Hola ${nombre.split(' ')[0]}, recibimos su ${r.vehiculos?.modelo}. ¡Gracias por rentar con Luciano's Tours!${saldoFinal > 0 ? ` Queda un saldo pendiente de $${fmt(saldoFinal)}.` : ''}`)}><MessageCircle size={15} />Agradecer por WhatsApp</a>}
+            {tel && <a className="btn" target="_blank" rel="noreferrer" href={whatsappUrl(tel, `Hola ${nombre.split(' ')[0]}, recibimos su ${r.vehiculos?.modelo}. ¡Gracias por rentar con ${EMPRESA.nombreComercial}!${saldoFinal > 0 ? ` Queda un saldo pendiente de $${fmt(saldoFinal)}.` : ''}`)}><MessageCircle size={15} />Agradecer por WhatsApp</a>}
             <button className="btn primary" onClick={() => navigate('/app/reservations')}>Volver a reservas</button>
           </div>
         </div>
@@ -117,6 +123,7 @@ export default function DevolucionScreen() {
   async function confirmar() {
     if (!r) return
     setErrConfirm('')
+    if (noRentar && !motivoNoRentar.trim()) { setErrConfirm('Falta el motivo para no volver a rentarle al cliente.'); return }
     const avisos: string[] = []
     try {
       const rutas: string[] = []
@@ -160,7 +167,13 @@ export default function DevolucionScreen() {
       await insertLog({ accion: 'recibir_vehiculo', entidad: 'reservas', entidad_id: r.id, realizado_por: currentEmail,
         descripcion: `${r.vehiculos?.modelo} recibido de ${nombre} (#${r.folio ?? ''}) · ${fmt(kmNum)} km${totalCargos ? ` · cargos $${fmt(totalCargos)}` : ''}`,
         datos_nuevos: { km: kmNum, gasolina: gas, cargos: detalle, garantia_devuelta: devolver } })
-      setListo({ avisos, devolver })
+      let vetado = false
+      if (noRentar && r.clientes) {
+        setGuardando('Marcando al cliente…')
+        const e = await marcarNoDeseado({ id: r.cliente_id!, nombre: r.clientes.nombre, telefono: r.clientes.telefono }, motivoNoRentar, { id: r.id, folio: r.folio ?? null })
+        if (e) avisos.push(`No se pudo marcar al cliente como no deseado: ${mensajeError(e)}`); else vetado = true
+      }
+      setListo({ avisos, devolver, vetado })
     } catch (e) {
       setErrConfirm(`No se pudo registrar la devolución: ${mensajeError(e as { message: string })}`)
     }
@@ -260,7 +273,15 @@ export default function DevolucionScreen() {
             {devolver > 0 && <div style={{ display: 'flex', gap: 6 }}>{metodosActivos().map(m => <button key={m} className={`btn sm${metodoDevol === m ? ' primary' : ''}`} style={{ flex: 1 }} onClick={() => setMetodoDevol(m)}>{metodoLabel(m)}</button>)}</div>}
           </>}
         </Bloque>
-        {errConfirm && <div style={{ color: 'var(--danger-ink)', fontSize: 13 }}>{errConfirm}</div>}
+        <Bloque titulo="¿Volver a rentarle?" ayuda={r.clientes?.no_rentar ? undefined : 'Si el cliente causó problemas, márcalo para que no se le vuelva a rentar.'}>
+          {r.clientes?.no_rentar
+            ? <div style={{ fontSize: 13, color: 'var(--danger-ink)' }}>Este cliente ya está marcado como no deseado: {r.clientes.no_rentar_motivo}</div>
+            : <>
+              <Casilla ok={noRentar} onChange={setNoRentar}>No volver a rentarle a {nombre} (marcar como no deseado)</Casilla>
+              {noRentar && <MotivoNoDeseado value={motivoNoRentar} onChange={v => { setMotivoNoRentar(v); setErrConfirm('') }} />}
+            </>}
+        </Bloque>
+        {errConfirm && <div role="alert" style={{ color: 'var(--danger-ink)', fontSize: 13 }}>{errConfirm}</div>}
       </>}
     </FlujoPasos>
   )

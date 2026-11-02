@@ -14,6 +14,9 @@ Con --sin-adeudos (junto con --limpio): el saldo que el sistema anterior marcaba
 las rentas que ya están en curso se da por cobrado (se registra como pago de ajuste "cambio de
 sistema"); las rentas próximas conservan su anticipo y su saldo real por cobrar.
 Con --solo-proximas (junto con --limpio): no carga las rentas en curso, solo las que aún no salen.
+Con --historial (junto con --limpio): carga todo el historial (terminadas, canceladas y próximas)
+menos las rentas en curso; las reservas viejas que nunca salieron quedan como canceladas.
+Con --sin-adeudos además, los saldos viejos de rentas terminadas se dan por cobrados.
 El archivo generado contiene datos personales de clientes: no lo suba al repositorio.
 """
 import json
@@ -69,12 +72,18 @@ def vigente(c, hoy, solo_proximas=False):
     return (c['status'] == 'active' and not solo_proximas) or (c['status'] == 'reserved' and local(c['end_date']).date() >= hoy)
 
 
-def main(ruta, limpio=False, sin_adeudos=False, solo_proximas=False):
+def main(ruta, limpio=False, sin_adeudos=False, solo_proximas=False, historial=False):
     d = json.load(open(ruta, encoding='utf-8'))
     hoy = (datetime.utcnow() + TZ).date()
     todos = [c for c in d['contracts'] if not c.get('is_deleted')]
     folio_max = max(int(c['contract_number']) for c in d['contracts'] if str(c['contract_number']).isdigit())
-    contratos = [c for c in todos if vigente(c, hoy, solo_proximas)] if limpio else todos
+    if limpio and historial:
+        contratos = [c for c in todos if c['status'] != 'active']
+    else:
+        contratos = [c for c in todos if vigente(c, hoy, solo_proximas)] if limpio else todos
+    # A booking whose dates passed without the car ever going out
+    def vencida(c):
+        return c['status'] == 'reserved' and local(c['end_date']).date() < hoy
     ids_contrato = {c['id'] for c in contratos}
     con_contrato = {c['customer_id'] for c in contratos}
 
@@ -124,11 +133,12 @@ def main(ruta, limpio=False, sin_adeudos=False, solo_proximas=False):
         else:
             desc = 0
         notas = '\n'.join(x for x in [c.get('internal_notes'), c.get('notes'),
-                                      f"Cancelación: {c.get('cancelled_reason') or c.get('cancellation_reason')}" if c.get('status') == 'cancelled' and (c.get('cancelled_reason') or c.get('cancellation_reason')) else None] if x)
+                                      f"Cancelación: {c.get('cancelled_reason') or c.get('cancellation_reason')}" if c.get('status') == 'cancelled' and (c.get('cancelled_reason') or c.get('cancellation_reason')) else None,
+                                      'Reserva vencida en el sistema anterior (el auto nunca salió): se importa como cancelada' if vencida(c) else None] if x)
         ant, gar = anticipo(c), declarado(c, 'pending_deposit_collected')
         res.append([c['id'], int(c['contract_number']), c['customer_id'], c['vehicle_id'],
                     ini.date().isoformat(), ini.strftime('%H:%M'), fin.date().isoformat(), fin.strftime('%H:%M'),
-                    STATUS_RES.get(c['status'], 'confirmada'), total, (c.get('amount_paid') or 0) + (ant['amount'] if ant else 0),
+                    'cancelada' if vencida(c) else STATUS_RES.get(c['status'], 'confirmada'), total, (c.get('amount_paid') or 0) + (ant['amount'] if ant else 0),
                     METODO.get((ant or {}).get('method') or c.get('initial_payment_method')), round(desc, 2), iva,
                     (gar or {}).get('amount') or c.get('deposit_amount') or 0, fianza_metodo.get(c['id']) or METODO.get((gar or {}).get('method')),
                     c.get('pickup_location'), c.get('return_location'), notas or None,
@@ -142,7 +152,7 @@ def main(ruta, limpio=False, sin_adeudos=False, solo_proximas=False):
     if sin_adeudos:
         for r, c in zip(res, contratos):
             saldo = (r[9] or 0) - (r[10] or 0)
-            if c['status'] == 'active' and saldo > 0:
+            if c['status'] in ('active', 'completed') and saldo > 0:
                 r[10] = r[9]
                 ajustados.append((c, saldo))
 
@@ -167,10 +177,10 @@ def main(ruta, limpio=False, sin_adeudos=False, solo_proximas=False):
             pagos.append([c['id'] + ':garantia', c['id'], gar['amount'], METODO.get(gar.get('method')), gar.get('date'), 'Garantía recibida al reservar', None, 'fianza'])
 
     for c, saldo in ajustados:
-        pagos.append([c['id'] + ':ajuste', c['id'], saldo, None, c['start_date'],
+        pagos.append([c['id'] + ':ajuste', c['id'], saldo, None, c.get('actual_return_date') or c['end_date'],
                       'Ajuste por cambio de sistema: saldo del sistema anterior que se da por cobrado', None, 'renta'])
 
-    titulo = ('CAMBIO LIMPIO: borra los datos actuales y carga solo rentas ' + ('próximas' if solo_proximas else 'activas y próximas')) if limpio else 'Importación del respaldo del sistema anterior'
+    titulo = ('CAMBIO LIMPIO: borra los datos actuales y carga ' + ('el historial sin las rentas en curso' if historial else 'solo rentas ' + ('próximas' if solo_proximas else 'activas y próximas'))) if limpio else 'Importación del respaldo del sistema anterior'
     out = [f'-- {titulo} · generado {datetime.now():%Y-%m-%d %H:%M} (hoy en Sonora: {hoy})',
            f'-- {len(veh)} vehículos · {len(cli)} clientes · {len(res)} reservas · {len(pagos)} pagos',
            '-- CONTIENE DATOS PERSONALES DE CLIENTES. No compartir ni subir al repositorio.',
@@ -395,4 +405,5 @@ if __name__ == '__main__':
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
     if len(args) != 1:
         sys.exit(__doc__)
-    main(args[0], limpio='--limpio' in sys.argv, sin_adeudos='--sin-adeudos' in sys.argv, solo_proximas='--solo-proximas' in sys.argv)
+    main(args[0], limpio='--limpio' in sys.argv, sin_adeudos='--sin-adeudos' in sys.argv, solo_proximas='--solo-proximas' in sys.argv,
+         historial='--historial' in sys.argv)

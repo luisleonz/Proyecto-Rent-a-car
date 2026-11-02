@@ -13,6 +13,7 @@ sistema anterior. Los usuarios y archivos (fotos, firma) no se tocan.
 Con --sin-adeudos (junto con --limpio): el saldo que el sistema anterior marcaba como pendiente en
 las rentas que ya están en curso se da por cobrado (se registra como pago de ajuste "cambio de
 sistema"); las rentas próximas conservan su anticipo y su saldo real por cobrar.
+Con --solo-proximas (junto con --limpio): no carga las rentas en curso, solo las que aún no salen.
 El archivo generado contiene datos personales de clientes: no lo suba al repositorio.
 """
 import json
@@ -63,17 +64,17 @@ def values(filas):
     return ',\n'.join('(' + ', '.join(q(x) for x in f) + ')' for f in filas)
 
 
-def vigente(c, hoy):
+def vigente(c, hoy, solo_proximas=False):
     """Active rentals (car still out) and upcoming bookings whose dates haven't passed."""
-    return c['status'] == 'active' or (c['status'] == 'reserved' and local(c['end_date']).date() >= hoy)
+    return (c['status'] == 'active' and not solo_proximas) or (c['status'] == 'reserved' and local(c['end_date']).date() >= hoy)
 
 
-def main(ruta, limpio=False, sin_adeudos=False):
+def main(ruta, limpio=False, sin_adeudos=False, solo_proximas=False):
     d = json.load(open(ruta, encoding='utf-8'))
     hoy = (datetime.utcnow() + TZ).date()
     todos = [c for c in d['contracts'] if not c.get('is_deleted')]
     folio_max = max(int(c['contract_number']) for c in d['contracts'] if str(c['contract_number']).isdigit())
-    contratos = [c for c in todos if vigente(c, hoy)] if limpio else todos
+    contratos = [c for c in todos if vigente(c, hoy, solo_proximas)] if limpio else todos
     ids_contrato = {c['id'] for c in contratos}
     con_contrato = {c['customer_id'] for c in contratos}
 
@@ -169,7 +170,7 @@ def main(ruta, limpio=False, sin_adeudos=False):
         pagos.append([c['id'] + ':ajuste', c['id'], saldo, None, c['start_date'],
                       'Ajuste por cambio de sistema: saldo del sistema anterior que se da por cobrado', None, 'renta'])
 
-    titulo = 'CAMBIO LIMPIO: borra los datos actuales y carga solo rentas activas y próximas' if limpio else 'Importación del respaldo del sistema anterior'
+    titulo = ('CAMBIO LIMPIO: borra los datos actuales y carga solo rentas ' + ('próximas' if solo_proximas else 'activas y próximas')) if limpio else 'Importación del respaldo del sistema anterior'
     out = [f'-- {titulo} · generado {datetime.now():%Y-%m-%d %H:%M} (hoy en Sonora: {hoy})',
            f'-- {len(veh)} vehículos · {len(cli)} clientes · {len(res)} reservas · {len(pagos)} pagos',
            '-- CONTIENE DATOS PERSONALES DE CLIENTES. No compartir ni subir al repositorio.',
@@ -394,4 +395,4 @@ if __name__ == '__main__':
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
     if len(args) != 1:
         sys.exit(__doc__)
-    main(args[0], limpio='--limpio' in sys.argv, sin_adeudos='--sin-adeudos' in sys.argv)
+    main(args[0], limpio='--limpio' in sys.argv, sin_adeudos='--sin-adeudos' in sys.argv, solo_proximas='--solo-proximas' in sys.argv)

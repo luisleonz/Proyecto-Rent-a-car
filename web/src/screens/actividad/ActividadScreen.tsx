@@ -1,30 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Lock, Search } from 'lucide-react'
+import { Lock, Search, Bot } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
 import { mensajeError } from '../../lib/operacion'
 import { identificador } from '../../lib/usuarios'
+import { cambiosLegibles, tituloCambio, esCambioVacio, esAutomatico, type Audit } from '../../lib/historial'
 
 const db = supabase as any // eslint-disable-line @typescript-eslint/no-explicit-any
 
 type Log = { id: string; accion: string; descripcion: string | null; realizado_por: string | null; created_at: string }
-type Audit = { id: number; fecha: string; usuario: string | null; tabla: string; operacion: string; registro_id: string | null
-  datos_anteriores: Record<string, unknown> | null; datos_nuevos: Record<string, unknown> | null }
-
-const TABLA: Record<string, string> = { reservas: 'Reserva', pagos: 'Pago', vehiculos: 'Vehículo', clientes: 'Cliente', cotizaciones: 'Cotización',
-  caja_movimientos: 'Caja', configuracion: 'Configuración', clientes_vetos: 'Cliente no deseado' }
-const OPER: Record<string, string> = { insert: 'creó', update: 'cambió', delete: 'borró' }
-const IGNORAR = new Set(['updated_at', 'created_at'])
-
 const fechaHora = (s: string) => new Date(s).toLocaleString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-
-function cambios(a: Audit) {
-  if (a.operacion !== 'update' || !a.datos_anteriores || !a.datos_nuevos) return []
-  return Object.keys(a.datos_nuevos)
-    .filter(k => !IGNORAR.has(k) && JSON.stringify(a.datos_anteriores![k]) !== JSON.stringify(a.datos_nuevos![k]))
-    .map(k => ({ campo: k, antes: a.datos_anteriores![k], despues: a.datos_nuevos![k] }))
-}
-const corto = (v: unknown) => { const s = v == null ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v); return s.length > 60 ? s.slice(0, 57) + '…' : s }
 
 export default function ActividadScreen() {
   const { esDueno } = useAuth()
@@ -32,6 +17,12 @@ export default function ActividadScreen() {
   const [logs, setLogs] = useState<Log[]>([])
   const [audit, setAudit] = useState<Audit[]>([])
   const [q, setQ] = useState('')
+  const [verAuto, setVerAuto] = useState(false)
+  const [nombres, setNombres] = useState<Record<string, string>>({})
+  useEffect(() => {
+    db.from('vehiculos').select('id, modelo, placa').then(({ data }: { data: { id: string; modelo: string; placa: string }[] | null }) =>
+      setNombres(Object.fromEntries((data ?? []).map(v => [v.id, `${v.modelo} (${v.placa})`]))))
+  }, [])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -49,7 +40,9 @@ export default function ActividadScreen() {
 
   const qn = q.trim().toLowerCase()
   const logsF = useMemo(() => logs.filter(l => !qn || `${l.descripcion} ${identificador(l.realizado_por)} ${l.accion}`.toLowerCase().includes(qn)), [logs, qn])
-  const auditF = useMemo(() => audit.filter(a => !qn || `${a.usuario} ${a.tabla} ${JSON.stringify(a.datos_nuevos ?? a.datos_anteriores)}`.toLowerCase().includes(qn)), [audit, qn])
+  const auditVisibles = useMemo(() => audit.filter(a => !esCambioVacio(a) && (verAuto || !esAutomatico(a))), [audit, verAuto])
+  const auditF = useMemo(() => auditVisibles.filter(a => !qn || `${tituloCambio(a, nombres)} ${cambiosLegibles(a, nombres).join(' ')}`.toLowerCase().includes(qn)), [auditVisibles, qn, nombres])
+  const nAuto = useMemo(() => audit.filter(a => !esCambioVacio(a) && esAutomatico(a)).length, [audit])
 
   return (
     <div className="screen">
@@ -75,6 +68,12 @@ export default function ActividadScreen() {
           style={{ flex: 1, border: 0, outline: 'none', background: 'none', font: 'inherit', fontSize: 14, padding: '10px 0', color: 'var(--ink)' }} />
       </label>
 
+      {tab === 'detalle' && nAuto > 0 && (
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--ink2)', marginBottom: 10, cursor: 'pointer' }}>
+          <input type="checkbox" checked={verAuto} onChange={e => setVerAuto(e.target.checked)} />
+          Mostrar cambios automáticos de disponibilidad ({nAuto}): los hace la app según las reservas, no una persona.
+        </label>
+      )}
       {error && <div style={{ padding: '12px 16px', background: 'var(--danger-soft)', color: 'var(--danger-ink)', borderRadius: 'var(--radius-sm)', marginBottom: 12 }}>{error}</div>}
 
       <div className="card tilelist">
@@ -87,18 +86,17 @@ export default function ActividadScreen() {
               </div>
             </div>
           ))) : (auditF.length === 0 ? <div style={{ padding: 24, color: 'var(--ink3)' }}>Sin cambios registrados.</div> : auditF.map(a => {
-            const cs = cambios(a)
-            const datos = (a.datos_nuevos ?? a.datos_anteriores ?? {}) as Record<string, unknown>
-            const etiqueta = datos.folio != null ? `#${datos.folio}` : (datos.nombre ?? datos.modelo ?? datos.placa ?? datos.concepto ?? '') as string
+            const cs = cambiosLegibles(a, nombres)
+            const auto = esAutomatico(a)
             return (
-              <div key={a.id} className="tilerow" style={{ alignItems: 'flex-start' }}>
+              <div key={a.id} className="tilerow" style={{ alignItems: 'flex-start', ...(auto ? { opacity: 0.75 } : {}) }}>
                 <div className="tile-main">
-                  <div className="tile-l" style={{ fontWeight: 500 }}>{a.usuario ? identificador(a.usuario) : 'sistema'} {OPER[a.operacion] ?? a.operacion} {TABLA[a.tabla] ?? a.tabla} {etiqueta}</div>
-                  <div className="tile-s">{fechaHora(a.fecha)}</div>
+                  <div className="tile-l" style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>{auto && <Bot size={14} />}{tituloCambio(a, nombres)}</div>
+                  <div className="tile-s">{fechaHora(a.fecha)}{auto ? ' · según las reservas, nadie lo editó' : ''}</div>
                   {cs.length > 0 && (
-                    <div style={{ fontSize: 12, color: 'var(--ink2)', marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      {cs.slice(0, 8).map(c => <span key={c.campo}><b>{c.campo}</b>: {corto(c.antes)} → {corto(c.despues)}</span>)}
-                    </div>
+                    <ul style={{ fontSize: 12.5, color: 'var(--ink2)', margin: '4px 0 0', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {cs.slice(0, 10).map(c => <li key={c}>{c[0].toUpperCase() + c.slice(1)}</li>)}
+                    </ul>
                   )}
                 </div>
               </div>

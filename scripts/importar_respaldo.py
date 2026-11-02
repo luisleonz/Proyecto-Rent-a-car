@@ -21,7 +21,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 MIGRACIONES = ['supabase_migracion_2026_10_contratos.sql', 'supabase_migracion_2026_10_importacion.sql',
                'supabase_migracion_2026_10_operacion.sql', 'supabase_migracion_2026_11_control.sql',
-               'supabase_migracion_2026_11_clientes.sql']
+               'supabase_migracion_2026_11_clientes.sql', 'supabase_migracion_2026_11_actividad.sql']
 TZ = timedelta(hours=-7)  # America/Hermosillo, sin horario de verano
 
 METODO = {'cash': 'efectivo', 'bank_transfer': 'transferencia', 'card': 'tarjeta', 'pos': 'tarjeta'}

@@ -639,6 +639,23 @@ async function otraSesion(ctx, b) {
     ok(!(await p.locator('button:has-text("Cambios detallados")').count()), 'Sin historial detallado (solo dueño)')
     ok((await texto(p)).includes('nadie lo puede editar ni borrar'), 'Explica que es permanente')
   })
+  await escenario('Actividad', 'Cambios detallados: dice qué cambió y no muestra cambios vacíos ni automáticos', async ({ p, b, ok }) => {
+    const v = b.v1, base = { ...v }
+    const A = (usuario, tabla, antes, despues) => b.insertar('auditoria', { usuario, tabla, operacion: 'update', registro_id: despues.id, datos_anteriores: antes, datos_nuevos: despues })
+    A('luis@lucianos.mx', 'vehiculos', base, { ...base })                                         // opened a screen: nothing changed
+    A('luis@lucianos.mx', 'vehiculos', { ...base, status: 'disponible' }, { ...base, status: 'reservado', cliente_actual: 'Pedro', info_cliente: 'sale 10/11' })
+    A('ana@lucianos.mx', 'vehiculos', { ...base, tarifa_diaria: 1500 }, { ...base, tarifa_diaria: 1700 })
+    A('luis@lucianos.mx', 'reservas', { ...b.r4, fecha_devolucion: d(12) }, { ...b.r4, fecha_devolucion: d(14), total: 4000 })
+    await entrar(p); await ir(p, '/app/actividad'); await p.click('button:has-text("Cambios detallados")'); await p.waitForTimeout(700)
+    let t = await texto(p)
+    ok(t.includes('ana@lucianos.mx editó el vehículo MAZDA 2 #8 (VYP190C)') && t.includes('Tarifa diaria de $1,500 a $1,700'), 'Dice quién y qué cambió con valores')
+    ok(t.includes('editó la reserva #13') && t.includes('Fecha de devolución de') && t.includes('Total de $3,000 a $4,000'), 'Cambios de la reserva en palabras')
+    ok(!t.includes('Pedro') && !/cambió Vehículo/.test(t), 'Oculta los cambios vacíos y los automáticos')
+    await p.click('text=Mostrar cambios automáticos'); await p.waitForTimeout(300)
+    t = await texto(p)
+    ok(t.includes('Automático actualizó el vehículo MAZDA 2 #8') && t.includes('Estado de Disponible a Reservado') && t.includes('nadie lo editó'), 'Los automáticos se identifican como tales')
+    ok(!t.includes('luis@lucianos.mx actualizó'), 'No los atribuye a quien abrió la pantalla')
+  })
   await escenario('Caja', 'Fondo inicial del dueño, gasto del administrador y efectivo ahora', async ({ p, b, ok, ctx }) => {
     await entrar(p, 'ana@lucianos.mx', 'Empleada2026'); await ir(p, '/app/caja')
     ok((await texto(p)).includes('pídele al dueño'), 'Sin fondo: pide al dueño registrarlo')

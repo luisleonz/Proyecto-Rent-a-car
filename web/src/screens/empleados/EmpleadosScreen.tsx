@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
-import { UserPlus, X, Copy, MessageCircle, Link2, ShieldCheck, Check } from 'lucide-react'
+import { UserPlus, X, Copy, MessageCircle, Link2, ShieldCheck, Check, RefreshCw, KeyRound } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
 import { mensajeError, whatsappUrl } from '../../lib/operacion'
 import { EMPRESA } from '../../lib/empresa'
+import { usuarioValido, normalizarUsuario, mensajeContrasena, faltasContrasena, generarContrasena, identificador, usuarioDeCorreo, USUARIO_REGLA } from '../../lib/usuarios'
+import ReglasContrasena from '../../components/ReglasContrasena'
 
 const db = supabase as any // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -63,28 +65,73 @@ function EnlaceListo({ enlace, nombre, onClose }: { enlace: string; nombre: stri
   )
 }
 
+const sinAcentos = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+const sugerirUsuario = (nombre: string) => sinAcentos(nombre.trim().toLowerCase()).split(/\s+/).slice(0, 2).join('.').replace(/[^a-z0-9._-]/g, '').slice(0, 30)
+
+const mensajeCredenciales = (nombre: string, usuario: string, pass: string) =>
+  `Hola${nombre ? ` ${nombre.split(' ')[0]}` : ''}, ya tienes acceso a la app de ${EMPRESA.nombreComercial}.\n${location.origin}\nUsuario: ${usuario}\nContraseña temporal: ${pass}\nAl entrar te pedirá crear tu propia contraseña.`
+
+/** Username + temporary password, ready to send by WhatsApp. */
+function CredencialesListas({ nombre, usuario, pass, onClose }: { nombre: string; usuario: string; pass: string; onClose: () => void }) {
+  const [copiado, setCopiado] = useState(false)
+  const msg = mensajeCredenciales(nombre, usuario, pass)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ padding: '10px 13px', background: 'var(--primary-soft)', color: 'var(--primary-dark)', borderRadius: 'var(--radius-sm)', fontSize: 13, lineHeight: 1.5 }}>
+        Cuenta lista. Envíale estos datos; al entrar por primera vez la app le pedirá crear su propia contraseña.
+      </div>
+      <div style={{ background: 'var(--paper-alt)', borderRadius: 10, padding: 12, fontSize: 14, lineHeight: 1.7 }}>
+        Usuario: <b className="mono">{usuario}</b><br />Contraseña temporal: <b className="mono">{pass}</b>
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <a className="btn primary" href={whatsappUrl('', msg)} target="_blank" rel="noreferrer"><MessageCircle size={15} />Enviar por WhatsApp</a>
+        <button className="btn" onClick={() => { navigator.clipboard?.writeText(msg); setCopiado(true) }}>{copiado ? <Check size={15} /> : <Copy size={15} />}{copiado ? 'Copiado' : 'Copiar'}</button>
+        <button className="btn" onClick={onClose}>Listo</button>
+      </div>
+    </div>
+  )
+}
+
+function CampoContrasena({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="field">
+      <label className="field-l">Contraseña temporal *</label>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input className="field-i mono" value={value} onChange={e => onChange(e.target.value)} placeholder="Ej. Renta#2026" autoComplete="new-password" autoCapitalize="off" />
+        <button type="button" className="btn" onClick={() => onChange(generarContrasena())} title="Generar una contraseña segura"><RefreshCw size={14} />Generar</button>
+      </div>
+      <ReglasContrasena pass={value} />
+    </div>
+  )
+}
+
 function NuevoUsuario({ onClose, onCreado }: { onClose: () => void; onCreado: () => void }) {
   const [nombre, setNombre] = useState('')
+  const [usuario, setUsuario] = useState('')
+  const [usuarioEditado, setUsuarioEditado] = useState(false)
   const [email, setEmail] = useState('')
   const [rol, setRol] = useState<'Administrador' | 'Dueño'>('Administrador')
-  const [modo, setModo] = useState<'enlace' | 'correo' | 'crear'>('enlace')
-  const [password, setPassword] = useState('')
+  const [modo, setModo] = useState<'usuario' | 'enlace' | 'correo'>('usuario')
+  const [password, setPassword] = useState(() => generarContrasena())
   const [error, setError] = useState('')
   const [guardando, setGuardando] = useState(false)
-  const [listo, setListo] = useState<{ enlace?: string; msg?: string } | null>(null)
+  const [listo, setListo] = useState<{ enlace?: string; msg?: string; usuario?: string; pass?: string } | null>(null)
 
   async function guardar() {
-    const faltan = [!nombre.trim() && 'el nombre', !/^\S+@\S+\.\S+$/.test(email.trim()) && 'un correo válido',
-      modo === 'crear' && password.length < 8 && 'una contraseña temporal de al menos 8 caracteres'].filter(Boolean)
-    if (faltan.length) { setError(`Falta ${faltan.join(', ')}.`); return }
+    const conUsuario = modo === 'usuario'
+    const faltan = [!nombre.trim() && 'el nombre',
+      conUsuario && !usuarioValido(usuario) && `un nombre de usuario válido (${USUARIO_REGLA.toLowerCase()})`,
+      !conUsuario && !/^\S+@\S+\.\S+$/.test(email.trim()) && 'un correo válido',
+      conUsuario && mensajeContrasena(password) && `una contraseña temporal con ${faltasContrasena(password).join(', ')}`].filter(Boolean)
+    if (faltan.length) { setError(`Falta ${faltan.join('; ')}.`); return }
     setGuardando(true); setError('')
-    const r = await llamar(modo === 'enlace' ? 'invitar_enlace' : modo === 'correo' ? 'invitar_correo' : 'crear', { nombre: nombre.trim(), email: email.trim(), rol, password })
+    const r = await llamar(conUsuario ? 'crear' : modo === 'enlace' ? 'invitar_enlace' : 'invitar_correo',
+      { nombre: nombre.trim(), rol, ...(conUsuario ? { usuario: normalizarUsuario(usuario), password } : { email: email.trim() }) })
     setGuardando(false)
     if (r.error) { setError(r.error); return }
     onCreado()
-    setListo(modo === 'enlace' ? { enlace: r.enlace } : modo === 'correo'
-      ? { msg: `Se envió la invitación a ${email.trim()}. Si no le llega en unos minutos (revisar spam), usa "Nuevo enlace" en la lista y envíalo por WhatsApp.` }
-      : { msg: `Cuenta creada. Dale a la persona su correo y la contraseña temporal; pídele que la cambie en Ajustes → Seguridad.` })
+    setListo(conUsuario ? { usuario: normalizarUsuario(usuario), pass: password } : modo === 'enlace' ? { enlace: r.enlace }
+      : { msg: `Se envió la invitación a ${email.trim()}. Si no le llega en unos minutos (revisar spam), usa "Nuevo enlace" en la lista y envíalo por WhatsApp.` })
   }
 
   return (
@@ -96,7 +143,8 @@ function NuevoUsuario({ onClose, onCreado }: { onClose: () => void; onCreado: ()
           <button className="iconbtn" onClick={onClose} aria-label="Cerrar"><X size={18} /></button>
         </div>
         <div className="qpanel-body">
-          {listo ? (listo.enlace ? <EnlaceListo enlace={listo.enlace} nombre={nombre} onClose={onClose} /> : (
+          {listo ? (listo.usuario ? <CredencialesListas nombre={nombre} usuario={listo.usuario} pass={listo.pass!} onClose={onClose} />
+            : listo.enlace ? <EnlaceListo enlace={listo.enlace} nombre={nombre} onClose={onClose} /> : (
             <>
               <div style={{ padding: '10px 13px', background: 'var(--primary-soft)', color: 'var(--primary-dark)', borderRadius: 'var(--radius-sm)', fontSize: 13, lineHeight: 1.5 }}>{listo.msg}</div>
               <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={onClose}>Listo</button>
@@ -104,9 +152,33 @@ function NuevoUsuario({ onClose, onCreado }: { onClose: () => void; onCreado: ()
           )) : (
             <>
               <div className="field"><label className="field-l">Nombre *</label>
-                <input className="field-i" value={nombre} onChange={e => { setNombre(e.target.value); setError('') }} placeholder="Nombre y apellido" /></div>
-              <div className="field"><label className="field-l">Correo *</label>
-                <input className="field-i" type="email" value={email} onChange={e => { setEmail(e.target.value); setError('') }} placeholder="correo@ejemplo.com" autoCapitalize="off" /></div>
+                <input className="field-i" value={nombre} placeholder="Nombre y apellido" onChange={e => {
+                  setNombre(e.target.value); setError('')
+                  if (!usuarioEditado) setUsuario(sugerirUsuario(e.target.value))
+                }} /></div>
+              <div className="field">
+                <label className="field-l">¿Cómo va a entrar?</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {([['usuario', 'Con nombre de usuario (sin correo)', 'Tú eliges su usuario y una contraseña temporal.'],
+                    ['enlace', 'Con su correo + enlace por WhatsApp', 'La app genera un enlace para que cree su contraseña.'],
+                    ['correo', 'Con su correo + invitación por correo', 'Supabase le envía un correo. Puede tardar o caer en spam.']] as const).map(([v, t, s]) => (
+                    <label key={v} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer', fontSize: 13.5 }}>
+                      <input type="radio" name="modo" checked={modo === v} onChange={() => { setModo(v); setError('') }} style={{ marginTop: 3 }} />
+                      <span><b>{t}</b><br /><span style={{ color: 'var(--ink3)', fontSize: 12 }}>{s}</span></span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              {modo === 'usuario' ? <>
+                <div className="field"><label className="field-l">Nombre de usuario *</label>
+                  <input className="field-i mono" value={usuario} placeholder="ej. ana.lopez" autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                    onChange={e => { setUsuario(e.target.value.toLowerCase().replace(/\s/g, '')); setUsuarioEditado(true); setError('') }} />
+                  <div style={{ fontSize: 12, color: 'var(--ink3)' }}>{USUARIO_REGLA}</div></div>
+                <CampoContrasena value={password} onChange={v => { setPassword(v); setError('') }} />
+              </> : (
+                <div className="field"><label className="field-l">Correo *</label>
+                  <input className="field-i" type="email" value={email} onChange={e => { setEmail(e.target.value); setError('') }} placeholder="correo@ejemplo.com" autoCapitalize="off" /></div>
+              )}
               <div className="field">
                 <label className="field-l">Tipo de usuario</label>
                 <div className="filterbar" style={{ margin: 0 }}>
@@ -114,24 +186,7 @@ function NuevoUsuario({ onClose, onCreado }: { onClose: () => void; onCreado: ()
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--ink3)', lineHeight: 1.45 }}>{ROL_INFO[rol]}</div>
               </div>
-              <div className="field">
-                <label className="field-l">¿Cómo le das acceso?</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {([['enlace', 'Enlace por WhatsApp (recomendado)', 'La app genera un enlace para que cree su contraseña.'],
-                    ['correo', 'Invitación por correo', 'Supabase le envía un correo. Puede tardar o caer en spam.'],
-                    ['crear', 'Crear con contraseña temporal', 'Para cuando la persona está contigo.']] as const).map(([v, t, s]) => (
-                    <label key={v} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer', fontSize: 13.5 }}>
-                      <input type="radio" name="modo" checked={modo === v} onChange={() => setModo(v)} style={{ marginTop: 3 }} />
-                      <span><b>{t}</b><br /><span style={{ color: 'var(--ink3)', fontSize: 12 }}>{s}</span></span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-              {modo === 'crear' && (
-                <div className="field"><label className="field-l">Contraseña temporal *</label>
-                  <input className="field-i" value={password} onChange={e => { setPassword(e.target.value); setError('') }} placeholder="Mínimo 8 caracteres" /></div>
-              )}
-              {error && <div style={{ padding: '10px 13px', background: 'var(--danger-soft)', color: 'var(--danger-ink)', borderRadius: 'var(--radius-sm)', fontSize: 13 }}>{error}</div>}
+              {error && <div role="alert" style={{ padding: '10px 13px', background: 'var(--danger-soft)', color: 'var(--danger-ink)', borderRadius: 'var(--radius-sm)', fontSize: 13 }}>{error}</div>}
             </>
           )}
         </div>
@@ -140,6 +195,44 @@ function NuevoUsuario({ onClose, onCreado }: { onClose: () => void; onCreado: ()
             <button className="btn primary" onClick={guardar} disabled={guardando}><UserPlus size={15} />{guardando ? 'Creando…' : 'Agregar usuario'}</button>
           </div>
         )}
+      </div>
+    </>
+  )
+}
+
+/** Owner assigns a new temporary password (the person changes it when signing in). */
+function NuevaContrasena({ u, onClose }: { u: Usuario; onClose: () => void }) {
+  const [password, setPassword] = useState(() => generarContrasena())
+  const [error, setError] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [listo, setListo] = useState(false)
+  const ident = identificador(u.email)
+  async function guardar() {
+    const problema = mensajeContrasena(password)
+    if (problema) { setError(problema); return }
+    setGuardando(true); setError('')
+    const r = await llamar('contrasena', { id: u.id, password })
+    setGuardando(false)
+    if (r.error) { setError(r.error); return }
+    setListo(true)
+  }
+  return (
+    <>
+      <div className="qpanel-overlay" onClick={onClose} />
+      <div className="qpanel open" role="dialog" aria-label="Nueva contraseña">
+        <div className="qpanel-head">
+          <div><div className="eyebrow">Usuarios</div><h2 className="h-display" style={{ fontSize: 24, marginTop: 4 }}>Nueva contraseña</h2>
+            <div style={{ fontSize: 13, color: 'var(--ink3)', marginTop: 4 }}>{u.nombre ?? ident} · {ident}</div></div>
+          <button className="iconbtn" onClick={onClose} aria-label="Cerrar"><X size={18} /></button>
+        </div>
+        <div className="qpanel-body">
+          {listo ? <CredencialesListas nombre={u.nombre ?? ''} usuario={ident} pass={password} onClose={onClose} /> : <>
+            <div style={{ fontSize: 13, color: 'var(--ink2)', lineHeight: 1.5 }}>Su contraseña actual dejará de funcionar. Al entrar con esta, la app le pedirá crear una propia.</div>
+            <CampoContrasena value={password} onChange={v => { setPassword(v); setError('') }} />
+            {error && <div role="alert" style={{ padding: '10px 13px', background: 'var(--danger-soft)', color: 'var(--danger-ink)', borderRadius: 'var(--radius-sm)', fontSize: 13 }}>{error}</div>}
+          </>}
+        </div>
+        {!listo && <div className="qpanel-foot"><button className="btn primary" onClick={guardar} disabled={guardando}><KeyRound size={15} />{guardando ? 'Guardando…' : 'Asignar contraseña'}</button></div>}
       </div>
     </>
   )
@@ -154,6 +247,7 @@ export default function UsuariosScreen() {
   const [loading, setLoading] = useState(true)
   const [cambiando, setCambiando] = useState<string | null>(null)
   const [nuevo, setNuevo] = useState(false)
+  const [cambiarPass, setCambiarPass] = useState<Usuario | null>(null)
   const [enlace, setEnlace] = useState<{ id: string; enlace: string; nombre: string } | null>(null)
 
   async function cargar() {
@@ -178,7 +272,7 @@ export default function UsuariosScreen() {
 
   async function cambiarRol(u: Usuario, rol: string) {
     if (rol === u.rol) return
-    const quien = u.nombre ?? u.email
+    const quien = u.nombre ?? identificador(u.email)
     if (!confirm(rol === 'Dueño' ? `¿Hacer dueño a ${quien}? Podrá administrar usuarios, ajustes, la caja y borrar registros.`
       : rol === 'Sin acceso' ? `¿Quitar el acceso a ${quien}? Ya no podrá ver ni modificar datos.`
       : `¿Dejar a ${quien} como administrador?`)) return
@@ -191,7 +285,7 @@ export default function UsuariosScreen() {
   }
 
   async function accion(u: Usuario, a: 'enlace' | 'desactivar' | 'reactivar') {
-    const quien = u.nombre ?? u.email
+    const quien = u.nombre ?? identificador(u.email)
     if (a === 'desactivar' && !confirm(`¿Desactivar la cuenta de ${quien}? No podrá entrar a la app. Su historial se conserva y puedes reactivarla después.`)) return
     setCambiando(u.id); setError(''); setAviso('')
     const r = await llamar(a, { id: u.id })
@@ -238,30 +332,31 @@ export default function UsuariosScreen() {
           const inactivo = u.activo === false
           return (
             <div key={u.id} className="tilerow" style={{ flexWrap: 'wrap', opacity: inactivo ? 0.65 : 1 }}>
-              <div className="avatar accent" style={{ width: 40, height: 40, fontSize: 14 }}>{(u.nombre ?? u.email).slice(0, 2).toUpperCase()}</div>
+              <div className="avatar accent" style={{ width: 40, height: 40, fontSize: 14 }}>{(u.nombre ?? identificador(u.email)).slice(0, 2).toUpperCase()}</div>
               <div className="tile-main" style={{ minWidth: 200 }}>
                 <div className="tile-l" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                  {u.nombre ?? u.email.split('@')[0]}{yo && <span className="chip sm">tú</span>}
+                  {u.nombre ?? identificador(u.email).split('@')[0]}{yo && <span className="chip sm">tú</span>}
                   <span className={`chip sm ${u.rol === 'Dueño' ? 'primary' : u.rol === 'Sin acceso' ? 'danger' : ''}`}>{u.rol}</span>
                   {inactivo && <span className="chip sm danger">Desactivado</span>}
-                  {!u.confirmado && !inactivo && <span className="chip sm warn">Invitación pendiente</span>}
+                  {!u.confirmado && !inactivo && !usuarioDeCorreo(u.email) && <span className="chip sm warn">Invitación pendiente</span>}
                   {u.dos_pasos && <span className="chip sm" title="Verificación en dos pasos activa"><ShieldCheck size={11} />2FA</span>}
                 </div>
-                <div className="tile-s">{u.email} · último acceso {hace(u.ultimo_acceso)}</div>
+                <div className="tile-s">{usuarioDeCorreo(u.email) ? `usuario: ${usuarioDeCorreo(u.email)}` : u.email} · último acceso {hace(u.ultimo_acceso)}</div>
                 {a && <div className="tile-s">Últimos 30 días: {a.reservas} reservas · {a.entregas} entregas · {a.devoluciones} devoluciones · {a.cobros} cobros</div>}
               </div>
               {!yo && (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                   {!inactivo && (
                     <select className="field-i" style={{ width: 'auto', padding: '6px 10px', fontSize: 13 }} value={u.rol} disabled={cambiando === u.id}
-                      onChange={e => cambiarRol(u, e.target.value)} aria-label={`Tipo de usuario de ${u.email}`}>
+                      onChange={e => cambiarRol(u, e.target.value)} aria-label={`Tipo de usuario de ${identificador(u.email)}`}>
                       <option value="Administrador">Administrador</option>
                       <option value="Dueño">Dueño</option>
                       <option value="Sin acceso">Sin acceso</option>
                     </select>
                   )}
-                  {!inactivo && <button className="btn sm" onClick={() => accion(u, 'enlace')} disabled={cambiando === u.id}
-                    title={u.confirmado ? 'Enlace para que cree una contraseña nueva' : 'Reenviar invitación'}><Link2 size={13} />{u.confirmado ? 'Restablecer contraseña' : 'Nuevo enlace'}</button>}
+                  {!inactivo && (u.confirmado || usuarioDeCorreo(u.email)
+                    ? <button className="btn sm" onClick={() => setCambiarPass(u)} disabled={cambiando === u.id}><KeyRound size={13} />Nueva contraseña</button>
+                    : <button className="btn sm" onClick={() => accion(u, 'enlace')} disabled={cambiando === u.id} title="Reenviar invitación"><Link2 size={13} />Nuevo enlace</button>)}
                   {inactivo
                     ? <button className="btn sm primary" onClick={() => accion(u, 'reactivar')} disabled={cambiando === u.id}>Reactivar</button>
                     : <button className="btn sm" style={{ color: 'var(--danger-ink)' }} onClick={() => accion(u, 'desactivar')} disabled={cambiando === u.id}>Desactivar</button>}
@@ -274,6 +369,7 @@ export default function UsuariosScreen() {
       </div>
 
       {nuevo && <NuevoUsuario onClose={() => setNuevo(false)} onCreado={cargar} />}
+      {cambiarPass && <NuevaContrasena u={cambiarPass} onClose={() => { setCambiarPass(null); cargar() }} />}
     </div>
   )
 }

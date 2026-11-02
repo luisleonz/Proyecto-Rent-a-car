@@ -197,7 +197,7 @@ body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; color
   .mtop .sub { font-size: 11.5px; color: var(--ink3); margin-top: 1px; }
   .mtop .grow { flex: 1; }
   .content { padding: 16px 16px 96px; }
-  .botnav { display: flex; justify-content: space-around; align-items: stretch; flex-shrink: 0; padding: 8px 4px 12px; background: var(--paper); border-top: 1px solid var(--hairline); z-index: 30; position: sticky; bottom: 0; }
+  .botnav { display: flex; justify-content: space-around; align-items: stretch; flex-shrink: 0; padding: 8px 4px calc(12px + env(safe-area-inset-bottom)); background: var(--paper); border-top: 1px solid var(--hairline); z-index: 30; position: sticky; bottom: 0; }
   .botnav .bn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; border: 0; background: transparent; cursor: pointer; padding: 4px; color: var(--ink3); font-family: inherit; font-size: 10.5px; font-weight: 500; }
   .botnav .bn[data-active="true"] { color: var(--primary); font-weight: 600; }
   .main { margin-left: 0 !important; padding-top: 0 !important; }

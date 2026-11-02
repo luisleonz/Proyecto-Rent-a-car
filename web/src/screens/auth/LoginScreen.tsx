@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
-import { Mail, Car } from 'lucide-react'
+import { User, Car } from 'lucide-react'
 import { useAuth } from '../../state/auth'
 import { rutaTrasSesion, errorDeEnlace } from '../../lib/supabase'
+import { usuarioValido, correoDeUsuario, USUARIO_REGLA } from '../../lib/usuarios'
 
 export default function LoginScreen() {
   const navigate  = useNavigate()
@@ -18,7 +19,14 @@ export default function LoginScreen() {
 
   function onContinue() {
     const trimmed = email.trim().toLowerCase()
-    if (!trimmed) { setError('Ingresa tu correo electrónico'); return }
+    if (!trimmed) { setError('Ingresa tu usuario o tu correo'); return }
+    // Without "@" it is a username; it maps to the internal address the account was created with
+    if (!trimmed.includes('@')) {
+      if (!usuarioValido(trimmed)) { setError(`Usuario no válido. ${USUARIO_REGLA}`); return }
+      setError(null)
+      navigate(`/enter-password?email=${encodeURIComponent(correoDeUsuario(trimmed))}`)
+      return
+    }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) { setError('Correo electrónico no válido'); return }
     setError(null)
     navigate(`/enter-password?email=${encodeURIComponent(trimmed)}`)
@@ -65,21 +73,25 @@ export default function LoginScreen() {
           Iniciar sesión
         </h1>
         <p style={{ fontSize: 14, color: 'var(--ink3)', margin: '0 0 28px', lineHeight: 1.5 }}>
-          Ingresa el correo con el que tu administrador te registró.
+          Ingresa tu nombre de usuario o el correo con el que te registraron.
         </p>
 
         {/* Email field */}
         <div style={{ position: 'relative', marginBottom: error ? 6 : 20 }}>
           <div style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-            <Mail size={17} color={error ? 'var(--danger)' : 'var(--ink3)'} />
+            <User size={17} color={error ? 'var(--danger)' : 'var(--ink3)'} />
           </div>
           <input
-            type="email"
+            type="text"
+            inputMode="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             value={email}
             onChange={e => { setEmail(e.target.value); setError(null) }}
             onKeyDown={e => e.key === 'Enter' && onContinue()}
-            placeholder="Correo electrónico"
-            autoComplete="email"
+            placeholder="Usuario o correo"
+            autoComplete="username"
             autoFocus
             style={{
               width: '100%', boxSizing: 'border-box',

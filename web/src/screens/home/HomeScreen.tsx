@@ -7,6 +7,7 @@ import { hoyISO, addDias, diffDias, parseISO } from '../../lib/fechas'
 import { porCobrar } from '../../lib/reservas'
 import { sincronizarFlota } from '../../lib/operacion'
 import type { Vehiculo, ReservaConDetalle } from '../../lib/database.types'
+import InstalarApp from '../../components/InstalarApp'
 
 const db = supabase as any // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -127,6 +128,8 @@ export default function HomeScreen() {
           <button className="btn sm primary" onClick={() => navigate('/app/reservations?new=1')}>Nueva reserva</button>
         </div>
       </div>
+
+      <InstalarApp aviso />
 
       <div className="dash-top">
         <div className="card dash-hero">

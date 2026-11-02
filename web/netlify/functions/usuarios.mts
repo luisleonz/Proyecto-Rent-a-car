@@ -2,6 +2,7 @@
 // Runs on Netlify with the service role key, which only exists as a Netlify environment variable
 // (SUPABASE_SERVICE_ROLE_KEY) and never reaches the browser or the repository.
 import { createClient } from '@supabase/supabase-js'
+import { correoDeUsuario, usuarioValido, normalizarUsuario, mensajeContrasena, identificador, USUARIO_REGLA } from '../../src/lib/usuarios'
 
 const URL_SB = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? ''
 const SERVICIO = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
@@ -84,16 +85,36 @@ async function atender(req: Request): Promise<Response> {
       return json(200, { ok: true, enlace })
     }
 
-    // For when the person is right there: account ready to use with a temporary password
+    // Account ready to use with a temporary password, with a username (no email) or with an email.
+    // The person must replace the temporary password the first time they sign in.
     case 'crear': {
-      if (!/^\S+@\S+\.\S+$/.test(email)) return json(400, { error: 'Escribe un correo válido.' })
-      if ((p.password ?? '').length < 8) return json(400, { error: 'La contraseña temporal debe tener al menos 8 caracteres.' })
+      const usuario = p.usuario ? normalizarUsuario(p.usuario) : ''
+      if (usuario && !usuarioValido(usuario)) return json(400, { error: `Nombre de usuario no válido. ${USUARIO_REGLA}` })
+      if (!usuario && !/^\S+@\S+\.\S+$/.test(email)) return json(400, { error: 'Escribe un correo válido.' })
+      const problema = mensajeContrasena(p.password ?? '')
+      if (problema) return json(400, { error: problema })
+      const correo = usuario ? correoDeUsuario(usuario) : email
       const { data, error } = await admin.auth.admin.createUser({
-        email, password: p.password, email_confirm: true,
-        user_metadata: { first_name: nombre || undefined, nombre: nombre || undefined }, app_metadata: { role: rol },
+        email: correo, password: p.password, email_confirm: true,
+        user_metadata: { first_name: nombre || undefined, nombre: nombre || undefined, usuario: usuario || undefined, debe_cambiar: true },
+        app_metadata: { role: rol },
       })
-      if (error) return json(400, { error: errorAlta(error.message) })
-      await registrar('crear_usuario', `Creó la cuenta de ${email} como ${rol}`, data.user?.id)
+      if (error) return json(400, { error: usuario && /exists|registered/i.test(error.message) ? 'Ese nombre de usuario ya existe. Elige otro.' : errorAlta(error.message) })
+      await registrar('crear_usuario', `Creó la cuenta de ${usuario || email} como ${rol}`, data.user?.id)
+      return json(200, { ok: true })
+    }
+
+    // The owner sets a new temporary password (for people without email, or who forgot theirs)
+    case 'contrasena': {
+      const u = await buscar(p.id)
+      if (!u) return json(404, { error: 'Usuario no encontrado.' })
+      const problema = mensajeContrasena(p.password ?? '')
+      if (problema) return json(400, { error: problema })
+      const { error } = await admin.auth.admin.updateUserById(u.id, {
+        password: p.password, user_metadata: { ...u.user_metadata, debe_cambiar: true },
+      })
+      if (error) return json(400, { error: error.message })
+      await registrar('contrasena_usuario', `Asignó una contraseña temporal a ${identificador(u.email)}`, u.id)
       return json(200, { ok: true })
     }
 
@@ -118,7 +139,7 @@ async function atender(req: Request): Promise<Response> {
         ban_duration: PARA_SIEMPRE, app_metadata: { role: null, rol_anterior: anterior },
       })
       if (error) return json(400, { error: error.message })
-      await registrar('desactivar_usuario', `Desactivó la cuenta de ${u.email}`, u.id)
+      await registrar('desactivar_usuario', `Desactivó la cuenta de ${identificador(u.email)}`, u.id)
       return json(200, { ok: true })
     }
 
@@ -128,7 +149,7 @@ async function atender(req: Request): Promise<Response> {
       const nuevo = ROLES.includes(u.app_metadata?.rol_anterior) ? u.app_metadata.rol_anterior : 'Administrador'
       const { error } = await admin.auth.admin.updateUserById(u.id, { ban_duration: 'none', app_metadata: { role: nuevo, rol_anterior: null } })
       if (error) return json(400, { error: error.message })
-      await registrar('reactivar_usuario', `Reactivó la cuenta de ${u.email} como ${nuevo}`, u.id)
+      await registrar('reactivar_usuario', `Reactivó la cuenta de ${identificador(u.email)} como ${nuevo}`, u.id)
       return json(200, { ok: true })
     }
 

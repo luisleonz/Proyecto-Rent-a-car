@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Check } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
+import { identificador } from '../../lib/usuarios'
 
 export default function EditProfileScreen() {
   const navigate  = useNavigate()
@@ -71,7 +72,7 @@ export default function EditProfileScreen() {
           </div>
           <div>
             <div style={{ fontWeight: 600, fontSize: 15 }}>{firstName || '—'} {lastName}</div>
-            <div style={{ fontSize: 13, color: 'var(--ink3)' }}>{currentEmail}</div>
+            <div style={{ fontSize: 13, color: 'var(--ink3)' }}>{identificador(currentEmail)}</div>
             <div style={{ fontSize: 12, marginTop: 3 }}>
               <span style={{
                 padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600,
@@ -128,7 +129,7 @@ export default function EditProfileScreen() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
               <span style={{ color: 'var(--ink2)' }}>Correo</span>
-              <span style={{ color: 'var(--ink)' }}>{currentEmail}</span>
+              <span style={{ color: 'var(--ink)' }}>{identificador(currentEmail)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
               <span style={{ color: 'var(--ink2)' }}>Rol</span>

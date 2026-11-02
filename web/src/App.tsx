@@ -16,6 +16,7 @@ import Verificar2FA from './screens/auth/Verificar2FA'
 import { cargarConfig } from './lib/empresa'
 import HomeScreen from './screens/home/HomeScreen'
 import ReservationsScreen from './screens/reservations/ReservationsScreen'
+import { identificador } from './lib/usuarios'
 
 // Loaded on first visit so the app opens faster on phones
 const VehiclesScreen        = lazy(() => import('./screens/vehicles/VehiclesScreen'))
@@ -49,6 +50,8 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   )
   if (loading) return espera
   if (!session) return <Navigate to="/" replace />
+  // Signed in with a temporary password: choose a personal one first
+  if (session.user.user_metadata?.debe_cambiar) return <Navigate to="/crear-contrasena?modo=temporal" replace />
   if (falta2fa) return <Verificar2FA />
   if (!tieneAcceso) return <SinAcceso />
   if (!config) return espera
@@ -63,7 +66,7 @@ function SinAcceso() {
       <div className="card" style={{ maxWidth: 420, padding: 32, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <h1 className="h-display" style={{ fontSize: 26 }}>Tu cuenta aún no tiene acceso</h1>
         <p style={{ color: 'var(--ink2)', margin: 0, lineHeight: 1.5 }}>
-          Iniciaste sesión como <strong>{currentEmail}</strong>. Pide al dueño del negocio que active tu cuenta en la pantalla de Usuarios y luego toca “Ya me dieron acceso”.
+          Iniciaste sesión como <strong>{identificador(currentEmail)}</strong>. Pide al dueño del negocio que active tu cuenta en la pantalla de Usuarios y luego toca “Ya me dieron acceso”.
         </p>
         <button className="btn primary" disabled={revisando}
           onClick={async () => { setRevisando(true); await supabase.auth.refreshSession(); setRevisando(false) }}>
@@ -134,7 +137,7 @@ function AppLayout() {
             </Routes>
           </Suspense>
         </div>
-        <BottomNav />
+        <BottomNav onMenu={() => setSideOpen(true)} />
       </div>
     </div>
   )

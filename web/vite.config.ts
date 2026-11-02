@@ -9,13 +9,22 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: ['icons/*.png'],
       manifest: {
+        id: '/',
         name: 'Lucianos Rent-a-Car',
+        lang: 'es-MX',
         short_name: 'Lucianos',
         description: 'Panel de gestión · Lucianos Rent-a-Car',
         theme_color: '#1a8a52',
         background_color: '#f8f8f4',
         display: 'standalone',
-        orientation: 'portrait-primary',
+        orientation: 'any',
+        categories: ['business', 'productivity'],
+        // Long-press the app icon for these
+        shortcuts: [
+          { name: 'Nueva reserva', url: '/#/app/reservations?new=1', icons: [{ src: 'icons/icon-96x96.png', sizes: '96x96' }] },
+          { name: 'Reservas', url: '/#/app/reservations', icons: [{ src: 'icons/icon-96x96.png', sizes: '96x96' }] },
+          { name: 'Flota', url: '/#/app/vehicles', icons: [{ src: 'icons/icon-96x96.png', sizes: '96x96' }] },
+        ],
         scope: '/',
         start_url: '/#/app/home',
         icons: [

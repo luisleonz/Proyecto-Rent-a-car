@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
+import { identificador } from '../../lib/usuarios'
 
 /** Second step after the password, for users who turned on two-step verification. */
 export default function Verificar2FA() {
@@ -32,7 +33,7 @@ export default function Verificar2FA() {
         </div>
         <h1 className="h-display" style={{ fontSize: 26 }}>Verificación en dos pasos</h1>
         <p style={{ color: 'var(--ink2)', margin: 0, lineHeight: 1.5 }}>
-          Abre tu aplicación de autenticación (Google Authenticator, Microsoft Authenticator…) y escribe el código de <strong>{currentEmail}</strong>.
+          Abre tu aplicación de autenticación (Google Authenticator, Microsoft Authenticator…) y escribe el código de <strong>{identificador(currentEmail)}</strong>.
         </p>
         <input className="field-i" value={codigo} inputMode="numeric" autoComplete="one-time-code" autoFocus maxLength={6}
           onChange={e => { setCodigo(e.target.value.replace(/\D/g, '')); setError('') }} onKeyDown={e => e.key === 'Enter' && verificar()}

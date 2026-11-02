@@ -69,7 +69,7 @@ async function escenario(grupo, nombre, fn, opciones = {}) {
 
 async function entrar(p, email = 'luis@lucianos.mx', pass = 'Admin2026') {
   await p.goto(APP + '/', { waitUntil: 'networkidle' })
-  await p.fill('input[type=email]', email); await p.keyboard.press('Enter')
+  await p.fill('input[autocomplete=username]', email); await p.keyboard.press('Enter')
   await p.fill('input[type=password]', pass); await p.keyboard.press('Enter')
   await p.waitForTimeout(1200)
 }
@@ -89,7 +89,7 @@ async function otraSesion(ctx, b) {
   /* ═══ A. Acceso ═══ */
   await escenario('Acceso', 'Contraseña incorrecta muestra el motivo', async ({ p, ok }) => {
     await entrar(p, 'luis@lucianos.mx', 'mala')
-    ok((await texto(p)).includes('Correo o contraseña incorrectos'), 'Debe decir "Correo o contraseña incorrectos"')
+    ok((await texto(p)).includes('Usuario/correo o contraseña incorrectos'), 'Debe decir "Usuario/correo o contraseña incorrectos"')
   })
   await escenario('Acceso', 'Dueño entra y ve el menú completo', async ({ p, ok }) => {
     await entrar(p)
@@ -125,8 +125,11 @@ async function otraSesion(ctx, b) {
     await p.waitForTimeout(800)
     ok((await texto(p)).includes('Crea tu contraseña'), 'Abre "Crea tu contraseña"')
     await p.fill('input[placeholder="Contraseña nueva"]', 'NuevaClave123'); await p.fill('input[placeholder="Repite la contraseña"]', 'NuevaClave123')
+    await p.click('text=Guardar y entrar'); await p.waitForTimeout(600)
+    ok((await texto(p)).includes('La contraseña necesita: un símbolo'), 'Exige un símbolo')
+    await p.fill('input[placeholder="Contraseña nueva"]', 'NuevaClave#123'); await p.fill('input[placeholder="Repite la contraseña"]', 'NuevaClave#123')
     await p.click('text=Guardar y entrar'); await p.waitForTimeout(900)
-    ok(b.ana.password === 'NuevaClave123', 'La contraseña quedó guardada')
+    ok(b.ana.password === 'NuevaClave#123', 'La contraseña quedó guardada')
     ok(p.url().includes('/app/home'), 'Entra a la app')
   })
 
@@ -448,12 +451,19 @@ async function otraSesion(ctx, b) {
       const q = JSON.parse(r.request().postData())
       const resp = (s, x) => r.fulfill({ status: s, contentType: 'application/json', body: JSON.stringify(x) })
       if (b.rol(yo) !== 'Dueño') return resp(403, { error: 'Solo el dueño puede administrar usuarios.' })
+      if (q.accion === 'crear') {
+        const correo = 'lucianostoursnogales+' + q.usuario + '@gmail.com'
+        if (b.usuarios.some(u => u.email === correo)) return resp(400, { error: 'Ese nombre de usuario ya existe. Elige otro.' })
+        const u = b.agregarUsuario(correo, q.password, q.rol, q.nombre); u.user_metadata.usuario = q.usuario; u.user_metadata.debe_cambiar = true
+        return resp(200, { ok: true })
+      }
       if (q.accion === 'invitar_enlace') {
         if (b.usuarios.some(u => u.email === q.email)) return resp(400, { error: 'Ya existe un usuario con ese correo.' })
         const u = b.agregarUsuario(q.email, null, q.rol, q.nombre); u.email_confirmed_at = null
         return resp(200, { ok: true, enlace: 'https://x.supabase.co/auth/v1/verify?token=abc&type=invite' })
       }
       const u = b.usuarios.find(x => x.id === q.id)
+      if (q.accion === 'contrasena') { u.password = q.password; u.user_metadata.debe_cambiar = true; return resp(200, { ok: true }) }
       if (q.accion === 'desactivar') { u.desactivado = true; delete u.app_metadata.role; return resp(200, { ok: true }) }
       if (q.accion === 'reactivar') { u.desactivado = false; u.app_metadata.role = 'Administrador'; return resp(200, { ok: true }) }
       return resp(400, { error: 'Acción no válida' })
@@ -461,8 +471,38 @@ async function otraSesion(ctx, b) {
     await entrar(p); await ir(p, '/app/usuarios')
     await p.click('button:has-text("Agregar usuario")')
     await p.click('.qpanel-foot button:has-text("Agregar usuario")')
-    ok((await texto(p)).includes('Falta el nombre, un correo válido'), 'Dice qué falta antes de crear')
-    await p.fill('input[placeholder="Nombre y apellido"]', 'Carla Mostrador'); await p.fill('input[placeholder="correo@ejemplo.com"]', 'carla@lucianos.mx')
+    ok((await texto(p)).includes('Falta el nombre'), 'Dice qué falta antes de crear')
+    // Without email: username + temporary password
+    await p.fill('input[placeholder="Nombre y apellido"]', 'Lupita Gómez')
+    ok(await p.inputValue('input[placeholder="ej. ana.lopez"]') === 'lupita.gomez', 'Sugiere el usuario lupita.gomez')
+    await p.fill('.field:has(.field-l:text-is("Contraseña temporal *")) input', 'debil')
+    await p.click('.qpanel-foot button:has-text("Agregar usuario")')
+    ok((await texto(p)).includes('una letra mayúscula, un número, un símbolo'), 'Valida la contraseña temporal')
+    await p.fill('.field:has(.field-l:text-is("Contraseña temporal *")) input', 'Temporal#26')
+    await p.click('.qpanel-foot button:has-text("Agregar usuario")'); await p.waitForTimeout(900)
+    const lupita = b.usuarios.find(u => u.email === 'lucianostoursnogales+lupita.gomez@gmail.com')
+    ok(lupita && lupita.password === 'Temporal#26' && lupita.app_metadata.role === 'Administrador', 'Cuenta sin correo creada')
+    ok((await texto(p)).includes('Usuario: lupita.gomez') && await p.locator('a[href^="https://wa.me/?text="]').count(), 'Muestra usuario y contraseña para mandar por WhatsApp')
+    await p.click('button:has-text("Listo")'); await p.waitForTimeout(600)
+    ok((await texto(p)).includes('usuario: lupita.gomez'), 'Aparece en la lista con su usuario')
+    // Signs in with the username and must choose a personal password
+    const p3 = await otraSesion(ctx, b); await entrar(p3, 'lupita.gomez', 'Temporal#26')
+    ok((await texto(p3)).includes('Crea tu contraseña personal'), 'Al entrar pide crear su contraseña')
+    await p3.fill('input[placeholder="Contraseña nueva"]', 'Lupita$2026'); await p3.fill('input[placeholder="Repite la contraseña"]', 'Lupita$2026')
+    await p3.click('text=Guardar y entrar'); await p3.waitForTimeout(1200)
+    ok(lupita.password === 'Lupita$2026' && lupita.user_metadata.debe_cambiar === false, 'Contraseña personal guardada')
+    ok((await texto(p3)).includes('Hola, Lupita'), 'Entra a la app con su usuario')
+    // The owner assigns a new temporary password
+    await p.locator('.tilerow:has-text("lupita.gomez") button:has-text("Nueva contraseña")').click()
+    await p.fill('.qpanel.open .field:has(.field-l:text-is("Contraseña temporal *")) input', 'Reinicio#99')
+    await p.click('.qpanel.open button:has-text("Asignar contraseña")'); await p.waitForTimeout(800)
+    ok(lupita.password === 'Reinicio#99' && lupita.user_metadata.debe_cambiar, 'Contraseña reasignada; tendrá que cambiarla')
+    await p.click('.qpanel.open button:has-text("Listo")'); await p.waitForTimeout(400)
+    // With email + WhatsApp link
+    await p.click('button:has-text("Agregar usuario")')
+    await p.fill('input[placeholder="Nombre y apellido"]', 'Carla Mostrador')
+    await p.click('text=Con su correo + enlace por WhatsApp')
+    await p.fill('input[placeholder="correo@ejemplo.com"]', 'carla@lucianos.mx')
     await p.click('.qpanel-foot button:has-text("Agregar usuario")'); await p.waitForTimeout(900)
     const carla = b.usuarios.find(u => u.email === 'carla@lucianos.mx')
     ok(carla && carla.app_metadata.role === 'Administrador', 'Cuenta creada como Administrador')
@@ -477,7 +517,7 @@ async function otraSesion(ctx, b) {
   await escenario('Usuarios', 'Sin la función publicada: mensaje claro', async ({ p, ok }) => {
     await entrar(p); await ir(p, '/app/usuarios')
     await p.click('button:has-text("Agregar usuario")')
-    await p.fill('input[placeholder="Nombre y apellido"]', 'X Y'); await p.fill('input[placeholder="correo@ejemplo.com"]', 'x@y.mx')
+    await p.fill('input[placeholder="Nombre y apellido"]', 'X Y')
     await p.click('.qpanel-foot button:has-text("Agregar usuario")'); await p.waitForTimeout(900)
     ok((await texto(p)).includes('aún no está publicada en Netlify'), 'Explica que falta publicar la función')
   })
@@ -506,6 +546,7 @@ async function otraSesion(ctx, b) {
     ok((await texto(p)).includes('Solo el dueño puede cambiar'), 'Avisa que solo el dueño puede cambiarlos')
     ok(await p.locator('.field:has(.field-l:text-is("WhatsApp")) input').isDisabled(), 'Campos bloqueados')
     await p.click('text=Sincronización y respaldo')
+    await p.waitForSelector('text=Conectado a la base de datos', { timeout: 5000 }).catch(() => null)
     ok((await texto(p)).includes('Conectado a la base de datos'), 'Muestra conexión')
   })
   await escenario('Ajustes', 'Cambiar contraseña y activar verificación en dos pasos', async ({ p, b, ok, ctx }) => {
@@ -513,16 +554,19 @@ async function otraSesion(ctx, b) {
     await p.click('text=Seguridad y 2FA')
     await p.fill('.field:has(.field-l:text-is("Nueva contraseña")) input', 'Corta'); await p.click('button:has-text("Cambiar contraseña")')
     ok((await texto(p)).includes('al menos 8 caracteres'), 'Valida longitud')
-    await p.fill('.field:has(.field-l:text-is("Nueva contraseña")) input', 'NuevaClave2026'); await p.fill('.field:has(.field-l:text-is("Repítela")) input', 'NuevaClave2026')
+    await p.fill('.field:has(.field-l:text-is("Nueva contraseña")) input', 'nuevaclave2026'); await p.fill('.field:has(.field-l:text-is("Repítela")) input', 'nuevaclave2026')
+    await p.click('button:has-text("Cambiar contraseña")')
+    ok((await texto(p)).includes('una letra mayúscula, un símbolo'), 'Exige mayúscula y símbolo')
+    await p.fill('.field:has(.field-l:text-is("Nueva contraseña")) input', 'NuevaClave#2026'); await p.fill('.field:has(.field-l:text-is("Repítela")) input', 'NuevaClave#2026')
     await p.click('button:has-text("Cambiar contraseña")'); await p.waitForTimeout(700)
-    ok(b.luis.password === 'NuevaClave2026', 'Contraseña cambiada')
+    ok(b.luis.password === 'NuevaClave#2026', 'Contraseña cambiada')
     await p.click('button:has-text("Activar verificación en dos pasos")'); await p.waitForTimeout(700)
     ok(await p.locator('img[alt^="Código QR"]').count(), 'Muestra el código QR')
     await p.fill('input[placeholder="000000"]', '111111'); await p.click('button:text-is("Activar")'); await p.waitForTimeout(700)
     ok((await texto(p)).includes('Código incorrecto'), 'Rechaza un código incorrecto')
     await p.fill('input[placeholder="000000"]', '123456'); await p.click('button:text-is("Activar")'); await p.waitForTimeout(900)
     ok(b.luis.factores?.some(f => f.status === 'verified'), '2FA activada')
-    const p2 = await otraSesion(ctx, b); await entrar(p2, 'luis@lucianos.mx', 'NuevaClave2026')
+    const p2 = await otraSesion(ctx, b); await entrar(p2, 'luis@lucianos.mx', 'NuevaClave#2026')
     ok((await texto(p2)).includes('Verificación en dos pasos'), 'Al volver a entrar pide el código')
     await p2.fill('input[placeholder="000000"]', '123456'); await p2.click('button:text-is("Verificar")'); await p2.waitForTimeout(1200)
     ok((await texto(p2)).includes('Hola, Luis'), 'Con el código entra a la app')
@@ -656,10 +700,25 @@ async function otraSesion(ctx, b) {
   })
   await escenario('Celular', 'Pantallas principales sin desbordarse a lo ancho', async ({ p, ok }) => {
     await entrar(p)
-    for (const r of ['/app/home', '/app/reservations', '/app/vehicles', '/app/calendario', '/app/caja']) {
+    for (const r of ['/app/home', '/app/reservations', '/app/cotizaciones', '/app/vehicles', '/app/calendario', '/app/clientes', '/app/caja', '/app/reportes', '/app/actividad', '/app/usuarios', '/app/more']) {
       await ir(p, r)
       ok(!(await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), `${r} cabe en el celular`)
     }
+    await ir(p, '/app/home')
+    await p.click('.botnav button:has-text("Más")'); await p.waitForTimeout(400)
+    await p.click('.side .navitem:has-text("Usuarios")'); await p.waitForTimeout(700)
+    ok(p.url().includes('/app/usuarios'), 'El botón "Más" abre el menú completo (Usuarios)')
+  }, { movil: true })
+  await escenario('Celular', 'Instalable como app (PWA)', async ({ p, ok }) => {
+    await p.goto(APP + '/', { waitUntil: 'networkidle' })
+    const m = await p.evaluate(async () => { const l = document.querySelector('link[rel=manifest]'); return l ? (await fetch(l.href)).json() : null })
+    ok(m && m.display === 'standalone' && m.icons.some(i => i.sizes === '512x512') && m.start_url, 'Manifiesto válido para instalar')
+    ok(await p.evaluate(async () => !!(await navigator.serviceWorker?.getRegistration())), 'Service worker registrado (funciona como app)')
+    ok(await p.locator('link[rel=apple-touch-icon]').count(), 'Ícono para iPhone')
+    await p.fill('input[autocomplete=username]', 'luis@lucianos.mx'); await p.keyboard.press('Enter')
+    await p.fill('input[type=password]', 'Admin2026'); await p.keyboard.press('Enter'); await p.waitForTimeout(1200)
+    await ir(p, '/app/more'); await p.click('text=Instalar la app en este dispositivo')
+    ok((await texto(p)).includes('Android (Chrome)') || (await texto(p)).includes('Instalar la app'), 'Ajustes explica cómo instalarla')
   }, { movil: true })
   await escenario('Compatibilidad', 'Antes de la actualización: rol de administrador guardado por SQL se reconoce', async ({ p, ok }) => {
     await entrar(p)

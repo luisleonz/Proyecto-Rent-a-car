@@ -1,15 +1,15 @@
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Home, Calendar, FileText, Car, Settings } from 'lucide-react'
+import { Home, Calendar, FileText, Car, Menu } from 'lucide-react'
 
 const BOTNAV = [
   { label: 'Inicio',       icon: Home,     path: '/app/home' },
   { label: 'Reservas',     icon: Calendar, path: '/app/reservations' },
   { label: 'Cotizaciones', icon: FileText, path: '/app/cotizaciones' },
   { label: 'Flota',        icon: Car,      path: '/app/vehicles' },
-  { label: 'Ajustes',      icon: Settings, path: '/app/more' },
 ]
 
-export default function BottomNav() {
+/** Phone navigation: the main screens plus "Más", which opens the full menu. */
+export default function BottomNav({ onMenu }: { onMenu: () => void }) {
   const navigate = useNavigate()
   const location = useLocation()
   return (
@@ -23,6 +23,10 @@ export default function BottomNav() {
           </button>
         )
       })}
+      <button className="bn" data-active={String(!BOTNAV.some(b => location.pathname.startsWith(b.path)))} onClick={onMenu} aria-label="Más opciones">
+        <Menu size={21} strokeWidth={1.8} />
+        <span>Más</span>
+      </button>
     </nav>
   )
 }

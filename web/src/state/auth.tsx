@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { identificador } from '../lib/usuarios'
 
 interface AuthContextType {
   session: Session | null
@@ -73,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const user = session?.user ?? null
   const meta = user?.user_metadata ?? {}
   const email     = user?.email ?? ''
-  const firstName = meta.first_name ?? meta.nombre ?? email.split('@')[0] ?? ''
+  const firstName = meta.first_name ?? meta.nombre ?? identificador(email).split('@')[0] ?? ''
   const initials  = meta.initials ?? firstName.slice(0, 2).toUpperCase()
   // Role lives in app_metadata, which users cannot edit themselves (user_metadata they can)
   const rolApp = user?.app_metadata?.role as string | undefined

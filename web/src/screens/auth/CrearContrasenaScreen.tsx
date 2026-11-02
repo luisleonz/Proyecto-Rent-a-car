@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Lock, Eye, EyeOff, Car, User, Check } from 'lucide-react'
+import { Lock, Eye, EyeOff, Car, User } from 'lucide-react'
 import { supabase, enlaceAtendido } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
+import { mensajeContrasena, identificador } from '../../lib/usuarios'
+import ReglasContrasena from '../../components/ReglasContrasena'
 
 const inputStyle = (activo: boolean): React.CSSProperties => ({
   width: '100%', boxSizing: 'border-box', padding: '13px 44px 13px 44px',
@@ -15,6 +17,8 @@ export default function CrearContrasenaScreen() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const recuperar = params.get('modo') === 'recuperar'
+  // Signed in with a temporary password the owner assigned: must choose a personal one
+  const temporal = params.get('modo') === 'temporal'
   const { session, user, loading } = useAuth()
   const [nombre, setNombre] = useState('')
   const [pass, setPass] = useState('')
@@ -23,16 +27,16 @@ export default function CrearContrasenaScreen() {
   const [error, setError] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
 
-  const largo = pass.length >= 8
   const coincide = pass.length > 0 && pass === confirm
 
   async function guardar() {
-    if (!largo) { setError('La contraseña debe tener al menos 8 caracteres'); return }
+    const problema = mensajeContrasena(pass)
+    if (problema) { setError(problema); return }
     if (!coincide) { setError('Las contraseñas no coinciden'); return }
     setGuardando(true); setError(null)
     const { error: e } = await supabase.auth.updateUser({
       password: pass,
-      ...(nombre.trim() ? { data: { first_name: nombre.trim() } } : {}),
+      data: { debe_cambiar: false, ...(nombre.trim() ? { first_name: nombre.trim() } : {}) },
     })
     setGuardando(false)
     if (e) {
@@ -67,11 +71,14 @@ export default function CrearContrasenaScreen() {
         ) : (
           <>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 400, textAlign: 'center', margin: '0 0 6px' }}>
-              {recuperar ? 'Nueva contraseña' : 'Crea tu contraseña'}
+              {recuperar ? 'Nueva contraseña' : temporal ? 'Crea tu contraseña personal' : 'Crea tu contraseña'}
             </h1>
-            <p style={{ fontSize: 14, color: 'var(--ink3)', textAlign: 'center', margin: '0 0 24px' }}>{user?.email}</p>
+            <p style={{ fontSize: 14, color: 'var(--ink3)', textAlign: 'center', margin: '0 0 24px' }}>
+              {identificador(user?.email)}
+              {temporal && <><br />Entraste con una contraseña temporal. Elige una que solo tú conozcas.</>}
+            </p>
 
-            {!recuperar && (
+            {!recuperar && !temporal && (
               <div style={{ position: 'relative', marginBottom: 12 }}>
                 <div style={icono}><User size={17} color="var(--ink3)" /></div>
                 <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Tu nombre (opcional)" autoComplete="given-name" style={inputStyle(!!nombre)} />
@@ -92,12 +99,8 @@ export default function CrearContrasenaScreen() {
                 onKeyDown={e => e.key === 'Enter' && guardar()} placeholder="Repite la contraseña" autoComplete="new-password" style={inputStyle(!!confirm)} />
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, margin: '4px 2px 16px', fontSize: 12.5 }}>
-              {[[largo, 'Al menos 8 caracteres'], [coincide, 'Las dos contraseñas coinciden']].map(([ok, t]) => (
-                <span key={t as string} style={{ display: 'flex', alignItems: 'center', gap: 6, color: ok ? 'var(--primary-dark)' : 'var(--ink3)' }}>
-                  <Check size={13} strokeWidth={ok ? 3 : 2} color={ok ? 'var(--primary)' : 'var(--ink4)'} />{t}
-                </span>
-              ))}
+            <div style={{ margin: '4px 2px 16px' }}>
+              <ReglasContrasena pass={pass} extra={[[coincide, 'Las dos contraseñas coinciden']]} />
             </div>
 
             {error && <p style={{ fontSize: 12.5, color: 'var(--danger)', margin: '0 0 14px 2px' }}>{error}</p>}

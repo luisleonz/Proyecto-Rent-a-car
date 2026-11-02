@@ -1,12 +1,15 @@
 import { useEffect, useState, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Building2, DollarSign, CreditCard, FileText, Key, ShieldCheck, RefreshCw, Download, LogOut, ChevronDown, ChevronRight, Lock, Check } from 'lucide-react'
+import { Building2, DollarSign, CreditCard, FileText, Key, ShieldCheck, RefreshCw, Download, LogOut, ChevronDown, ChevronRight, Lock, Check, Smartphone } from 'lucide-react'
 import { useAuth } from '../../state/auth'
 import { supabase } from '../../lib/supabase'
 import { EMPRESA, Empresa, guardarConfig, cargarConfig } from '../../lib/empresa'
 import { METODOS, metodoLabel, mensajeError } from '../../lib/operacion'
 import { insertLog } from '../../lib/log'
 import { urlFirmaArrendador } from '../../lib/fotos'
+import { mensajeContrasena, identificador } from '../../lib/usuarios'
+import ReglasContrasena from '../../components/ReglasContrasena'
+import InstalarApp from '../../components/InstalarApp'
 
 const db = supabase as any // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -238,10 +241,11 @@ function SeguridadForm() {
   const activo = factores.find(x => x.status === 'verified')
 
   async function cambiarPass() {
-    if (pass.length < 8) { setMsgPass({ tipo: 'error', msg: 'La contraseña debe tener al menos 8 caracteres.' }); return }
+    const problema = mensajeContrasena(pass)
+    if (problema) { setMsgPass({ tipo: 'error', msg: problema }); return }
     if (pass !== pass2) { setMsgPass({ tipo: 'error', msg: 'Las dos contraseñas no coinciden.' }); return }
     setOcupado(true)
-    const { error } = await supabase.auth.updateUser({ password: pass })
+    const { error } = await supabase.auth.updateUser({ password: pass, data: { debe_cambiar: false } })
     setOcupado(false)
     if (error) { setMsgPass({ tipo: 'error', msg: /different from the old/i.test(error.message) ? 'La nueva contraseña debe ser distinta de la actual.' : error.message }); return }
     setPass(''); setPass2(''); setMsgPass({ tipo: 'ok', msg: 'Contraseña actualizada.' })
@@ -289,6 +293,7 @@ function SeguridadForm() {
         <Campo label="Nueva contraseña" tipo="password" value={pass} onChange={v => { setPass(v); setMsgPass(null) }} />
         <Campo label="Repítela" tipo="password" value={pass2} onChange={v => { setPass2(v); setMsgPass(null) }} />
       </div>
+      {pass && <ReglasContrasena pass={pass} extra={[[!!pass2 && pass === pass2, 'Las dos contraseñas coinciden']]} />}
       {msgPass && <Aviso tipo={msgPass.tipo}>{msgPass.msg}</Aviso>}
       <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={cambiarPass} disabled={ocupado || !pass}><Key size={15} />Cambiar contraseña</button>
 
@@ -434,7 +439,7 @@ export default function MoreScreen() {
           <div className="avatar accent" style={{ width: 60, height: 60, fontSize: 20 }}>{currentInitials || 'LL'}</div>
           <div className="meta">
             <h2>{currentFirstName || 'Usuario'}</h2>
-            <div className="mail">{currentEmail}</div>
+            <div className="mail">{identificador(currentEmail)}</div>
           </div>
           <span className={'chip ' + (esDueno ? 'primary' : '')}>{currentRole}</span>
           <button className="btn sm" onClick={() => navigate('/app/edit-profile')}>Editar perfil</button>
@@ -464,6 +469,9 @@ export default function MoreScreen() {
           <div className="card set-card">
             <Seccion id="seguridad" abierta={abierta} onToggle={toggle} icon={<Key size={17} />} titulo="Seguridad y 2FA">
               <SeguridadForm />
+            </Seccion>
+            <Seccion id="instalar" abierta={abierta} onToggle={toggle} icon={<Smartphone size={17} />} titulo="Instalar la app en este dispositivo">
+              <InstalarApp />
             </Seccion>
             <Seccion id="respaldo" abierta={abierta} onToggle={toggle} icon={<RefreshCw size={17} />} titulo="Sincronización y respaldo">
               <RespaldoForm esDueno={esDueno} />

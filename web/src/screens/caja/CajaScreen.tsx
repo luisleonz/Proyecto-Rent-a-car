@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { hoyISO, addDias, parseISO } from '../../lib/fechas'
 import { CONCEPTO_LABEL, metodoLabel, mensajeError, faltaMigracion, metodosActivos, type ConceptoPago } from '../../lib/operacion'
 import { useAuth } from '../../state/auth'
+import { identificador } from '../../lib/usuarios'
 
 const db = supabase as any // eslint-disable-line @typescript-eslint/no-explicit-any
 const fmt = (n: number) => new Intl.NumberFormat('es-MX', { maximumFractionDigits: 2 }).format(n)
@@ -243,7 +244,7 @@ export default function CajaScreen() {
                     <div className="agenda-who">{TIPO_LABEL[c.tipo]} · {metodoLabel(c.metodo)}</div>
                     <div className="agenda-car">
                       {c.concepto ?? ''}{' · '}{new Date(c.fecha).toLocaleString('es-MX', { day: dias > 1 ? '2-digit' : undefined, month: dias > 1 ? 'short' : undefined, hour: '2-digit', minute: '2-digit' })}
-                      {c.registrado_por ? ` · ${c.registrado_por.split('@')[0]}` : ''}
+                      {c.registrado_por ? ` · ${identificador(c.registrado_por).split('@')[0]}` : ''}
                     </div>
                   </div>
                   <strong style={{ color: sale ? 'var(--danger-ink)' : 'var(--ink)', whiteSpace: 'nowrap' }}>{c.tipo === 'apertura' ? '= ' : sale ? '−' : ''}${fmt(c.monto)}</strong>
@@ -262,7 +263,7 @@ export default function CajaScreen() {
                       <div className="agenda-car">
                         {m.reservas?.folio != null ? `#${m.reservas.folio} · ` : ''}{m.reservas?.clientes?.nombre ?? ''}
                         {' · '}{new Date(m.fecha).toLocaleString('es-MX', { day: dias > 1 ? '2-digit' : undefined, month: dias > 1 ? 'short' : undefined, hour: '2-digit', minute: '2-digit' })}
-                        {m.registrado_por ? ` · ${m.registrado_por.split('@')[0]}` : ''}
+                        {m.registrado_por ? ` · ${identificador(m.registrado_por).split('@')[0]}` : ''}
                       </div>
                     </div>
                     <strong style={{ color: sale ? 'var(--danger-ink)' : 'var(--ink)', whiteSpace: 'nowrap' }}>{sale ? '−' : ''}${fmt(m.monto)}</strong>

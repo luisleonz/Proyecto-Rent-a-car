@@ -3,12 +3,13 @@ import { useNavigate, useSearchParams, Navigate } from 'react-router-dom'
 import { ArrowLeft, Lock, Eye, EyeOff, Car } from 'lucide-react'
 import { supabase, rutaTrasSesion } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
+import { usuarioDeCorreo } from '../../lib/usuarios'
 
 function mensajeDeError(e: { message: string; code?: string; status?: number; name?: string }) {
-  if (e.code === 'invalid_credentials') return 'Correo o contraseña incorrectos'
+  if (e.code === 'invalid_credentials') return 'Usuario/correo o contraseña incorrectos'
   if (e.code === 'email_not_confirmed') return 'Este correo no ha sido confirmado. Confírmalo en Supabase → Authentication → Users.'
   if (e.code === 'email_provider_disabled') return 'El inicio de sesión con correo está desactivado en Supabase (Authentication → Sign In / Providers → Email).'
-  if (e.code === 'user_banned') return 'Este usuario está bloqueado en Supabase.'
+  if (e.code === 'user_banned') return 'Esta cuenta está desactivada. Habla con el dueño del negocio.'
   if (e.code === 'over_request_rate_limit' || e.status === 429) return 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.'
   if (e.name === 'AuthRetryableFetchError' || !e.status || e.status >= 500)
     return 'No se pudo conectar con el servidor. Revisa tu internet o que el proyecto de Supabase esté activo (no pausado).'
@@ -19,6 +20,7 @@ export default function EnterPasswordScreen() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const email = decodeURIComponent(params.get('email') ?? '')
+  const usuario = usuarioDeCorreo(email)
   const { session } = useAuth()
 
   const [password, setPassword]       = useState('')
@@ -35,6 +37,8 @@ export default function EnterPasswordScreen() {
 
   async function onOlvide() {
     setError(null); setAviso(null)
+    // Username accounts have no personal inbox: the owner assigns a new password instead
+    if (usuario) { setAviso('Pide al dueño del negocio que te asigne una contraseña nueva (en la app: Usuarios → Nueva contraseña).'); return }
     const { error: e } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/` })
     if (e) setError(e.status === 429 ? 'Ya se envió un correo hace poco. Espera unos minutos e inténtalo de nuevo.' : mensajeDeError(e))
     else setAviso(`Te enviamos un correo a ${email} con un enlace para crear una nueva contraseña.`)
@@ -100,7 +104,7 @@ export default function EnterPasswordScreen() {
           Bienvenido
         </h1>
         <p style={{ fontSize: 14, color: 'var(--ink3)', margin: '0 0 28px', textAlign: 'center' }}>
-          {email}
+          {usuario ?? email}
         </p>
 
         {/* Password field */}

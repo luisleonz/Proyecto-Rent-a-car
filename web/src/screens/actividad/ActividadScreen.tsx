@@ -3,6 +3,7 @@ import { Lock, Search } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
 import { mensajeError } from '../../lib/operacion'
+import { identificador } from '../../lib/usuarios'
 
 const db = supabase as any // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -47,7 +48,7 @@ export default function ActividadScreen() {
   }, [tab])
 
   const qn = q.trim().toLowerCase()
-  const logsF = useMemo(() => logs.filter(l => !qn || `${l.descripcion} ${l.realizado_por} ${l.accion}`.toLowerCase().includes(qn)), [logs, qn])
+  const logsF = useMemo(() => logs.filter(l => !qn || `${l.descripcion} ${identificador(l.realizado_por)} ${l.accion}`.toLowerCase().includes(qn)), [logs, qn])
   const auditF = useMemo(() => audit.filter(a => !qn || `${a.usuario} ${a.tabla} ${JSON.stringify(a.datos_nuevos ?? a.datos_anteriores)}`.toLowerCase().includes(qn)), [audit, qn])
 
   return (
@@ -82,7 +83,7 @@ export default function ActividadScreen() {
             <div key={l.id} className="tilerow">
               <div className="tile-main">
                 <div className="tile-l" style={{ fontWeight: 500 }}>{l.descripcion ?? l.accion}</div>
-                <div className="tile-s">{l.realizado_por ?? '—'} · {fechaHora(l.created_at)}</div>
+                <div className="tile-s">{l.realizado_por ? identificador(l.realizado_por) : '—'} · {fechaHora(l.created_at)}</div>
               </div>
             </div>
           ))) : (auditF.length === 0 ? <div style={{ padding: 24, color: 'var(--ink3)' }}>Sin cambios registrados.</div> : auditF.map(a => {
@@ -92,7 +93,7 @@ export default function ActividadScreen() {
             return (
               <div key={a.id} className="tilerow" style={{ alignItems: 'flex-start' }}>
                 <div className="tile-main">
-                  <div className="tile-l" style={{ fontWeight: 500 }}>{a.usuario ?? 'sistema'} {OPER[a.operacion] ?? a.operacion} {TABLA[a.tabla] ?? a.tabla} {etiqueta}</div>
+                  <div className="tile-l" style={{ fontWeight: 500 }}>{a.usuario ? identificador(a.usuario) : 'sistema'} {OPER[a.operacion] ?? a.operacion} {TABLA[a.tabla] ?? a.tabla} {etiqueta}</div>
                   <div className="tile-s">{fechaHora(a.fecha)}</div>
                   {cs.length > 0 && (
                     <div style={{ fontSize: 12, color: 'var(--ink2)', marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>

@@ -10,6 +10,9 @@ Modo --limpio (para el día del cambio de sistema): BORRA los datos de la app (r
 clientes, vehículos, cotizaciones, solicitudes y actividad) y carga solo vehículos, clientes y las
 rentas activas y próximas, con sus pagos. Los números de contrato siguen después del último del
 sistema anterior. Los usuarios y archivos (fotos, firma) no se tocan.
+Con --sin-adeudos (junto con --limpio): el saldo que el sistema anterior marcaba como pendiente en
+las rentas que ya están en curso se da por cobrado (se registra como pago de ajuste "cambio de
+sistema"); las rentas próximas conservan su anticipo y su saldo real por cobrar.
 El archivo generado contiene datos personales de clientes: no lo suba al repositorio.
 """
 import json
@@ -65,7 +68,7 @@ def vigente(c, hoy):
     return c['status'] == 'active' or (c['status'] == 'reserved' and local(c['end_date']).date() >= hoy)
 
 
-def main(ruta, limpio=False):
+def main(ruta, limpio=False, sin_adeudos=False):
     d = json.load(open(ruta, encoding='utf-8'))
     hoy = (datetime.utcnow() + TZ).date()
     todos = [c for c in d['contracts'] if not c.get('is_deleted')]
@@ -133,6 +136,15 @@ def main(ruta, limpio=False):
                     combustible(c.get('fuel_level_in') or c.get('fuel_level_on_return')),
                     c.get('actual_return_date'), c.get('created_date')])
 
+    # Old balances of rentals already under way were most likely collected without being recorded
+    ajustados = []
+    if sin_adeudos:
+        for r, c in zip(res, contratos):
+            saldo = (r[9] or 0) - (r[10] or 0)
+            if c['status'] == 'active' and saldo > 0:
+                r[10] = r[9]
+                ajustados.append((c, saldo))
+
     pagos = [[p['id'], p['contract_id'], p['amount'], METODO.get(p.get('payment_method')), p.get('payment_date'),
               p.get('notes'), p.get('recorded_by'), 'renta']
              for p in d['contract_payments']
@@ -153,10 +165,15 @@ def main(ruta, limpio=False):
         if gar and c['id'] not in con_garantia:
             pagos.append([c['id'] + ':garantia', c['id'], gar['amount'], METODO.get(gar.get('method')), gar.get('date'), 'Garantía recibida al reservar', None, 'fianza'])
 
+    for c, saldo in ajustados:
+        pagos.append([c['id'] + ':ajuste', c['id'], saldo, None, c['start_date'],
+                      'Ajuste por cambio de sistema: saldo del sistema anterior que se da por cobrado', None, 'renta'])
+
     titulo = 'CAMBIO LIMPIO: borra los datos actuales y carga solo rentas activas y próximas' if limpio else 'Importación del respaldo del sistema anterior'
     out = [f'-- {titulo} · generado {datetime.now():%Y-%m-%d %H:%M} (hoy en Sonora: {hoy})',
            f'-- {len(veh)} vehículos · {len(cli)} clientes · {len(res)} reservas · {len(pagos)} pagos',
            '-- CONTIENE DATOS PERSONALES DE CLIENTES. No compartir ni subir al repositorio.',
+           *[f"-- Saldo anterior dado por cobrado: contrato #{c['contract_number']} ({c.get('customer_name')}) ${saldo:,.0f}" for c, saldo in ajustados],
            'begin;', '']
     for m in MIGRACIONES:
         out += [f'-- ── {m} ──', (RAIZ / m).read_text(encoding='utf-8'), '']
@@ -377,4 +394,4 @@ if __name__ == '__main__':
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
     if len(args) != 1:
         sys.exit(__doc__)
-    main(args[0], limpio='--limpio' in sys.argv)
+    main(args[0], limpio='--limpio' in sys.argv, sin_adeudos='--sin-adeudos' in sys.argv)

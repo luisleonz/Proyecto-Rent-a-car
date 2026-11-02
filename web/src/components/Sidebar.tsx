@@ -44,7 +44,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   return (
     <nav className="side" style={isOpen ? { left: 0 } : undefined}>
       <div className="logo">
-        <div className="ring">L</div>
+        <div className="ring" style={{ background: '#fff', padding: 0, overflow: 'hidden' }}>
+          <img src="icons/favicon-64.png" alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        </div>
         <div className="wm">
           <div className="n">Lucianos</div>
           <div className="s">Rent · a · car</div>

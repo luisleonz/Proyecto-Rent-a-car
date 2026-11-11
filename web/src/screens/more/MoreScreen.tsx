@@ -402,8 +402,9 @@ function RespaldoForm({ esDueno }: { esDueno: boolean }) {
       <div style={{ borderTop: '1px solid var(--hairline)', margin: '6px 0' }} />
       <div className="field-l">Respaldo</div>
       <div style={{ fontSize: 13, color: 'var(--ink2)', lineHeight: 1.5 }}>
-        Supabase guarda copias automáticas de la base de datos. Además, el dueño puede descargar aquí un archivo con toda la información
-        (autos, clientes, reservas, pagos, caja y registro de actividad) para guardarlo en su computadora o en Drive.
+        El dueño puede descargar aquí un archivo con toda la información (autos, clientes, reservas, pagos, caja y registro de actividad)
+        para guardarlo en su computadora o en Drive. Recomendado: una vez por semana. Las copias automáticas diarias de Supabase solo
+        vienen en su plan de pago; en el plan gratuito este archivo es el único respaldo.
       </div>
       {esDueno
         ? <button className="btn primary" style={{ alignSelf: 'flex-start' }} onClick={descargar} disabled={!!progreso && !progreso.startsWith('Respaldo')}><Download size={15} />Descargar respaldo completo</button>

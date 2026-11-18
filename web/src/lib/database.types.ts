@@ -65,6 +65,8 @@ export interface Database {
           lugar_entrega?: string | null; lugar_devolucion?: string | null
           descuento?: number | null
           cobertura?: Cobertura | null; cobertura_costo?: number | null
+          con_chofer?: boolean; chofer_nombre?: string | null; chofer_costo?: number | null
+          servicios?: { concepto: string; monto: number }[] | null
           iva?: number | null
           fianza?: number | null; metodo_fianza?: string | null
           notas?: string | null

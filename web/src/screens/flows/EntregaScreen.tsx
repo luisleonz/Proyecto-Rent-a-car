@@ -105,7 +105,7 @@ export default function EntregaScreen() {
   }
 
   const faltaPaso = ([
-    [r?.clientes?.no_rentar && 'El cliente está marcado como no deseado: no se le puede entregar el vehículo', !licencia.trim() && 'El número de licencia', !licOk && 'Marcar que revisaste la licencia', !idOk && 'Marcar que revisaste la identificación'],
+    [r?.clientes?.no_rentar && 'El cliente está marcado como no deseado: no se le puede entregar el vehículo', !r?.con_chofer && !licencia.trim() && 'El número de licencia', !r?.con_chofer && !licOk && 'Marcar que revisaste la licencia', !idOk && 'Marcar que revisaste la identificación'],
     [!km && 'El kilometraje de salida', gas == null && 'El nivel de gasolina'],
     [fianzaOk && !(Number(fianza) >= 0) && 'El monto del depósito en garantía'],
     [],
@@ -193,7 +193,12 @@ export default function EntregaScreen() {
             Esta reserva es para el {new Date(r.fecha_entrega + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })}. Puedes entregarla antes si el cliente ya está aquí.
           </div>
         )}
-        <Bloque titulo="Licencia de conducir" ayuda="Revisa que sea original, vigente y a nombre del cliente.">
+        {r.con_chofer && (
+          <div style={{ background: 'var(--primary-soft)', color: 'var(--primary-dark)', borderRadius: 10, padding: '10px 12px', fontSize: 13.5 }}>
+            <b>Renta con chofer{r.chofer_nombre ? `: ${r.chofer_nombre}` : ''}.</b> El cliente no maneja, así que su licencia es opcional.
+          </div>
+        )}
+        <Bloque titulo={r.con_chofer ? 'Licencia del cliente (opcional)' : 'Licencia de conducir'} ayuda={r.con_chofer ? undefined : 'Revisa que sea original, vigente y a nombre del cliente.'}>
           <div style={{ display: 'flex', gap: 10 }}>
             <input className="field-i" style={{ flex: 3 }} value={licencia} onChange={e => setLicencia(e.target.value)} placeholder="Número de licencia" />
             <input className="field-i" style={{ flex: 2 }} type="date" value={licVence} onChange={e => setLicVence(e.target.value)} />

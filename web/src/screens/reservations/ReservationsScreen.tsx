@@ -11,6 +11,8 @@ import { hoyISO, addDias, diffDias } from '../../lib/fechas'
 import { porCobrar } from '../../lib/reservas'
 import ReservaPanel from './ReservaPanel'
 import type { ReservaConDetalle, ReservaStatus, Cobertura } from '../../lib/database.types'
+import { leerFilas, totalServicios, type FilaServicio } from '../../lib/servicios'
+import EditorServicios from '../../components/EditorServicios'
 
 /* ─── Constants ─────────────────────────────────────────────── */
 const db = supabase as any // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -100,7 +102,7 @@ function ResRow({ r, hoy, onClick }: { r: ReservaConDetalle; hoy: string; onClic
       <div className="rs-who">
         <div className="avatar accent" style={{ width: 32, height: 32, fontSize: 12, flexShrink: 0 }}>{initials(r)}</div>
         <div style={{ minWidth: 0 }}>
-          <div className="rs-name">{clientName(r)}{r.clientes?.no_rentar && r.status !== 'devuelta' && r.status !== 'cancelada' && <span className="chip sm danger" style={{ marginLeft: 6 }}>No rentar</span>}</div>
+          <div className="rs-name">{clientName(r)}{r.clientes?.no_rentar && r.status !== 'devuelta' && r.status !== 'cancelada' && <span className="chip sm danger" style={{ marginLeft: 6 }}>No rentar</span>}{r.con_chofer && <span className="chip sm" style={{ marginLeft: 6 }}>Con chofer</span>}</div>
           {r.clientes?.telefono && <div className="rs-sub">{r.clientes.telefono}</div>}
         </div>
       </div>
@@ -208,6 +210,12 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
   const [fianza,       setFianza]       = useState('')
   const [metodoFianza, setMetodoFianza] = useState<'efectivo' | 'tarjeta' | 'transferencia'>('efectivo')
   const [conIva,       setConIva]       = useState(EMPRESA.ivaPorDefecto)
+  // Rental with a driver: name is optional, the price is typed by hand (depends on driver, days, holidays)
+  const [conChofer,    setConChofer]    = useState(false)
+  const [choferNombre, setChoferNombre] = useState('')
+  const [choferCosto,  setChoferCosto]  = useState('')
+  // Other occasional services, typed by hand
+  const [servicios,    setServicios]    = useState<FilaServicio[]>([])
 
   const [working, setWorking] = useState(false)
   const [error,   setError]   = useState('')
@@ -284,6 +292,7 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
     setDescuento(''); setTieneDeposito(false); setDeposito(''); setMetodoDeposito('efectivo')
     setHoraEntrega('10:00'); setHoraDev('10:00')
     setLugarEntrega(EMPRESA.lugarEntregaPredeterminado); setLugarDev(EMPRESA.lugarEntregaPredeterminado)
+    setConChofer(false); setChoferNombre(''); setChoferCosto(''); setServicios([])
     setCobertura('basica'); setCeroDiario(EMPRESA.ceroDeducibleDia ? String(EMPRESA.ceroDeducibleDia) : ''); setFianza(''); setMetodoFianza('efectivo'); setConIva(EMPRESA.ivaPorDefecto)
     setError(''); setCreated(null); setIntento(false); setVetado(null)
   }
@@ -313,8 +322,11 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
   const subtotal = tarifa * dias
   const descNum  = Math.min(Math.max(0, Number(descuento) || 0), subtotal)
   const ceroCosto = cobertura === 'cero_deducible' ? (Number(ceroDiario) || 0) * dias : 0
-  const ivaMonto = conIva ? ivaDe(subtotal - descNum + ceroCosto) : 0
-  const total    = subtotal - descNum + ceroCosto + ivaMonto
+  const choferNum = conChofer ? (Number(choferCosto) || 0) : 0
+  const extras = leerFilas(servicios)
+  const serviciosNum = totalServicios(extras.servicios)
+  const ivaMonto = conIva ? ivaDe(subtotal - descNum + ceroCosto + choferNum + serviciosNum) : 0
+  const total    = subtotal - descNum + ceroCosto + choferNum + serviciosNum + ivaMonto
   const showCalc = dias > 0 && tarifa > 0
   const datesSet = !!(fechaEntrega && fechaDev && fechaDev > fechaEntrega)
 
@@ -329,6 +341,8 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
     datesSet && !vehiculoId && (loadingVeh ? 'Espera a que carguen los vehículos' : vehicles.length === 0 ? 'No hay vehículos disponibles en esas fechas: cambia las fechas' : 'El vehículo'),
     selectedVehicle && !tarifa && 'El vehículo no tiene tarifa diaria (agrégala en Flota)',
     cobertura === 'cero_deducible' && !(Number(ceroDiario) > 0) && 'El costo por día del cero deducible',
+    conChofer && choferCosto.trim() === '' && 'Cuánto se cobra por el chofer (escribe 0 si no se cobra)',
+    ...extras.faltan,
     tieneDeposito && !(Number(deposito) > 0) && 'El monto del anticipo',
     vetado && mensajeVetado(vetado),
   ].filter(Boolean) as string[]
@@ -376,10 +390,22 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
       metodo_fianza: fianzaNum > 0 ? metodoFianza : null,
     }
     const { data: reservaData, error: rErr, sinExtras } = await insertarConExtras('reservas', base, contrato)
-    const aviso = sinExtras
+    let aviso = sinExtras
       ? 'La reserva se guardó, pero sin hora, cobertura, IVA ni fianza: falta ejecutar la migración SQL más reciente en Supabase.'
       : ''
     if (rErr) { setError(`Error al crear reserva: ${rErr.message}`); setWorking(false); return }
+    // Saved apart so a database without the newer columns keeps everything else
+    if (conChofer || extras.servicios.length) {
+      const adicionales = { ...(conChofer ? { con_chofer: true, chofer_nombre: choferNombre.trim() || null, chofer_costo: choferNum } : {}),
+        ...(extras.servicios.length ? { servicios: extras.servicios } : {}) }
+      const { error: adErr } = await db.from('reservas').update(adicionales).eq('id', reservaData.id)
+      if (adErr) {
+        const nota = [conChofer && `Con chofer${choferNombre.trim() ? `: ${choferNombre.trim()}` : ''} · $${fmt(choferNum)}`,
+          ...extras.servicios.map(x => `${x.concepto} · $${fmt(x.monto)}`)].filter(Boolean).join('\n') + '\n(incluido en el total)'
+        await db.from('reservas').update({ notas: nota }).eq('id', reservaData.id)
+        aviso = [aviso, 'El chofer y los conceptos adicionales quedaron anotados en las notas: falta ejecutar "supabase_migracion_2026_11_chofer_servicios.sql" en Supabase.'].filter(Boolean).join(' ')
+      }
+    }
 
     // Booking advance goes into the payments history too
     if (base.deposito > 0) {
@@ -403,6 +429,8 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
         fecha_devolucion: fechaDev,
         total: showCalc ? total : null,
         cobertura,
+        ...(conChofer ? { chofer: choferNombre.trim() || 'sí', chofer_costo: choferNum } : {}),
+        ...(extras.servicios.length ? { servicios: extras.servicios } : {}),
       },
     })
 
@@ -661,6 +689,18 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
                     <span>+${fmt(ceroCosto)}</span>
                   </div>
                 )}
+                {conChofer && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--ink3)' }}>
+                    <span>Chofer{choferNombre.trim() ? ` · ${choferNombre.trim()}` : ''}</span>
+                    <span>+${fmt(choferNum)}</span>
+                  </div>
+                )}
+                {extras.servicios.map((x, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--ink3)' }}>
+                    <span>{x.concepto}</span>
+                    <span>+${fmt(x.monto)}</span>
+                  </div>
+                ))}
                 <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, color: 'var(--ink3)', cursor: 'pointer' }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     <input type="checkbox" checked={conIva} onChange={e => setConIva(e.target.checked)} />{ivaEtiqueta()}
@@ -769,6 +809,34 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
                 <span style={{ fontSize: 12, color: 'var(--ink3)', paddingRight: 10 }}>/día</span>
               </div>
             )}
+          </div>
+
+          {/* ── Driver ── */}
+          <div className="field">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>
+              <input type="checkbox" checked={conChofer} onChange={e => setConChofer(e.target.checked)} />
+              Renta con chofer
+            </label>
+            {conChofer && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+                <input className="field-i" value={choferNombre} onChange={e => setChoferNombre(e.target.value)}
+                  placeholder="Nombre del chofer (opcional)" aria-label="Nombre del chofer" />
+                <div className="field-money" style={{ width: '100%' }}>
+                  <span>$</span>
+                  <input className="field-i" value={choferCosto} inputMode="decimal" placeholder="Cobro por el chofer" aria-label="Cobro por el chofer"
+                    onChange={e => setChoferCosto(e.target.value.replace(/[^0-9.]/g, ''))} />
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--ink3)', lineHeight: 1.45 }}>
+                  Total por el chofer en toda la renta (cambia según el chofer, los días y las festividades). Se suma al total{conIva ? ' y lleva IVA' : ''}.
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Other services, by hand ── */}
+          <div className="field">
+            <label className="field-l">Otros conceptos <span style={{ color: 'var(--ink4)', fontWeight: 400 }}>(opcional: servicios que se cobran en ocasiones)</span></label>
+            <EditorServicios filas={servicios} onChange={setServicios} />
           </div>
 
           {/* ── Security deposit (cláusula OCTAVA) ── */}

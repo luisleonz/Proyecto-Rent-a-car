@@ -86,7 +86,20 @@ export default function ReportesScreen() {
     })
     const saldos = reservas.filter(r => r.status === 'devuelta' || r.status === 'entregada').map(r => ({ r, s: porCobrar(r) })).filter(x => x.s > 0)
 
-    return { validas, canceladas, reservado, cobrado, porVeh, utilizacion, diasRentados, topClientes, meses, saldos,
+    // Driver and hand-typed concepts, grouped by name (same text written differently counts once)
+    const grupos: Record<string, { nombre: string; veces: number; total: number }> = {}
+    const sumar = (nombre: string, monto: number) => {
+      const k = nombre.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase()
+      const g = (grupos[k] ??= { nombre: nombre.trim(), veces: 0, total: 0 })
+      g.veces++; g.total += Number(monto) || 0
+    }
+    for (const r of validas) {
+      if (r.con_chofer) sumar('Chofer', r.chofer_costo ?? 0)
+      for (const x of r.servicios ?? []) sumar(x.concepto, x.monto)
+    }
+    const extras = Object.values(grupos).sort((a, b) => b.veces - a.veces || b.total - a.total)
+
+    return { validas, canceladas, reservado, cobrado, porVeh, utilizacion, diasRentados, topClientes, meses, saldos, extras,
       ticket: validas.length ? reservado / validas.length : 0, total: enPeriodo.length }
   }, [reservas, pagos, vehiculos, desde, hasta, diasPeriodo])
 
@@ -156,6 +169,16 @@ export default function ReportesScreen() {
                     <div className="tile-ic">{i + 1}</div>
                     <div className="tile-main"><div className="tile-l">{c.nombre}</div><div className="tile-s">{c.rentas} renta{c.rentas > 1 ? 's' : ''}</div></div>
                     <strong>${fmt(c.total)}</strong>
+                  </div>
+                ))}
+            </div>
+            <div className="sect-head" style={{ marginTop: 'var(--gap)' }}><h2 className="sect-title">Chofer y otros conceptos</h2></div>
+            <div className="card tilelist">
+              {d.extras.length === 0 ? <div style={{ padding: 20, color: 'var(--ink3)', fontSize: 13 }}>Sin chofer ni conceptos adicionales en el periodo.</div>
+                : d.extras.map(x => (
+                  <div key={x.nombre} className="tilerow">
+                    <div className="tile-main"><div className="tile-l">{x.nombre}</div><div className="tile-s">{x.veces} {x.veces === 1 ? 'vez' : 'veces'} · promedio ${fmt(x.total / x.veces)}</div></div>
+                    <strong>${fmt(x.total)}</strong>
                   </div>
                 ))}
             </div>

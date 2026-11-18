@@ -20,6 +20,7 @@ const DEFAULTS = {
   clientes: () => ({ no_rentar: false, no_rentar_motivo: null, no_rentar_desde: null, no_rentar_por: null }),
   clientes_vetos: () => ({ fecha: ahora(), reserva_id: null, reserva_folio: null }),
   reservas: () => ({ status: 'pendiente', deposito: 0, iva: 0, cobertura: 'basica', cobertura_costo: 0, fianza: 0, cargos_extra: 0,
+    con_chofer: false, chofer_nombre: null, chofer_costo: 0, servicios: [],
     fotos_entrega: [], fotos_devolucion: [], legacy_id: null, notas: null }),
   pagos: () => ({ concepto: 'renta', fecha: ahora() }),
   cotizaciones: () => ({ status: 'enviada', iva: 0, reserva_id: null }),

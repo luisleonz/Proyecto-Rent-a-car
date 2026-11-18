@@ -9,7 +9,9 @@ import { registrarPago, mensajeError, whatsappUrl, metodoLabel, CONCEPTO_LABEL, 
   type Pago, type MetodoPago, type ConceptoPago } from '../../lib/operacion'
 import { urlsFirmadas } from '../../lib/fotos'
 import type { ReservaConDetalle, ReservaStatus } from '../../lib/database.types'
-import { EMPRESA } from '../../lib/empresa'
+import { EMPRESA, ivaDe } from '../../lib/empresa'
+import { leerFilas, totalServicios, aFilas, type FilaServicio } from '../../lib/servicios'
+import EditorServicios from '../../components/EditorServicios'
 
 const db = supabase as any // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -44,7 +46,8 @@ export default function ReservaPanel({ res, open, onClose, onChanged }: {
   const [notaPago, setNotaPago] = useState('')
   // edit form
   const [editing, setEditing] = useState(false)
-  const [ed, setEd] = useState({ fecha_entrega: '', hora_entrega: '', fecha_devolucion: '', hora_devolucion: '', total: '', notas: '', motivo: '' })
+  const [ed, setEd] = useState({ fecha_entrega: '', hora_entrega: '', fecha_devolucion: '', hora_devolucion: '', total: '', notas: '', motivo: '',
+    con_chofer: false, chofer_nombre: '', chofer_costo: '', servicios: [] as FilaServicio[] })
 
   const hoy = hoyISO()
   const pagado = res?.deposito ?? 0
@@ -127,7 +130,9 @@ export default function ReservaPanel({ res, open, onClose, onChanged }: {
 
   function abrirEdicion() {
     setEd({ fecha_entrega: res!.fecha_entrega, hora_entrega: res!.hora_entrega?.slice(0, 5) ?? '', fecha_devolucion: res!.fecha_devolucion,
-      hora_devolucion: res!.hora_devolucion?.slice(0, 5) ?? '', total: String(res!.total ?? ''), notas: res!.notas ?? '', motivo: '' })
+      hora_devolucion: res!.hora_devolucion?.slice(0, 5) ?? '', total: String(res!.total ?? ''), notas: res!.notas ?? '', motivo: '',
+      con_chofer: !!res!.con_chofer, chofer_nombre: res!.chofer_nombre ?? '', chofer_costo: res!.con_chofer ? String(res!.chofer_costo ?? 0) : '',
+      servicios: aFilas(res!.servicios) })
     setEditing(true)
   }
 
@@ -139,6 +144,23 @@ export default function ReservaPanel({ res, open, onClose, onChanged }: {
     if (ed.hora_devolucion !== (res!.hora_devolucion?.slice(0, 5) ?? '')) nuevos.hora_devolucion = ed.hora_devolucion || null
     if (ed.total !== String(res!.total ?? '')) nuevos.total = ed.total === '' ? null : Number(ed.total)
     if (ed.notas !== (res!.notas ?? '')) nuevos.notas = ed.notas || null
+    // Driver and extra services: a price change moves the total (and its VAT) by the difference,
+    // unless the total was typed by hand
+    const choferAntes = res!.con_chofer ? Number(res!.chofer_costo ?? 0) : 0
+    const choferAhora = ed.con_chofer ? Number(ed.chofer_costo || 0) : 0
+    if (ed.con_chofer && ed.chofer_costo.trim() === '') { setAviso({ ok: false, t: 'Falta cuánto se cobra por el chofer (escribe 0 si no se cobra).' }); return }
+    const extras = leerFilas(ed.servicios)
+    if (extras.faltan.length) { setAviso({ ok: false, t: `Falta: ${extras.faltan.join(', ').toLowerCase()}.` }); return }
+    if (ed.con_chofer !== !!res!.con_chofer) nuevos.con_chofer = ed.con_chofer
+    if ((ed.con_chofer ? ed.chofer_nombre.trim() : '') !== (res!.chofer_nombre ?? '')) nuevos.chofer_nombre = ed.con_chofer ? ed.chofer_nombre.trim() || null : null
+    if (choferAhora !== choferAntes) nuevos.chofer_costo = choferAhora
+    if (JSON.stringify(extras.servicios) !== JSON.stringify(res!.servicios ?? [])) nuevos.servicios = extras.servicios
+    const dif = choferAhora - choferAntes + totalServicios(extras.servicios) - totalServicios(res!.servicios)
+    if (dif !== 0 && nuevos.total === undefined && res!.total != null) {
+      const ivaDif = (res!.iva ?? 0) > 0 ? ivaDe(Math.abs(dif)) * Math.sign(dif) : 0
+      nuevos.total = Math.round((res!.total + dif + ivaDif) * 100) / 100
+      if (ivaDif) nuevos.iva = Math.round(((res!.iva ?? 0) + ivaDif) * 100) / 100
+    }
     if (!Object.keys(nuevos).length) { setEditing(false); return }
     if (ed.fecha_devolucion < ed.fecha_entrega) { setAviso({ ok: false, t: 'La devolución no puede ser antes de la entrega.' }); return }
     if ((nuevos.fecha_entrega || nuevos.fecha_devolucion) && res!.vehiculo_id) {
@@ -230,6 +252,8 @@ export default function ReservaPanel({ res, open, onClose, onChanged }: {
               <Fila l="Entrega" v={`${fmtDate(res.fecha_entrega)}${res.hora_entrega ? ` · ${res.hora_entrega.slice(0, 5)}` : ''}`} />
               <Fila l="Devolución" v={`${fmtDate(res.fecha_devolucion)}${res.hora_devolucion ? ` · ${res.hora_devolucion.slice(0, 5)}` : ''}`} tono={vencida ? 'var(--danger-ink)' : undefined} />
               {res.cobertura && <Fila l="Cobertura" v={res.cobertura === 'cero_deducible' ? 'Cero deducible' : 'Básica'} />}
+              {res.con_chofer && <Fila l="Con chofer" v={`${res.chofer_nombre || 'Sin asignar'} · $${fmt(res.chofer_costo ?? 0)}`} />}
+              {(res.servicios ?? []).map((x, i) => <Fila key={i} l={x.concepto} v={`$${fmt(x.monto)}`} />)}
               {res.lugar_entrega && <Fila l="Lugar" v={res.lugar_entrega} />}
               {res.notas && <div style={{ fontSize: 12.5, color: 'var(--ink2)', whiteSpace: 'pre-line', background: 'var(--paper-alt)', borderRadius: 8, padding: '8px 10px', marginTop: 4 }}>{res.notas}</div>}
               {abierta && <button className="btn sm" style={{ alignSelf: 'flex-start', marginTop: 6 }} onClick={abrirEdicion}><Pencil size={13} />{isAdmin ? 'Editar' : 'Solicitar cambio'}</button>}
@@ -242,6 +266,19 @@ export default function ReservaPanel({ res, open, onClose, onChanged }: {
                     <input className="field-i" type={t} value={ed[k]} onChange={e => setEd(x => ({ ...x, [k]: e.target.value }))} /></div>
                 ))}
               </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>
+                <input type="checkbox" checked={ed.con_chofer} onChange={e => setEd(x => ({ ...x, con_chofer: e.target.checked }))} />Renta con chofer
+              </label>
+              {ed.con_chofer && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div className="field"><label className="field-l">Chofer</label>
+                    <input className="field-i" value={ed.chofer_nombre} placeholder="Nombre (opcional)" onChange={e => setEd(x => ({ ...x, chofer_nombre: e.target.value }))} /></div>
+                  <div className="field"><label className="field-l">Cobro por el chofer $</label>
+                    <input className="field-i" inputMode="decimal" value={ed.chofer_costo} onChange={e => setEd(x => ({ ...x, chofer_costo: e.target.value.replace(/[^0-9.]/g, '') }))} /></div>
+                </div>
+              )}
+              <div className="field"><label className="field-l">Otros conceptos</label>
+                <EditorServicios filas={ed.servicios} onChange={f => setEd(x => ({ ...x, servicios: f }))} /></div>
               <div className="field"><label className="field-l">Total $</label>
                 <input className="field-i" inputMode="decimal" value={ed.total} onChange={e => setEd(x => ({ ...x, total: e.target.value.replace(/[^0-9.]/g, '') }))} /></div>
               <div className="field"><label className="field-l">Notas</label>

@@ -129,7 +129,9 @@ function PaginaAnexo({ r, firmaUrl, firmaCliente }: { r: ReservaContrato; firmaU
   const descuento = r.descuento ?? 0
   const cobCosto  = r.cobertura_costo ?? 0
   const iva       = r.iva ?? 0
-  const total     = r.total ?? (subtotal != null ? subtotal - descuento + cobCosto + iva : null)
+  const chofer    = r.con_chofer ? r.chofer_costo ?? 0 : 0
+  const otros     = (r.servicios ?? []).reduce((s, x) => s + (Number(x.monto) || 0), 0)
+  const total     = r.total ?? (subtotal != null ? subtotal - descuento + cobCosto + chofer + otros + iva : null)
   const anticipo  = r.deposito ?? 0
   const saldo     = total != null ? Math.max(0, total - anticipo) : null
   const cero      = r.cobertura === 'cero_deducible'
@@ -179,6 +181,7 @@ function PaginaAnexo({ r, firmaUrl, firmaCliente }: { r: ReservaContrato; firmaU
         <Campo span={2} label="Devolución (fecha y hora)" value={[fechaLarga(r.fecha_devolucion), hora(r.hora_devolucion)].filter(Boolean).join(' · ')} />
         <Campo span={2} label="Lugar de entrega" value={r.lugar_entrega ?? EMPRESA.lugarEntregaPredeterminado} />
         <Campo span={2} label="Lugar de devolución" value={r.lugar_devolucion ?? r.lugar_entrega ?? EMPRESA.lugarEntregaPredeterminado} />
+        {r.con_chofer && <Campo span={4} label="Conductor" value={`Chofer proporcionado por el arrendador${r.chofer_nombre ? `: ${r.chofer_nombre}` : ''}`} />}
       </div>
 
       <div className="ct-sec">Precio del arrendamiento y depósitos</div>
@@ -187,6 +190,8 @@ function PaginaAnexo({ r, firmaUrl, firmaCliente }: { r: ReservaContrato; firmaU
           <tr><td>Renta: {dias} {dias === 1 ? 'día' : 'días'} × {money(tarifa)} por día</td><td>{money(subtotal)}</td></tr>
           {descuento > 0 && <tr><td>Descuento</td><td>−{money(descuento)}</td></tr>}
           <tr><td>Protección adicional cero deducible</td><td>{cero ? money(cobCosto) : 'No contratada'}</td></tr>
+          {r.con_chofer && <tr><td>Servicio de chofer{r.chofer_nombre ? `: ${r.chofer_nombre}` : ''}</td><td>{money(chofer)}</td></tr>}
+          {(r.servicios ?? []).map((x, i) => <tr key={i}><td>{x.concepto}</td><td>{money(x.monto)}</td></tr>)}
           {iva > 0 && <tr><td>{ivaEtiqueta()}</td><td>{money(iva)}</td></tr>}
           <tr className="tot"><td>TOTAL DEL ARRENDAMIENTO (moneda nacional)</td><td>{money(total)}</td></tr>
           <tr><td>Anticipo / apartado recibido{r.metodo_deposito ? ` (${metodo(r.metodo_deposito)})` : ''}</td><td>{money(anticipo)}</td></tr>

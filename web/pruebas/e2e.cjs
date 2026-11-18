@@ -148,6 +148,13 @@ async function otraSesion(ctx, b) {
     await p.click('.qpanel button:has-text("KIA K3")')
     await p.click('button:has-text("Cero deducible")'); await p.fill('input[placeholder="Costo por día"]', '200')
     await p.click('.qpanel button:has-text("Sí")'); await p.fill('input[placeholder="Monto del depósito"]', '1000')
+    const resumen = await panel(p).innerText()
+    ok(resumen.includes('Total de la renta') && resumen.includes('$6,156') && resumen.includes('Total a pagar') && resumen.includes('$8,156'),
+      'El resumen suma el depósito en garantía: renta $6,156 + garantía $2,000 = $8,156')
+    ok(resumen.includes('Por pagar al recoger el auto') && resumen.includes('$7,156'), 'Descuenta el apartado: por pagar al recoger $7,156')
+    const yGarantia = (await p.locator('.qpanel .field-l:has-text("Depósito en garantía")').boundingBox()).y
+    const yTotal = (await p.locator('.qpanel span:text-is("Total a pagar")').boundingBox()).y
+    ok(yGarantia < yTotal, 'El campo del depósito en garantía está arriba del resumen')
     await p.click('.qpanel-foot button:has-text("Crear reserva")'); await p.waitForTimeout(1200)
     const r = b.t.reservas.find(x => x.vehiculo_id === b.v3.id && x.fecha_entrega === d(20))
     ok(r, 'La reserva quedó guardada')

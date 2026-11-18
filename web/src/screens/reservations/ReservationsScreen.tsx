@@ -664,10 +664,33 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
             </div>
           )}
 
+          {/* ── Security deposit (cláusula OCTAVA) ── */}
+          <div className="field">
+            <label className="field-l">
+              Depósito en garantía <span style={{ color: 'var(--ink4)', fontWeight: 400 }}>(se devuelve al regresar el auto)</span>
+            </label>
+            <div className="field-money" style={{ width: '100%', marginBottom: 8 }}>
+              <span>$</span>
+              <input className="field-i" value={fianza} inputMode="numeric" placeholder="0"
+                onChange={e => setFianza(e.target.value.replace(/[^0-9]/g, ''))} />
+            </div>
+            {Number(fianza) > 0 && (
+              <div style={{ display: 'flex', gap: 8 }}>
+                {(['efectivo', 'tarjeta', 'transferencia'] as const).map(m => (
+                  <Opt key={m} active={metodoFianza === m} onClick={() => setMetodoFianza(m)}>
+                    {m[0].toUpperCase() + m.slice(1)}
+                  </Opt>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* ── Calculation ── */}
           {showCalc && (() => {
             const depNum   = tieneDeposito ? (Number(deposito) || 0) : 0
-            const saldo    = Math.max(0, total - depNum)
+            const garantia = Number(fianza) || 0
+            const aPagar   = total + garantia
+            const saldo    = Math.max(0, aPagar - depNum)
             return (
               <div style={{
                 background: 'var(--paper-alt)', borderRadius: 12, padding: '14px 16px',
@@ -707,13 +730,32 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
                   </span>
                   <span>{conIva ? `+$${fmt(ivaMonto)}` : 'sin IVA'}</span>
                 </label>
-                <div style={{
-                  display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, color: 'var(--ink)',
-                  borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 2,
-                }}>
-                  <span>Total</span>
-                  <span>${fmt(total)}</span>
-                </div>
+                {garantia > 0 ? (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, fontWeight: 600, color: 'var(--ink2)',
+                      borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 2 }}>
+                      <span>Total de la renta</span>
+                      <span>${fmt(total)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--ink3)' }}>
+                      <span>Depósito en garantía <span style={{ color: 'var(--ink4)' }}>(se devuelve, sin IVA)</span></span>
+                      <span>+${fmt(garantia)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, color: 'var(--ink)',
+                      borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 2 }}>
+                      <span>Total a pagar</span>
+                      <span>${fmt(aPagar)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, color: 'var(--ink)',
+                    borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 2,
+                  }}>
+                    <span>Total</span>
+                    <span>${fmt(total)}</span>
+                  </div>
+                )}
                 {depNum > 0 && (
                   <>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--primary)' }}>
@@ -727,7 +769,7 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
                       border: `1px solid ${saldo === 0 ? 'oklch(82% 0.1 155)' : 'oklch(82% 0.12 60)'}`,
                     }}>
                       <span style={{ fontSize: 13, fontWeight: 600, color: saldo === 0 ? 'var(--primary)' : 'oklch(0.45 0.14 60)' }}>
-                        {saldo === 0 ? 'Liquidado' : 'Saldo pendiente al entregar'}
+                        {saldo === 0 ? 'Liquidado' : garantia > 0 ? 'Por pagar al recoger el auto' : 'Saldo pendiente al entregar'}
                       </span>
                       <span style={{ fontSize: 15, fontWeight: 800, color: saldo === 0 ? 'var(--primary)' : 'oklch(0.45 0.14 60)' }}>
                         {saldo === 0 ? '✓ $0' : `$${fmt(saldo)}`}
@@ -837,27 +879,6 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
           <div className="field">
             <label className="field-l">Otros conceptos <span style={{ color: 'var(--ink4)', fontWeight: 400 }}>(opcional: servicios que se cobran en ocasiones)</span></label>
             <EditorServicios filas={servicios} onChange={setServicios} />
-          </div>
-
-          {/* ── Security deposit (cláusula OCTAVA) ── */}
-          <div className="field">
-            <label className="field-l">
-              Depósito en garantía <span style={{ color: 'var(--ink4)', fontWeight: 400 }}>(se devuelve al regresar el auto)</span>
-            </label>
-            <div className="field-money" style={{ width: '100%', marginBottom: 8 }}>
-              <span>$</span>
-              <input className="field-i" value={fianza} inputMode="numeric" placeholder="0"
-                onChange={e => setFianza(e.target.value.replace(/[^0-9]/g, ''))} />
-            </div>
-            {Number(fianza) > 0 && (
-              <div style={{ display: 'flex', gap: 8 }}>
-                {(['efectivo', 'tarjeta', 'transferencia'] as const).map(m => (
-                  <Opt key={m} active={metodoFianza === m} onClick={() => setMetodoFianza(m)}>
-                    {m[0].toUpperCase() + m.slice(1)}
-                  </Opt>
-                ))}
-              </div>
-            )}
           </div>
 
           {/* ── Places ── */}

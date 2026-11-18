@@ -197,6 +197,7 @@ function PaginaAnexo({ r, firmaUrl, firmaCliente }: { r: ReservaContrato; firmaU
           <tr><td>Anticipo / apartado recibido{r.metodo_deposito ? ` (${metodo(r.metodo_deposito)})` : ''}</td><td>{money(anticipo)}</td></tr>
           <tr className="tot"><td>SALDO PENDIENTE AL ENTREGAR</td><td>{money(saldo)}</td></tr>
           <tr><td>Depósito en garantía (cláusula OCTAVA){r.metodo_fianza ? ` (${metodo(r.metodo_fianza)})` : ''}</td><td>{r.fianza ? money(r.fianza) : ' '}</td></tr>
+          {(r.fianza ?? 0) > 0 && saldo != null && <tr className="tot"><td>TOTAL A PAGAR AL RECIBIR EL VEHÍCULO (saldo + depósito en garantía)</td><td>{money(saldo + (r.fianza ?? 0))}</td></tr>}
         </tbody>
       </table>
 

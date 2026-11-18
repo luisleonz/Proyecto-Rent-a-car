@@ -664,6 +664,106 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
             </div>
           )}
 
+          {/* ── Discount ── */}
+          {showCalc && (
+            <div className="field">
+              <label className="field-l">Descuento <span style={{ color: 'var(--ink4)', fontWeight: 400 }}>(opcional)</span></label>
+              <div className="field-money" style={{ width: '100%' }}>
+                <span>$</span>
+                <input className="field-i" value={descuento}
+                  onChange={e => setDescuento(e.target.value.replace(/[^0-9]/g, ''))}
+                  inputMode="numeric" placeholder="0" />
+              </div>
+            </div>
+          )}
+
+          {/* ── Deposit ── */}
+          <div className="field">
+            <label className="field-l">Depósito de apartado</label>
+            <div style={{ display: 'flex', gap: 8, marginBottom: tieneDeposito ? 10 : 0 }}>
+              {(['No', 'Sí'] as const).map(opt => {
+                const active = opt === 'Sí' ? tieneDeposito : !tieneDeposito
+                return (
+                  <button key={opt} onClick={() => setTieneDeposito(opt === 'Sí')}
+                    style={{
+                      flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 13.5, fontWeight: 600,
+                      border: `1.5px solid ${active ? 'var(--primary)' : 'var(--border)'}`,
+                      background: active ? 'oklch(96% 0.04 155)' : 'var(--paper)',
+                      color: active ? 'var(--primary)' : 'var(--ink3)', cursor: 'pointer',
+                    }}>{opt}</button>
+                )
+              })}
+            </div>
+            {tieneDeposito && (
+              <>
+                <div className="field-money" style={{ width: '100%', marginBottom: 8 }}>
+                  <span>$</span>
+                  <input className="field-i" value={deposito}
+                    onChange={e => setDeposito(e.target.value.replace(/[^0-9]/g, ''))}
+                    inputMode="numeric" placeholder="Monto del depósito" />
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {(['efectivo', 'transferencia'] as const).map(m => (
+                    <button key={m} onClick={() => setMetodoDeposito(m)}
+                      style={{
+                        flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                        border: `1.5px solid ${metodoDeposito === m ? 'var(--primary)' : 'var(--border)'}`,
+                        background: metodoDeposito === m ? 'oklch(96% 0.04 155)' : 'var(--paper)',
+                        color: metodoDeposito === m ? 'var(--primary)' : 'var(--ink3)', cursor: 'pointer',
+                      }}>
+                      {m === 'efectivo' ? 'Efectivo' : 'Transferencia'}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* ── Coverage ── */}
+          <div className="field">
+            <label className="field-l">Cobertura</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Opt active={cobertura === 'basica'} onClick={() => setCobertura('basica')}>Básica (con deducible)</Opt>
+              <Opt active={cobertura === 'cero_deducible'} onClick={() => setCobertura('cero_deducible')}>Cero deducible</Opt>
+            </div>
+            {cobertura === 'cero_deducible' && (
+              <div className="field-money" style={{ width: '100%', marginTop: 8 }}>
+                <span>$</span>
+                <input className="field-i" value={ceroDiario} inputMode="numeric" placeholder="Costo por día"
+                  onChange={e => setCeroDiario(e.target.value.replace(/[^0-9]/g, ''))} />
+                <span style={{ fontSize: 12, color: 'var(--ink3)', paddingRight: 10 }}>/día</span>
+              </div>
+            )}
+          </div>
+
+          {/* ── Driver ── */}
+          <div className="field">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>
+              <input type="checkbox" checked={conChofer} onChange={e => setConChofer(e.target.checked)} />
+              Renta con chofer
+            </label>
+            {conChofer && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+                <input className="field-i" value={choferNombre} onChange={e => setChoferNombre(e.target.value)}
+                  placeholder="Nombre del chofer (opcional)" aria-label="Nombre del chofer" />
+                <div className="field-money" style={{ width: '100%' }}>
+                  <span>$</span>
+                  <input className="field-i" value={choferCosto} inputMode="decimal" placeholder="Cobro por el chofer" aria-label="Cobro por el chofer"
+                    onChange={e => setChoferCosto(e.target.value.replace(/[^0-9.]/g, ''))} />
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--ink3)', lineHeight: 1.45 }}>
+                  Total por el chofer en toda la renta (cambia según el chofer, los días y las festividades). Se suma al total{conIva ? ' y lleva IVA' : ''}.
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Other services, by hand ── */}
+          <div className="field">
+            <label className="field-l">Otros conceptos <span style={{ color: 'var(--ink4)', fontWeight: 400 }}>(opcional: servicios que se cobran en ocasiones)</span></label>
+            <EditorServicios filas={servicios} onChange={setServicios} />
+          </div>
+
           {/* ── Security deposit (cláusula OCTAVA) ── */}
           <div className="field">
             <label className="field-l">
@@ -780,106 +880,6 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
               </div>
             )
           })()}
-
-          {/* ── Discount ── */}
-          {showCalc && (
-            <div className="field">
-              <label className="field-l">Descuento <span style={{ color: 'var(--ink4)', fontWeight: 400 }}>(opcional)</span></label>
-              <div className="field-money" style={{ width: '100%' }}>
-                <span>$</span>
-                <input className="field-i" value={descuento}
-                  onChange={e => setDescuento(e.target.value.replace(/[^0-9]/g, ''))}
-                  inputMode="numeric" placeholder="0" />
-              </div>
-            </div>
-          )}
-
-          {/* ── Deposit ── */}
-          <div className="field">
-            <label className="field-l">Depósito de apartado</label>
-            <div style={{ display: 'flex', gap: 8, marginBottom: tieneDeposito ? 10 : 0 }}>
-              {(['No', 'Sí'] as const).map(opt => {
-                const active = opt === 'Sí' ? tieneDeposito : !tieneDeposito
-                return (
-                  <button key={opt} onClick={() => setTieneDeposito(opt === 'Sí')}
-                    style={{
-                      flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 13.5, fontWeight: 600,
-                      border: `1.5px solid ${active ? 'var(--primary)' : 'var(--border)'}`,
-                      background: active ? 'oklch(96% 0.04 155)' : 'var(--paper)',
-                      color: active ? 'var(--primary)' : 'var(--ink3)', cursor: 'pointer',
-                    }}>{opt}</button>
-                )
-              })}
-            </div>
-            {tieneDeposito && (
-              <>
-                <div className="field-money" style={{ width: '100%', marginBottom: 8 }}>
-                  <span>$</span>
-                  <input className="field-i" value={deposito}
-                    onChange={e => setDeposito(e.target.value.replace(/[^0-9]/g, ''))}
-                    inputMode="numeric" placeholder="Monto del depósito" />
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {(['efectivo', 'transferencia'] as const).map(m => (
-                    <button key={m} onClick={() => setMetodoDeposito(m)}
-                      style={{
-                        flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 13, fontWeight: 600,
-                        border: `1.5px solid ${metodoDeposito === m ? 'var(--primary)' : 'var(--border)'}`,
-                        background: metodoDeposito === m ? 'oklch(96% 0.04 155)' : 'var(--paper)',
-                        color: metodoDeposito === m ? 'var(--primary)' : 'var(--ink3)', cursor: 'pointer',
-                      }}>
-                      {m === 'efectivo' ? 'Efectivo' : 'Transferencia'}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* ── Coverage ── */}
-          <div className="field">
-            <label className="field-l">Cobertura</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Opt active={cobertura === 'basica'} onClick={() => setCobertura('basica')}>Básica (con deducible)</Opt>
-              <Opt active={cobertura === 'cero_deducible'} onClick={() => setCobertura('cero_deducible')}>Cero deducible</Opt>
-            </div>
-            {cobertura === 'cero_deducible' && (
-              <div className="field-money" style={{ width: '100%', marginTop: 8 }}>
-                <span>$</span>
-                <input className="field-i" value={ceroDiario} inputMode="numeric" placeholder="Costo por día"
-                  onChange={e => setCeroDiario(e.target.value.replace(/[^0-9]/g, ''))} />
-                <span style={{ fontSize: 12, color: 'var(--ink3)', paddingRight: 10 }}>/día</span>
-              </div>
-            )}
-          </div>
-
-          {/* ── Driver ── */}
-          <div className="field">
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>
-              <input type="checkbox" checked={conChofer} onChange={e => setConChofer(e.target.checked)} />
-              Renta con chofer
-            </label>
-            {conChofer && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-                <input className="field-i" value={choferNombre} onChange={e => setChoferNombre(e.target.value)}
-                  placeholder="Nombre del chofer (opcional)" aria-label="Nombre del chofer" />
-                <div className="field-money" style={{ width: '100%' }}>
-                  <span>$</span>
-                  <input className="field-i" value={choferCosto} inputMode="decimal" placeholder="Cobro por el chofer" aria-label="Cobro por el chofer"
-                    onChange={e => setChoferCosto(e.target.value.replace(/[^0-9.]/g, ''))} />
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--ink3)', lineHeight: 1.45 }}>
-                  Total por el chofer en toda la renta (cambia según el chofer, los días y las festividades). Se suma al total{conIva ? ' y lleva IVA' : ''}.
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* ── Other services, by hand ── */}
-          <div className="field">
-            <label className="field-l">Otros conceptos <span style={{ color: 'var(--ink4)', fontWeight: 400 }}>(opcional: servicios que se cobran en ocasiones)</span></label>
-            <EditorServicios filas={servicios} onChange={setServicios} />
-          </div>
 
           {/* ── Places ── */}
           <div style={{ display: 'flex', gap: 10 }}>

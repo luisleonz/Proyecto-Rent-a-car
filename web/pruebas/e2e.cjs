@@ -155,6 +155,10 @@ async function otraSesion(ctx, b) {
     const yGarantia = (await p.locator('.qpanel .field-l:has-text("Depósito en garantía")').boundingBox()).y
     const yTotal = (await p.locator('.qpanel span:text-is("Total a pagar")').boundingBox()).y
     ok(yGarantia < yTotal, 'El campo del depósito en garantía está arriba del resumen')
+    const y = async sel => (await p.locator(sel).first().boundingBox()).y
+    const yDesc = await y('.qpanel .field-l:has-text("Descuento")'), yChofer = await y('.qpanel label:has-text("Renta con chofer")')
+    const yOtros = await y('.qpanel .field-l:has-text("Otros conceptos")'), yLugar = await y('.qpanel .field-l:has-text("Lugar de entrega")')
+    ok(yDesc < yTotal && yChofer < yTotal && yOtros < yTotal && yTotal < yLugar, 'Los totales van hasta abajo: después de descuento, chofer y conceptos, antes del lugar de entrega')
     await p.click('.qpanel-foot button:has-text("Crear reserva")'); await p.waitForTimeout(1200)
     const r = b.t.reservas.find(x => x.vehiculo_id === b.v3.id && x.fecha_entrega === d(20))
     ok(r, 'La reserva quedó guardada')

@@ -383,12 +383,14 @@ export const CONTRATO_CSS = `
 .ct-lugar { margin-top: auto; padding-top: 10px; font-size: 8.6pt; }
 
 @media print {
-  @page { size: letter; margin: 0; }
+  /* Printers cannot print to the very edge: a safe margin keeps each sheet whole (no drift onto the next one) */
+  @page { size: letter; margin: 0.3in; }
   html, body, #root { background: #fff !important; height: auto !important; }
   .ct-screen { background: #fff; padding: 0; }
   .ct-toolbar, .ct-msg { display: none !important; }
   .ct-root { display: block; padding: 0; }
-  .ct-page { box-shadow: none; break-after: page; page-break-after: always; }
+  .ct-page { box-shadow: none; break-after: page; page-break-after: always; break-inside: avoid;
+    width: 7.9in; min-height: 0; height: 10.38in; padding: 0.1in 0.15in; }
   .ct-page:last-child { break-after: auto; page-break-after: auto; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }

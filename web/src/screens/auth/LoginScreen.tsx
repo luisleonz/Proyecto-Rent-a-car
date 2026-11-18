@@ -34,7 +34,7 @@ export default function LoginScreen() {
 
   return (
     <div style={{
-      minHeight: '100dvh',
+      minHeight: '100vh',
       background: 'var(--paper)',
       display: 'flex',
       alignItems: 'center',

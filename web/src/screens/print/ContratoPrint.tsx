@@ -324,7 +324,7 @@ export default function ContratoPrint() {
 }
 
 export const CONTRATO_CSS = `
-.ct-screen { min-height: 100dvh; background: #e9e9e6; padding-bottom: 40px; }
+.ct-screen { min-height: 100vh; background: #e9e9e6; padding-bottom: 40px; }
 .ct-toolbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
   padding: 12px 16px; background: var(--card); border-bottom: 1px solid var(--card-line); }
 .ct-toolbar-docs { display: flex; gap: 14px; flex-wrap: wrap; flex: 1; font-size: 13px; color: var(--ink2); }

@@ -193,7 +193,7 @@ function AgregarClientePanel({ open, onClose, onCreated }: {
           </div>
 
           {error && (
-            <div style={{ fontSize: 13, color: '#c0392b', padding: '8px 12px', borderRadius: 8, background: 'oklch(96% 0.03 20)' }}>
+            <div style={{ fontSize: 13, color: '#c0392b', padding: '8px 12px', borderRadius: 8, background: '#ffeae9' }}>
               {error}
             </div>
           )}
@@ -411,7 +411,7 @@ function ClienteDetail({ cliente, onNewReserva, onCotizar, onUpdated }: {
             </div>
           ))}
           {editError && (
-            <div style={{ fontSize: 12.5, color: '#c0392b', padding: '6px 10px', borderRadius: 7, background: 'oklch(96% 0.03 20)' }}>
+            <div style={{ fontSize: 12.5, color: '#c0392b', padding: '6px 10px', borderRadius: 7, background: '#ffeae9' }}>
               {editError}
             </div>
           )}

@@ -36,7 +36,7 @@ const DevolucionScreen      = lazy(() => import('./screens/flows/DevolucionScree
 const DisponiblesScreen     = lazy(() => import('./screens/publico/DisponiblesScreen'))
 
 const Cargando = () => (
-  <div style={{ minHeight: '50dvh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>
+  <div style={{ minHeight: '50vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>
 )
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -44,7 +44,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   const [config, setConfig] = useState(false)
   useEffect(() => { if (tieneAcceso && !config) cargarConfig().catch(() => null).finally(() => setConfig(true)) }, [tieneAcceso])
   const espera = (
-    <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--paper)' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--paper)' }}>
       <div className="spinner" />
     </div>
   )
@@ -62,7 +62,7 @@ function SinAcceso() {
   const { currentEmail, signOut } = useAuth()
   const [revisando, setRevisando] = useState(false)
   return (
-    <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--paper)', padding: 16 }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--paper)', padding: 16 }}>
       <div className="card" style={{ maxWidth: 420, padding: 32, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <h1 className="h-display" style={{ fontSize: 26 }}>Tu cuenta aún no tiene acceso</h1>
         <p style={{ color: 'var(--ink2)', margin: 0, lineHeight: 1.5 }}>

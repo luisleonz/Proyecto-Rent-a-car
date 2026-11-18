@@ -147,7 +147,7 @@ export default function EditProfileScreen() {
 
         {/* Error */}
         {error && (
-          <div style={{ fontSize: 13, color: '#c0392b', padding: '8px 12px', borderRadius: 8, background: 'oklch(96% 0.03 20)' }}>
+          <div style={{ fontSize: 13, color: '#c0392b', padding: '8px 12px', borderRadius: 8, background: '#ffeae9' }}>
             {error}
           </div>
         )}

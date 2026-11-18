@@ -430,7 +430,7 @@ function AgregarPanel({ open, onClose, onCreated, fleet }: AgregarPanelProps) {
           <div style={{ fontSize: 12, color: 'var(--ink3)' }}>Después de agregarlo podrás subir sus fotos y completar sus datos.</div>
 
           {error && (
-            <div style={{ fontSize: 13, color: '#c0392b', padding: '8px 12px', borderRadius: 8, background: 'oklch(96% 0.03 20)' }}>
+            <div style={{ fontSize: 13, color: '#c0392b', padding: '8px 12px', borderRadius: 8, background: '#ffeae9' }}>
               {error}
             </div>
           )}

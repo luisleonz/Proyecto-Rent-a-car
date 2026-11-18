@@ -492,7 +492,7 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
                 border: '1.5px solid var(--primary)', borderRadius: 10,
-                background: 'oklch(96% 0.04 155)',
+                background: '#defae6',
               }}>
                 <div className="avatar accent" style={{ width: 34, height: 34, fontSize: 12, flexShrink: 0 }}>
                   {inits(selectedCliente.nombre)}
@@ -634,7 +634,7 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
                           display: 'flex', alignItems: 'center', gap: 12,
                           padding: '10px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
                           border: `1.5px solid ${sel ? 'var(--primary)' : 'var(--border)'}`,
-                          background: sel ? 'oklch(96% 0.04 155)' : 'var(--paper)',
+                          background: sel ? '#defae6' : 'var(--paper)',
                         }}>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--ink)' }}>{v.modelo}</div>
@@ -642,8 +642,8 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
                         </div>
                         {v.returnsToday && (
                           <div style={{
-                            fontSize: 11, fontWeight: 600, color: 'oklch(55% 0.14 60)',
-                            background: 'oklch(96% 0.06 60)', border: '1px solid oklch(82% 0.12 60)',
+                            fontSize: 11, fontWeight: 600, color: '#ab5900',
+                            background: '#ffe9ca', border: '1px solid #fdb171',
                             borderRadius: 6, padding: '2px 7px', flexShrink: 0, whiteSpace: 'nowrap',
                           }}>
                             Devuelto hoy
@@ -688,7 +688,7 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
                     style={{
                       flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 13.5, fontWeight: 600,
                       border: `1.5px solid ${active ? 'var(--primary)' : 'var(--border)'}`,
-                      background: active ? 'oklch(96% 0.04 155)' : 'var(--paper)',
+                      background: active ? '#defae6' : 'var(--paper)',
                       color: active ? 'var(--primary)' : 'var(--ink3)', cursor: 'pointer',
                     }}>{opt}</button>
                 )
@@ -708,7 +708,7 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
                       style={{
                         flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 13, fontWeight: 600,
                         border: `1.5px solid ${metodoDeposito === m ? 'var(--primary)' : 'var(--border)'}`,
-                        background: metodoDeposito === m ? 'oklch(96% 0.04 155)' : 'var(--paper)',
+                        background: metodoDeposito === m ? '#defae6' : 'var(--paper)',
                         color: metodoDeposito === m ? 'var(--primary)' : 'var(--ink3)', cursor: 'pointer',
                       }}>
                       {m === 'efectivo' ? 'Efectivo' : 'Transferencia'}
@@ -865,13 +865,13 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
                     <div style={{
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                       padding: '9px 12px', borderRadius: 8,
-                      background: saldo === 0 ? 'oklch(95% 0.06 155)' : 'oklch(96% 0.06 60)',
-                      border: `1px solid ${saldo === 0 ? 'oklch(82% 0.1 155)' : 'oklch(82% 0.12 60)'}`,
+                      background: saldo === 0 ? '#d0fbdd' : '#ffe9ca',
+                      border: `1px solid ${saldo === 0 ? '#8ed8a8' : '#fdb171'}`,
                     }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: saldo === 0 ? 'var(--primary)' : 'oklch(0.45 0.14 60)' }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: saldo === 0 ? 'var(--primary)' : '#8a3b00' }}>
                         {saldo === 0 ? 'Liquidado' : garantia > 0 ? 'Por pagar al recoger el auto' : 'Saldo pendiente al entregar'}
                       </span>
-                      <span style={{ fontSize: 15, fontWeight: 800, color: saldo === 0 ? 'var(--primary)' : 'oklch(0.45 0.14 60)' }}>
+                      <span style={{ fontSize: 15, fontWeight: 800, color: saldo === 0 ? 'var(--primary)' : '#8a3b00' }}>
                         {saldo === 0 ? '✓ $0' : `$${fmt(saldo)}`}
                       </span>
                     </div>
@@ -896,7 +896,7 @@ function NuevaReservaModal({ open, onClose, onCreated, prefilledCliente, prefill
 
           {/* Error */}
           {error && (
-            <div style={{ background: 'oklch(96% 0.04 25)', border: '1px solid oklch(85% 0.1 25)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: 'oklch(40% 0.15 25)' }}>
+            <div style={{ background: '#ffe8e4', border: '1px solid #ffb4ad', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: '#861118' }}>
               {error}
             </div>
           )}
@@ -1134,7 +1134,7 @@ const RS_CSS = `
 .rs-name { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rs-sub { font-size: 12px; color: var(--ink3); white-space: nowrap; }
 .rs-car { min-width: 0; }
-.rs-plate { display: inline-block; margin-top: 3px; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 5px; background: oklch(0.93 0.09 95); color: var(--ink); }
+.rs-plate { display: inline-block; margin-top: 3px; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 5px; background: #fae8a2; color: var(--ink); }
 .rs-money { text-align: right; }
 .rs-due { font-size: 11.5px; font-weight: 600; color: var(--warn-ink); }
 .rs-paid { font-size: 11.5px; font-weight: 600; color: var(--primary); }

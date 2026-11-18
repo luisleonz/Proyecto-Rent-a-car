@@ -220,6 +220,28 @@ async function otraSesion(ctx, b) {
     const rep = await texto(p)
     ok(rep.includes('Chofer y otros conceptos') && rep.includes('Silla para bebé') && rep.includes('1 vez'), 'Reportes resume chofer y conceptos usados')
   })
+  await escenario('Reservas', 'Cambiar el vehículo de una reserva: recalcula o mantiene el precio', async ({ p, b, ok }) => {
+    // r4: Pedro, MAZDA 2 #8 ($1,500/día), d(10)→d(12), total $3,000 sin IVA
+    await entrar(p); await ir(p, `/app/reservations?res=${b.r4.id}`); await p.waitForTimeout(600)
+    await p.click('.qpanel.open button:has-text("Cambiar vehículo")'); await p.waitForTimeout(700)
+    const t = await panel(p).innerText()
+    ok(t.includes('KIA K3') && t.includes('+$400') && !t.includes('VOLKSWAGEN CRAFTER'), 'Ofrece autos libres con la diferencia de precio (KIA +$400) y no el que está en taller')
+    await p.click('.qpanel.open button:has-text("KIA K3")')
+    ok((await panel(p).innerText()).includes('$3,000 → $3,400'), 'Muestra el total nuevo')
+    await p.click('.qpanel.open button:has-text("Confirmar cambio")')
+    ok((await panel(p).innerText()).includes('Falta el motivo'), 'Pide el motivo')
+    await p.fill('input[aria-label="Motivo del cambio de vehículo"]', 'El Mazda no regresó a tiempo')
+    await p.click('.qpanel.open button:has-text("Confirmar cambio")'); await p.waitForTimeout(900)
+    ok(b.r4.vehiculo_id === b.v3.id && b.r4.total === 3400, `Reserva pasada al KIA con total $3,400 (es ${b.r4.total})`)
+    ok(ultimoLog(b, 'cambiar_vehiculo')?.descripcion.includes('El Mazda no regresó a tiempo'), 'Queda en la actividad con el motivo')
+    // Back to a cheaper/equal car keeping the price
+    await p.click('.qpanel.open button:has-text("Cambiar vehículo")'); await p.waitForTimeout(700)
+    await p.click('.qpanel.open button:has-text("MAZDA 2 #8")')
+    await p.click('text=Mantener el precio actual')
+    await p.fill('input[aria-label="Motivo del cambio de vehículo"]', 'Regresó el Mazda')
+    await p.click('.qpanel.open button:has-text("Confirmar cambio")'); await p.waitForTimeout(900)
+    ok(b.r4.vehiculo_id === b.v1.id && b.r4.total === 3400, 'Con "mantener precio" el total no cambia')
+  })
   await escenario('Reservas', 'Vehículo ocupado no se ofrece; devuelto el mismo día se marca', async ({ p, ok }) => {
     await entrar(p); await ir(p, '/app/reservations')
     await p.click('button:has-text("Nueva reserva")')

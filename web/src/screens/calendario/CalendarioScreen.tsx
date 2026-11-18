@@ -257,7 +257,7 @@ export const FC_CSS = `
 .fc-legend i.reservado { background: var(--primary-soft); border: 1px solid var(--primary-line); }
 .fc-legend i.devuelto { background: var(--card); border: 1px solid var(--ink4); }
 .fc-legend i.vencido { background: var(--danger); }
-.fc-legend i.hoy { background: oklch(0.93 0.09 95); border: 1px solid oklch(0.82 0.13 90); }
+.fc-legend i.hoy { background: #fae8a2; border: 1px solid #e5c057; }
 
 .fc-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .fc-grid { display: flex; flex-direction: column; }
@@ -276,11 +276,11 @@ export const FC_CSS = `
 .fc-dot.taller { background: var(--danger); }
 .fc-day { grid-row: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10.5px; color: var(--ink3); border-left: 1px solid var(--hairline); line-height: 1.25; }
 .fc-day b { font-size: 13px; color: var(--ink); }
-.fc-day.finde { background: oklch(0.955 0.006 80); }
-.fc-day.hoy { background: oklch(0.93 0.09 95); color: var(--ink); }
+.fc-day.finde { background: #f2f0ec; }
+.fc-day.hoy { background: #fae8a2; color: var(--ink); }
 .fc-cell { grid-row: 1; border: 0; border-left: 1px solid var(--hairline); background: transparent; cursor: pointer; padding: 0; }
 .fc-cell:hover { background: var(--primary-soft); }
-.fc-cell.hoy { background: oklch(0.97 0.05 95); }
+.fc-cell.hoy { background: #fff6d0; }
 .fc-track { grid-row: 1; position: relative; pointer-events: none; }
 .fc-bar { pointer-events: auto; position: absolute; top: 50%; transform: translateY(-50%); height: 28px; margin-left: 1.5px; border-radius: 7px;
   font: inherit; font-size: 11.5px; font-weight: 600; text-align: left; padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; border: 1px solid transparent; }

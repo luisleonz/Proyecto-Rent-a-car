@@ -50,7 +50,7 @@ export default function CrearContrasenaScreen() {
   }
 
   return (
-    <div style={{ minHeight: '100dvh', background: 'var(--paper)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--paper)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px' }}>
       <div style={{ width: '100%', maxWidth: 420, background: 'var(--card)', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-pop)', padding: '40px 32px' }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 22 }}>
           <div style={{ width: 64, height: 64, borderRadius: 20, background: 'var(--primary-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

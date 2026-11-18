@@ -31,7 +31,7 @@ export default function DisponiblesScreen() {
     : 'Hola, quiero información para rentar un auto.'
 
   return (
-    <div style={{ minHeight: '100dvh', background: 'var(--paper)' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--paper)' }}>
       <header style={{ background: '#fff', borderBottom: '1px solid var(--card-line)' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
           <img src="/docs/logo-lucianos.png" alt={EMPRESA.nombreComercial} style={{ height: 52 }} />

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X, Check, Clock, Printer, Key, CornerDownLeft, Ban, Archive, MessageCircle, Plus, Pencil, AlertTriangle } from 'lucide-react'
+import { X, Check, Clock, Printer, Key, CornerDownLeft, Ban, Archive, MessageCircle, Plus, Pencil, AlertTriangle, Repeat } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../state/auth'
 import { insertLog } from '../../lib/log'
@@ -12,6 +12,7 @@ import type { ReservaConDetalle, ReservaStatus } from '../../lib/database.types'
 import { EMPRESA, ivaDe } from '../../lib/empresa'
 import { leerFilas, totalServicios, aFilas, type FilaServicio } from '../../lib/servicios'
 import EditorServicios from '../../components/EditorServicios'
+import CambiarVehiculo from './CambiarVehiculo'
 
 const db = supabase as any // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -46,6 +47,7 @@ export default function ReservaPanel({ res, open, onClose, onChanged }: {
   const [notaPago, setNotaPago] = useState('')
   // edit form
   const [editing, setEditing] = useState(false)
+  const [cambioAuto, setCambioAuto] = useState(false)
   const [ed, setEd] = useState({ fecha_entrega: '', hora_entrega: '', fecha_devolucion: '', hora_devolucion: '', total: '', notas: '', motivo: '',
     con_chofer: false, chofer_nombre: '', chofer_costo: '', servicios: [] as FilaServicio[] })
 
@@ -62,7 +64,7 @@ export default function ReservaPanel({ res, open, onClose, onChanged }: {
 
   useEffect(() => {
     if (!res) return
-    setAviso(null); setPagoOpen(false); setEditing(false); setPagos([]); setFotos({})
+    setAviso(null); setPagoOpen(false); setEditing(false); setCambioAuto(false); setPagos([]); setFotos({})
     cargarPagos()
     const rutas = [...(res.fotos_entrega ?? []), ...(res.fotos_devolucion ?? []), ...(res.firma_cliente ? [res.firma_cliente] : [])]
     if (rutas.length) urlsFirmadas(rutas).then(setFotos)
@@ -226,7 +228,10 @@ export default function ReservaPanel({ res, open, onClose, onChanged }: {
                 {isAdmin && res.fecha_devolucion < hoy && (
                   <button className="btn sm" style={{ flex: 1 }} onClick={cerrarComoDevuelta} disabled={working}><Archive size={14} />Ya regresó (cerrar)</button>
                 )}
+                {!cambioAuto && <button className="btn sm" style={{ flex: 1 }} onClick={() => { setCambioAuto(true); setAviso(null) }}><Repeat size={14} />Cambiar vehículo</button>}
               </div>
+              {cambioAuto && <CambiarVehiculo res={res} onCancelar={() => setCambioAuto(false)}
+                onHecho={t => { setCambioAuto(false); setAviso({ ok: true, t }); onChanged() }} />}
             </div>
           )}
 

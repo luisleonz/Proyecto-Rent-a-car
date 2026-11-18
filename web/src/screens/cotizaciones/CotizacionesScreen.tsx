@@ -360,10 +360,10 @@ function QuoteDetailPanel({ cot, open, onClose, onStatusChange, onConvert }: Pan
               )}
 
               {cot.status === 'convertida' && (
-                <div style={{ background: 'oklch(0.95 0.03 250)', border: '1px solid oklch(0.80 0.08 250)', borderRadius: 10, padding: '12px 14px' }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'oklch(0.42 0.10 250)' }}>✓ Convertida a reserva</div>
+                <div style={{ background: '#e0f1ff', border: '1px solid #97c2f0', borderRadius: 10, padding: '12px 14px' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#194f81' }}>✓ Convertida a reserva</div>
                   {cot.reserva_id && (
-                    <div style={{ fontSize: 12, color: 'oklch(0.55 0.08 250)', marginTop: 3 }}>ID: {cot.reserva_id}</div>
+                    <div style={{ fontSize: 12, color: '#4c759f', marginTop: 3 }}>ID: {cot.reserva_id}</div>
                   )}
                 </div>
               )}
@@ -458,7 +458,7 @@ function QuoteDetailPanel({ cot, open, onClose, onStatusChange, onConvert }: Pan
 
                     {/* Error */}
                     {convertError && (
-                      <div style={{ fontSize: 12, color: '#c0392b', padding: '7px 10px', borderRadius: 7, background: 'oklch(96% 0.03 20)' }}>
+                      <div style={{ fontSize: 12, color: '#c0392b', padding: '7px 10px', borderRadius: 7, background: '#ffeae9' }}>
                         {convertError}
                       </div>
                     )}
@@ -754,7 +754,7 @@ export default function CotizacionesScreen() {
   const pipeline = [
     { tab: 'Enviadas',    label: 'Esperando respuesta', ...etapa('enviada'),    tone: 'var(--warn)' },
     { tab: 'Aceptadas',   label: 'Aceptadas',           ...etapa('aceptada'),   tone: 'var(--primary)' },
-    { tab: 'Convertidas', label: 'Convertidas a reserva', ...etapa('convertida'), tone: 'oklch(0.50 0.12 250)' },
+    { tab: 'Convertidas', label: 'Convertidas a reserva', ...etapa('convertida'), tone: '#2266a4' },
     { tab: 'Vencidas',    label: 'Vencidas',            ...etapa('vencida'),    tone: 'var(--ink4)' },
   ]
   const decididas  = cotizaciones.filter(c => c.status !== 'enviada').length

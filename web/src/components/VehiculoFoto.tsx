@@ -1,12 +1,12 @@
 import { useState } from 'react'
 
 export const TONES: Record<string, [string, string]> = {
-  blue:  ['oklch(0.62 0.10 245)', 'oklch(0.90 0.04 245)'],
-  slate: ['oklch(0.55 0.02 240)', 'oklch(0.92 0.01 240)'],
-  rose:  ['oklch(0.62 0.13 20)',  'oklch(0.92 0.04 20)'],
-  ink:   ['oklch(0.40 0.01 240)', 'oklch(0.88 0.01 240)'],
-  sand:  ['oklch(0.70 0.06 75)',  'oklch(0.93 0.03 80)'],
-  white: ['oklch(0.72 0.01 240)', 'oklch(0.95 0.005 240)'],
+  blue:  ['#4e8cbe', '#c9e2f7'],
+  slate: ['#67737c', '#dfe6eb'],
+  rose:  ['#c86265',  '#fedbda'],
+  ink:   ['#43494d', '#d2d8dd'],
+  sand:  ['#b59a75',  '#f3e6d2'],
+  white: ['#9fa6aa', '#eceff1'],
 }
 
 export function CarIlustracion({ tono, width = '70%' }: { tono?: string | null; width?: string }) {
@@ -20,9 +20,9 @@ export function CarIlustracion({ tono, width = '70%' }: { tono?: string | null; 
       <path d="M58 42 L82 42 L74 22 Z" fill={glass} />
       {[54, 154].map(cx => (
         <g key={cx}>
-          <circle cx={cx} cy="64" r="14" fill="oklch(0.18 0.005 240)" />
-          <circle cx={cx} cy="64" r="7" fill="oklch(0.40 0.008 240)" />
-          <circle cx={cx} cy="64" r="3" fill="oklch(0.62 0.008 240)" />
+          <circle cx={cx} cy="64" r="14" fill="#101214" />
+          <circle cx={cx} cy="64" r="7" fill="#44484c" />
+          <circle cx={cx} cy="64" r="3" fill="#82878b" />
         </g>
       ))}
     </svg>
